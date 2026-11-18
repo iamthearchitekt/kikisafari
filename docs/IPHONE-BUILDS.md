@@ -76,6 +76,29 @@ When the build reaches App Store Connect, it shows under **TestFlight** after Ap
 minutes). Add yourself as an **internal tester**. Install the **TestFlight** app on the iPhone, accept the invite and
 install KIKI SAFARI.
 
+## 7. Playing your test build
+
+1. Open KIKI SAFARI from the home screen and tap **Play**.
+2. Allow the **camera**, and allow **location "While Using the App"**. Location is only used while the game is open.
+3. **At home:** the first good GPS fix pins your test Rune Circle about 7 m in front of you, with a supply stop beside
+   it and a Kiki wandering nearby. Turn around slowly and look for the column of purple light.
+   - To move the circle: triple-tap the top-right corner (over the Rune Stone count) and choose
+     **Move test Rune Circle here**.
+4. **Catch:** walk within 40 m of a Kiki and tap it. Point the phone at the floor until Kiki pops up. Then flick the
+   Rune Stone up from the bottom of the screen, or use **Tap to throw**.
+5. **Refill:** tap a supply stop within 40 m for +5 Rune Stones. A stop restocks after 5 minutes.
+6. **Rune Circle:** once you've caught a Kiki, tap the circle and choose **Begin the Spiral Rite**. Tap as each ring
+   lands on the rune.
+7. **Map:** tap **Map** for your real streets, with stops and circles at real landmarks nearby. Tap **Camera** to go
+   back.
+8. **Handy testing switches** in the tuning panel:
+   - Force night, to see Moonbeam Kiki
+   - Force Portal Surge
+   - +30 stones
+   - Throw strength, aim assist, catch odds and more
+
+Safety: watch where you're going, and don't play while driving (the game also locks itself above about 30 km/h).
+
 ## Keeping round trips rare
 
 - Do daily work in the Unity editor. Use XR Simulation for AR, or press Play for the meadow stage.

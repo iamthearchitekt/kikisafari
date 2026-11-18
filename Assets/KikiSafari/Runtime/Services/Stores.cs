@@ -89,6 +89,13 @@ namespace KikiSafari
             set { PlayerPrefs.SetInt("kiki.forceSurge", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
+        /// <summary>The single home test Rune Circle (on by default while testing).</summary>
+        public static bool HomeCircle
+        {
+            get => PlayerPrefs.GetInt("kiki.homeCircle", 1) == 1;
+            set { PlayerPrefs.SetInt("kiki.homeCircle", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         public static bool ShowOverlay
         {
             get => PlayerPrefs.GetInt("kiki.debugOverlay", 0) == 1;

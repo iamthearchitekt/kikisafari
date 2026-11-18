@@ -14,5 +14,6 @@
   <ItemGroup>
     <Compile Include="../../Assets/KikiSafari/Core/**/*.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="../../Assets/KikiSafari/Tests/EditMode/OsmFixture.cs" />
   </ItemGroup>
 </Project>

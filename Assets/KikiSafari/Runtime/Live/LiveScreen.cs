@@ -18,6 +18,9 @@ namespace KikiSafari
         DeviceLocation _loc;
         LiveHud _hud;
         Transform _worldRoot;
+        OsmLoader _osm;
+        StreetMapView _map;
+        bool _mapMode;
         readonly Dictionary<string, WorldView> _views = new Dictionary<string, WorldView>();
         List<WorldThing> _things = new List<WorldThing>();
         float _nextPlan;
@@ -43,6 +46,9 @@ namespace KikiSafari
             s._game = game; s._stage = stage; s._loc = loc;
             s._worldRoot = new GameObject("LiveWorld").transform;
             s._worldRoot.SetParent(go.transform, false);
+            s._osm = go.AddComponent<OsmLoader>();
+            s._map = StreetMapView.Make(go.transform, s, game);
+            s._osm.Loaded += (cell, area) => s._map.AddArea(cell, area);
             s._hud = LiveHud.Make(go.transform, game, s);
             s.Activate();
             return s;
@@ -56,17 +62,53 @@ namespace KikiSafari
 
         void Activate()
         {
-            if (_stage is ARStage ar) { if (!ar.Active) ar.SetActive(true); ar.SetOcclusion(false); }
-            else _stage.SetActive(true);
+            if (_mapMode)
+            {
+                // Map mode: camera off to save battery.
+                if (_stage is ARStage a) { if (a.Active) a.SetActive(false); }
+                else _stage.SetActive(false);
+                _worldRoot.gameObject.SetActive(false);
+                _map.Show(true, _loc.Heading);
+            }
+            else
+            {
+                _map.Show(false, _loc.Heading);
+                if (_stage is ARStage ar) { if (!ar.Active) ar.SetActive(true); ar.SetOcclusion(false); }
+                else _stage.SetActive(true);
+                _worldRoot.gameObject.SetActive(true);
+                _anchored = false; _aligned = false; // re-anchor AR to GPS after the camera restarts
+            }
+            _hud.SetMapMode(_mapMode);
             _nextPlan = 0;
             _hud.SetStones(_game.Progress.Stones);
         }
+
+        public bool MapMode => _mapMode;
+
+        public void ToggleMap()
+        {
+            _mapMode = !_mapMode;
+            Activate();
+        }
+
+        public bool HudBlocks(Vector2 screen) => _hud.IsOverUi(screen);
+
+        static readonly Dictionary<string, WorldView> NoViews = new Dictionary<string, WorldView>();
 
         void Update()
         {
             if (!_loc.Ready)
             {
                 _hud.SetStatus(_loc.Problem ?? "Finding where you are…");
+                return;
+            }
+
+            if (_mapMode)
+            {
+                if (Time.time >= _nextPlan) Plan();
+                _map.Tick(Me, _loc.Heading, _things);
+                _hud.Tick(_map.Camera, _things, NoViews, _loc);
+                _hud.SetStatus(StatusText());
                 return;
             }
 
@@ -89,8 +131,9 @@ namespace KikiSafari
         string StatusText()
         {
             if (_loc.SpeedLocked) return MovementGuard.MovingFastText;
+            if (_mapMode && !_osm.Data.Covers(Me)) return _osm.Problem ?? "Loading the map…";
             if (!_loc.Simulated && _loc.AccuracyMeters > MovementGuard.MaxAccuracyMeters) return "Weak GPS. Things may wander a bit.";
-            if (_stage is ARStage ar && !ar.Tracking) return ar.Hint ?? "Waking up the camera…";
+            if (!_mapMode && _stage is ARStage ar && !ar.Tracking) return ar.Hint ?? "Waking up the camera…";
             return null;
         }
 
@@ -155,7 +198,7 @@ namespace KikiSafari
         {
             get
             {
-                if (!_stage.IsAR || !_anchored) return _loc.Fix;
+                if (_mapMode || !_stage.IsAR || !_anchored) return _loc.Fix;
                 var d = Quaternion.Euler(0, -_northYaw, 0) * (Flat(Cam.transform.position) - _anchorAR);
                 return Geo.FromLocal(_anchorGeo, d.x, d.z);
             }
@@ -171,7 +214,7 @@ namespace KikiSafari
         {
             get
             {
-                if (TestCircleStore.TryGet(out var where)) return new TestCircle { Where = where };
+                if (DebugFlags.HomeCircle && TestCircleStore.TryGet(out var where)) return new TestCircle { Where = where };
                 return null;
             }
         }
@@ -180,15 +223,17 @@ namespace KikiSafari
         {
             _nextPlan = Time.time + 1f;
             var me = Me;
-            if (!TestCircleStore.TryGet(out _) && (_loc.Simulated || _loc.AccuracyMeters <= 35))
+            _osm.Need(me);
+            if (DebugFlags.HomeCircle && !TestCircleStore.TryGet(out _) && (_loc.Simulated || _loc.AccuracyMeters <= 35))
             {
                 TestCircleStore.PinInFront(me, _loc.Heading);
                 _hud.Toast("Your test Rune Circle is pinned right here!");
             }
             long now = Util.UnixNow();
             if (DebugFlags.ForceSurge && !PortalSurge.Active(now)) now = now / PortalSurge.EverySeconds * PortalSurge.EverySeconds + 60;
-            _things = LiveWorldPlanner.Nearby(me, now, _game.Library.Defs, Circle, _game.Progress, _game.CaughtSpawns);
+            _things = LiveWorldPlanner.Nearby(me, now, _game.Library.Defs, Circle, _game.Progress, _game.CaughtSpawns, data: _osm.Data);
 
+            if (_mapMode) return; // the map draws its own
             var keep = new HashSet<string>();
             foreach (var t in _things)
             {

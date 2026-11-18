@@ -224,5 +224,47 @@ else if (SCENE === 'circle') {
   camera.fov = 40; camera.updateProjectionMatrix(); camera.position.set(0.5, 2.2, 7.6); camera.lookAt(0, 1.5, 0);
   renderer.render(scene, camera);
 }
+else if (SCENE === 'map') {
+  // The street map: flat layers unlit (sticker look), buildings softly lit; stops, Rune Circles, Kikis, the player.
+  const sfx = NIGHT ? '_night' : '';
+  scene.remove(ground); scene.remove(sky);
+  scene.background = new THREE.Color(NIGHT ? '#22304f' : '#e9f3d6');
+  // Flat layers draw in a fixed order without writing depth (like MapFlat.shader), so they never flicker.
+  let order = 0;
+  for (const n of ['green', 'water', 'casing', 'roads', 'paths']) {
+    const mesh = new THREE.Mesh(await geo(`map_${n}${sfx}.obj`), new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false }));
+    mesh.renderOrder = -10 + order++; scene.add(mesh);
+  }
+  scene.add(new THREE.Mesh(await geo(`map_buildings${sfx}.obj`), new THREE.MeshLambertMaterial({ vertexColors: true })));
+  const places = await (await fetch(ART + 'map-places.json')).json();
+  const W3 = (e, n, y = 0) => new THREE.Vector3(-e, y, n);
+  const stoneGeo = await geo('stone.obj'), standing = await geo('standing.obj');
+  for (const s of places.stops) {
+    const st = new THREE.Mesh(stoneGeo, runeMat(0, 1)); st.scale.setScalar(2.4); st.position.copy(W3(s.e, s.n, 7)); st.rotation.set(1.2, 0, 0); scene.add(st);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 4.6, 48), new THREE.MeshBasicMaterial({ color: '#ff5d8f', side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.copy(W3(s.e, s.n, 0.3)); scene.add(ring);
+  }
+  for (const c of places.circles) {
+    const g = new THREE.Group(); g.position.copy(W3(c.e, c.n, 0)); g.scale.setScalar(3); scene.add(g);
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2 + .2; const st = new THREE.Mesh(standing, runeMat(1, .42)); st.scale.setScalar(.65); st.position.set(Math.cos(a) * 2.6, .56, Math.sin(a) * 2.6); st.rotation.y = -a + Math.PI / 2; g.add(st); }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.15, 3.35, 64), new THREE.MeshBasicMaterial({ color: '#7a00ff', side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = .05; g.add(ring);
+    const portal = makePortal(1.9); portal.position.y = 2.6; portal.rotation.x = -0.6; g.add(portal);
+  }
+  for (const k of places.kikis) {
+    const v = man.variants.find(x => x.id === k.id) || man.variants[0];
+    const m = await kiki(v, parts); m.scale.multiplyScalar(2.1); m.position.copy(W3(k.e, k.n, 0)); m.rotation.y = Math.PI; scene.add(m);
+    const r = new THREE.Mesh(new THREE.RingGeometry(3, 3.8, 40), new THREE.MeshBasicMaterial({ color: { Common: '#ffffff', Rare: '#4cc3ff', Epic: '#c77dff', Legendary: '#ffd23f' }[v.rarity], side: THREE.DoubleSide }));
+    r.rotation.x = -Math.PI / 2; r.position.copy(W3(k.e, k.n, 0.2)); scene.add(r);
+  }
+  // The player at the centre: a cream puck with a navy ring, a pink arrow, and the 40 m catch range.
+  const me = new THREE.Group(); scene.add(me);
+  const puck = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 12), new THREE.MeshLambertMaterial({ color: '#fff8de' })); puck.scale.y = .5; puck.position.y = 1.1; me.add(puck);
+  const nr = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.3, 40), new THREE.MeshBasicMaterial({ color: '#18237a', side: THREE.DoubleSide })); nr.rotation.x = -Math.PI / 2; nr.position.y = .3; me.add(nr);
+  const range = new THREE.Mesh(new THREE.RingGeometry(39.2, 40, 96), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .8, side: THREE.DoubleSide })); range.rotation.x = -Math.PI / 2; range.position.y = .25; me.add(range);
+  camera.fov = 38; camera.near = 1; camera.far = 4000; camera.updateProjectionMatrix();
+  const dist = +(P.get('dist') || 260);
+  camera.position.set(0, dist * Math.sin(52 * Math.PI / 180), -dist * Math.cos(52 * Math.PI / 180)); camera.lookAt(0, 0, 0);
+  renderer.render(scene, camera);
+}
 document.title = 'ready';
 </script></body></html>

@@ -45,6 +45,7 @@ namespace KikiSafari
             Toggle(c, ref y, "Force night (Moonbeam)", DebugFlags.ForceNight, v => DebugFlags.ForceNight = v);
             Toggle(c, ref y, "Debug overlay", DebugFlags.ShowOverlay, v => DebugFlags.ShowOverlay = v);
             Toggle(c, ref y, "Force Portal Surge", DebugFlags.ForceSurge, v => DebugFlags.ForceSurge = v);
+            Toggle(c, ref y, "Home test Rune Circle", DebugFlags.HomeCircle, v => DebugFlags.HomeCircle = v);
             var pin = Sticker.Pill("Pin", c, "Move test Rune Circle here", Sticker.PinkGradient, Color.white, () =>
             {
                 var loc = _game.Location;

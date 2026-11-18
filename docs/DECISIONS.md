@@ -65,9 +65,10 @@ Rarity colors come from section 4 of the treatment.
 
 ## 5. Map
 - **Live map:** OpenStreetMap-based vector map tiles, drawn by the game's own lightweight renderer and saved on the phone so the map keeps working with no signal. The map shows "© OpenStreetMap contributors", as the map data's license requires. GeoJSON is still used for the demo map and for event zones.
-- **Tile hosting:**
-  - Development uses a hosted tile provider's free tier.
-  - Launch uses self-hosted tiles (one Protomaps file on low-cost storage), so map costs don't grow with the number of players.
+- **Map data (updated 2026-11-18):** the game downloads OpenStreetMap data itself, one 800 m area at a time, and draws streets, parks, water and buildings in its own sticker style. The same data places stops and Rune Circles, enforces the safety rules and sets habitats. It's cached on the phone for 14 days.
+  - Development uses the free public Overpass API, with no key needed.
+  - Launch uses a self-hosted extract on low-cost storage, so map costs don't grow with the number of players and the public service isn't overloaded.
+- **Map view:** Camera is the main view (owner). A Map button flips to the street map, and the camera switches off there to save battery.
 - **Map mood:** "sunny meadow" by day and "cosmic set" at night, by local time.
 - **Demo map:** Demo Safari keeps its bundled fictional campground with invented names: Spiral Maze, Creek Footbridge, Sunny Meadow, Pine Hollow and Supply Tent. Kiki's home spawn is by the Spiral Maze.
 
@@ -153,4 +154,10 @@ Rarity colors come from section 4 of the treatment.
   - Wild Keepers' attunement: 55 (Common), 65 (Rare), 75 (Epic), 85 (Legendary). No fighting and no teams.
 - **Portal Surges (Claude's call):** every 2 hours, for 15 minutes, a circle's portal opens wide and rarer Kikis pour out around it for everyone nearby. This is the Crew Hunts idea from section 4, held at Rune Circles; Golden Spiral is likelier.
 - **A wanderer:** one Kiki always hangs around each circle (a new one every 15-minute spawn window).
-- **Placement:** today, one test circle (above). Next, circles and stops at real landmarks from OpenStreetMap, following the safety rules in section 4. Until a server holds Keepers, a captured circle is remembered on the player's phone.
+- **Placement (Claude's call):** at real landmarks from OpenStreetMap.
+  - Priority: historic sites and parks over 5,000 m² first; then public art and fountains; then museums, galleries, theatres, arts centres, town halls, libraries, viewpoints and attractions.
+  - Up to three circles per 800 m area, at least 250 m apart. Other landmarks become supply stops, at least 70 m apart.
+  - Every 250 m square gets a stop, and every area gets a circle (in green space when there is some), so it works everywhere.
+  - Everything follows the safety rules in section 4.
+  - The home test circle stays until it's switched off in the tuning panel.
+  - Until a server holds Keepers, a captured circle is remembered on the player's phone.

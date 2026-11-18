@@ -63,6 +63,14 @@ namespace KikiSafari
             return m;
         }
 
+        /// <summary>Street map ground layer: flat, unlit, vertex-coloured, no depth writes (order set by render queue).</summary>
+        public static Material MapFlat(Color tint)
+        {
+            var m = new Material(Get("KikiSafari/MapFlat")) { name = "MapFlat" };
+            m.SetColor("_Tint", tint);
+            return m;
+        }
+
         public static Material LightBeam(Color color, float strength, float height)
         {
             var m = new Material(Get("KikiSafari/LightBeam")) { name = "LightBeam" };

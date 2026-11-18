@@ -13,7 +13,9 @@ Design direction: [`docs/DECISIONS.md`](docs/DECISIONS.md). Character canon: the
 |---|---|
 | ![The six variants](docs/brand/kiki-variants.png) | ![Rune Stone and portal](docs/brand/rune-stone-portal.png) |
 
-![A Rune Circle by day and night](docs/brand/rune-circle.png)
+| | |
+|---|---|
+| ![A Rune Circle by day and night](docs/brand/rune-circle.png) | ![The street map by day and night](docs/brand/street-map.png) |
 
 ## What's built
 
@@ -29,14 +31,25 @@ Design direction: [`docs/DECISIONS.md`](docs/DECISIONS.md). Character canon: the
   - Moonbeam appears only between local sunset and sunrise.
   - Supply stops are spread about every 250 m.
   - This needs no server yet; the server becomes the authority later.
+- **Real landmarks, everywhere.** OpenStreetMap data loads around you, 800 m at a time, and is kept on the phone for
+  two weeks so it works with weak signal.
+  - The most notable landmarks become **Rune Circles**: historic sites, parks, public art, fountains, museums,
+    libraries. Up to three per area, spaced at least 250 m apart. Other landmarks become **supply stops**.
+  - Quiet areas still get a stop every 250 m and a circle in the nearest green space, so the countryside works too.
+  - The decisions doc's safety rules apply: nothing in roads, railways, water or buildings, and nothing in or near
+    schools, hospitals, places of worship, cemeteries, memorials, military sites, prisons or airports.
+  - Habitats come from real land cover: parks favour Meadow, woods favour Pine, and water favours Rainbow.
+- **Street map.** Tap **Map** to see your real streets in the sticker style, with you, the Kikis, stops and Rune Circles
+  on it. Drag to turn, pinch to zoom, tap anything within 40 m. The camera switches off in map mode to save battery.
+  The map credits "© OpenStreetMap contributors", as the data's licence requires.
 - **Rune Circles** (instead of gyms): seven carved standing stones around a dais, with a Keeper Kiki, a swirling portal
   and a column of UV light you can spot down the street.
   - **Spiral Rite:** tap as each ring of light lands on the circle's spiral rune. Out-attune the Keeper and your Kiki
     takes the circle, gathering Sprouts while it holds it.
   - **Portal Surges:** every 2 hours, for 15 minutes, rarer Kikis pour out of the portal for everyone nearby, and Golden
     Spiral is likelier.
-- **For testing there's one Rune Circle, at home.** The first time the game gets a good GPS fix, it pins the circle a
-  few metres in front of you, with a supply stop beside it. A Kiki always wanders near it, so there's something to catch
+- **Plus a test Rune Circle at home.** The first time the game gets a good GPS fix, it pins an extra circle a few
+  metres in front of you, with a supply stop beside it. You can switch it off in the tuning panel. A Kiki always wanders near it, so there's something to catch
   at home. The spot is saved only on the phone. To move it, open the hidden tuning panel (triple-tap the top-right
   corner) and tap **Move test Rune Circle here**.
 - **AR catch with the Rune Stone.**
@@ -105,13 +118,16 @@ so there are no hand-made prefabs or scenes to get out of sync.
 dotnet test tools/CoreTests
 ```
 
-52 tests cover:
+61 tests cover:
 - **Catching:** the catch rules, wobble counts, and the reveal order (no spoilers, no text on a miss, Keep playing never
   auto-closes), including the Rune Stone and portal beats.
 - **Spawning:** night-only Moonbeam, habitats, Golden Spiral rarity, Surge boosts and determinism.
 - **The real world:** the worldwide grid, GPS-to-metres maths and bearings, local sunset and sunrise, the speed lock and
   GPS checks.
 - **Rune Circles:** the circle's wanderer Kiki, Portal Surges, Spiral Rite timing and scoring, and Keepers' Sprouts.
+- **Map data:** reading OpenStreetMap data, the safety rules (including a school with art inside it and a statue
+  beside a church), land-cover habitats, and landmark placement (spacing, coverage, determinism). These use a
+  made-up neighbourhood in the exact format the live service returns.
 - **Everything else:** supply stop cooldowns, throw maths and the practice map. The
 same files run in Unity's Test Runner (EditMode).
 
@@ -126,9 +142,7 @@ Serve `tools/ArtPreview/web` (for example `python -m http.server`) and open `ind
 
 ## Next
 
-- **Rune Circles and stops at real landmarks everywhere.** Use OpenStreetMap public art, fountains, parks, libraries and
-  historic sites, with the safety exclusions (schools, hospitals and so on), instead of the single test circle and
-  evenly spread stops.
-- **A street-map view** to switch to from the camera.
-- **The server.** Supabase sign-in, server-checked catches and shared Keepers (today Keepers are kept on the phone),
-  plus offline pending throws.
+- **The server.** Supabase sign-in, server-checked catches and shared Keepers (today a captured circle is remembered on
+  the phone), plus offline pending throws.
+- **Self-hosted map data for launch.** Development uses the free public Overpass service, which is fine for testing but
+  not for a big launch. One endpoint constant in `OsmLoader.cs` switches it.

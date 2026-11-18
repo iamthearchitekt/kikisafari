@@ -17,6 +17,8 @@ namespace KikiSafari
         Canvas _canvas;
         RectTransform _safe, _labels, _radar, _radarDots, _nearby, _status, _panelRoot;
         Text _stones, _statusText;
+        Button _mapButton;
+        RectTransform _attribution;
         readonly List<RectTransform> _controls = new List<RectTransform>();
         readonly List<Image> _dotPool = new List<Image>();
         readonly Dictionary<string, (RectTransform rt, Text text)> _labelPool = new Dictionary<string, (RectTransform, Text)>();
@@ -66,6 +68,17 @@ namespace KikiSafari
 
             h.BuildRadar();
             h.BuildNearby();
+
+            h._mapButton = Sticker.Pill("MapToggle", h._safe, "Map", Sticker.SkyGradient, Color.white, () => screen.ToggleMap(), 44);
+            Sticker.Place((RectTransform)h._mapButton.transform, new Vector2(1, 0), new Vector2(-36, 50 + RadarSize + 24), new Vector2(240, 110));
+            Sticker.StickerText(h._mapButton.GetComponentInChildren<Text>(), 3f, 5f);
+            h._controls.Add((RectTransform)h._mapButton.transform);
+
+            // Required credit for the map data.
+            h._attribution = Sticker.Panel("Attribution", h._safe, new Color(1, 0.97f, 0.87f, 0.9f), out var ac, shadow: false, radius: 16);
+            Sticker.Place(h._attribution, new Vector2(0, 0), new Vector2(36, 50), new Vector2(430, 56));
+            Sticker.Label(ac, OsmArea.Attribution, 26, Colors.Navy, Sticker.BodyMedium);
+            h._attribution.gameObject.SetActive(false);
             return h;
         }
 
@@ -126,6 +139,14 @@ namespace KikiSafari
 
         public void SetStones(int n) => _stones.text = n.ToString();
 
+        public void SetMapMode(bool map)
+        {
+            Sticker.SetPillText(_mapButton, map ? "Camera" : "Map");
+            _radar.gameObject.SetActive(!map);
+            _labels.gameObject.SetActive(!map);
+            _attribution.gameObject.SetActive(map);
+        }
+
         public void SetStatus(string text)
         {
             bool on = !string.IsNullOrEmpty(text);
@@ -140,7 +161,8 @@ namespace KikiSafari
             if (_panelRoot) return true;
             foreach (var c in _controls)
                 if (c && c.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(c, screen, null)) return true;
-            return RectTransformUtility.RectangleContainsScreenPoint(_radar, screen, null) || RectTransformUtility.RectangleContainsScreenPoint(_nearby, screen, null);
+            return (_radar.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(_radar, screen, null))
+                || RectTransformUtility.RectangleContainsScreenPoint(_nearby, screen, null);
         }
 
         static Color KindColor(WorldThing t) =>
