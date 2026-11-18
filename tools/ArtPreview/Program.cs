@@ -56,6 +56,9 @@ static class Program
     {
         string jsonPath = Path.Combine(outDir, "map-source.json");
         string json = File.Exists(jsonPath) ? File.ReadAllText(jsonPath) : KikiSafari.Tests.OsmFixture.Json();
+        Write(outDir, "osm-fixture.json", KikiSafari.Tests.OsmFixture.Json());
+        var fc = KikiSafari.Tests.OsmFixture.Cell;
+        Write(outDir, "osm-fixture-cell.json", FormattableString.Invariant($"{{\"x\":{fc.X},\"y\":{fc.Y}}}"));
         var cell = KikiSafari.Tests.OsmFixture.Cell;
         var area = OsmArea.FromOverpassJson(json, cell.Center);
         foreach (var night in new[] { false, true })

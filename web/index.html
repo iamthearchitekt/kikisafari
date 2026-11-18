@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#36b6ff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kiki Safari">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<title>KIKI SAFARI</title>
+</head>
+<body>
+<!-- Title: plain HTML so it shows at once; the 3D engine loads behind it. -->
+<section id="title" class="screen">
+  <img class="logo" src="assets/logo.webp" alt="KIKI SAFARI">
+  <div class="title-actions">
+    <button type="button" class="pill play" id="play">Play</button>
+    <section class="app-tip sticker" id="app-tip" hidden>
+      <img src="apple-touch-icon.png" alt="" width="52" height="52">
+      <div>
+        <b>Make it an app</b>
+        <p class="why">Add Kiki Safari to your Home Screen. It opens full screen and starts faster.</p>
+        <ol id="app-tip-steps"></ol>
+        <div class="row"><button type="button" class="pill small go" id="app-tip-ok">Got it</button><button type="button" class="pill small cream" id="app-tip-later">Not now</button></div>
+      </div>
+    </section>
+    <div class="row">
+      <button type="button" class="pill small cream" id="sound-toggle">Sound: on</button>
+      <button type="button" class="pill small cream" id="motion-toggle">Motion: auto</button>
+    </div>
+    <p class="sticker note">Heads up! Watch your surroundings while you play.</p>
+  </div>
+</section>
+
+<!-- Asking for the camera, motion and location (iPhone needs a tap for each). -->
+<section id="perms" class="screen dim" hidden>
+  <div class="sticker sheet">
+    <h2>Let's find some Kikis!</h2>
+    <p>Kiki Safari uses your <b>camera</b> to show Kikis in the world around you, your phone's <b>motion</b> to know which way you're looking, and your <b>location</b> while you play to find Kikis, supply stops and Rune Circles nearby.</p>
+    <p class="small-print">Nothing is shared with other players. Location is only used while the game is open.</p>
+    <button type="button" class="pill play" id="perms-go">Allow and play</button>
+    <p class="perm-status" id="perm-status"></p>
+  </div>
+</section>
+
+<!-- The game -->
+<section id="game" class="screen" hidden>
+  <video id="cam" playsinline muted autoplay></video>
+  <div id="sky"></div>
+  <canvas id="gl"></canvas>
+  <div id="labels"></div>
+  <div id="hud" class="safe">
+    <div class="topbar">
+      <div class="col">
+        <button type="button" class="pill small sky" id="btn-log">Safari Log</button>
+        <button type="button" class="pill small cream" id="btn-home">Home</button>
+      </div>
+      <div class="sticker stones" id="stones"><span class="stone-icon"></span><b id="stone-count">30</b></div>
+    </div>
+    <div class="sticker status" id="status" hidden></div>
+    <div class="bottom">
+      <canvas id="radar" width="320" height="320"></canvas>
+      <div class="right">
+        <button type="button" class="pill small sky" id="btn-map">Map</button>
+        <div id="nearby"></div>
+      </div>
+    </div>
+    <div class="sticker attribution" id="attribution" hidden>© OpenStreetMap contributors</div>
+  </div>
+  <div id="enc-hud" class="safe" hidden>
+    <div class="topbar">
+      <button type="button" class="pill small sky" id="enc-back">Back</button>
+      <div class="sticker namecard"><b id="enc-name">Meadow Kiki</b><span id="enc-rarity">COMMON</span></div>
+      <div class="sticker stones"><span class="stone-icon"></span><b id="enc-stones">30</b></div>
+    </div>
+    <div class="sticker hint" id="enc-hint" hidden></div>
+    <button type="button" class="pill pink" id="enc-tap">Tap to throw</button>
+  </div>
+  <div id="pop" class="pop"></div>
+  <div id="toasts"></div>
+  <div id="overlay"></div>
+</section>
+
+<script>
+// "Make it an app": on phone browsers, show how to add Kiki Safari to the Home Screen (like Big Plush).
+(function () {
+  const tip = document.getElementById('app-tip'), steps = document.getElementById('app-tip-steps');
+  const ua = navigator.userAgent, isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua), inApp = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|TikTok|Snapchat|Twitter|LinkedInApp|GSA\//i.test(ua);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const SHARE = '<svg viewBox="0 0 24 24" class="ico"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M8.5 10H6.5a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-8a1.5 1.5 0 0 0-1.5-1.5h-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ADD = '<svg viewBox="0 0 24 24" class="ico"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8.5v7M8.5 12h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const say = l => { steps.innerHTML = l.map(t => '<li>' + t + '</li>').join(''); };
+  let done = false; try { done = localStorage.getItem('kiki-app-tip') === 'done'; } catch (e) {}
+  if (!standalone && (isIOS || isAndroid) && !done) {
+    if (isIOS && inApp) say(['Tap <b>•••</b> and choose <b>Open in Safari</b>.', 'In Safari, tap Share ' + SHARE + ' then <b>Add to Home Screen</b> ' + ADD + '.']);
+    else if (isIOS) say(['Tap the Share button ' + SHARE + ' (on iOS 26, tap <b>•••</b> first).', 'Tap <b>Add to Home Screen</b> ' + ADD + '. Scroll down if you don\'t see it.', 'Tap <b>Add</b>, then open Kiki Safari from your Home Screen.']);
+    else say(['Tap the menu <b>⋮</b> at the top right.', 'Tap <b>Add to Home screen</b> or <b>Install app</b>.']);
+    tip.hidden = false;
+  }
+  document.getElementById('app-tip-ok').onclick = () => { try { localStorage.setItem('kiki-app-tip', 'done'); } catch (e) {} tip.hidden = true; };
+  document.getElementById('app-tip-later').onclick = () => { tip.hidden = true; };
+  if (window.navigator.standalone) { const fit = () => { document.documentElement.style.height = (innerWidth < innerHeight ? screen.height : screen.width) + 'px'; }; fit(); addEventListener('resize', fit); }
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

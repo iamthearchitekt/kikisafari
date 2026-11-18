@@ -45,3 +45,5 @@ tools/**/obj/
 
 # art preview output (symlink to a temp folder)
 tools/ArtPreview/web/art
+# web deploy bundle
+web-deploy.zip
