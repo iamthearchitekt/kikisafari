@@ -1,0 +1,1 @@
+{ "name": "kiki-art-preview", "private": true, "version": "1.0.0", "dependencies": { "three": "0.170.0" } }

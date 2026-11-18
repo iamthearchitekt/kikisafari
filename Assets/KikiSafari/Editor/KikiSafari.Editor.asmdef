@@ -1,0 +1,22 @@
+{
+    "name": "KikiSafari.Editor",
+    "rootNamespace": "KikiSafari.EditorTools",
+    "references": [
+        "KikiSafari.Core",
+        "KikiSafari.Runtime",
+        "Unity.XR.Management",
+        "Unity.XR.Management.Editor",
+        "Unity.XR.ARFoundation"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

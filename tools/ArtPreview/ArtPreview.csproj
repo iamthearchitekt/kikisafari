@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Exports Kiki's real game meshes and textures (from Assets/KikiSafari/Core/Art) to OBJ + PNG, so the art can be
+    rendered and checked without Unity:  dotnet run with the project tools/ArtPreview and an output folder argument
+    Then open tools/ArtPreview/web/index.html via a local server (see tools/ArtPreview/README.md).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/KikiSafari/Core/**/*.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

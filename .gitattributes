@@ -1,0 +1,15 @@
+* text=auto
+*.cs text eol=lf
+*.shader text eol=lf
+*.mm text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.geojson text eol=lf
+*.unity text merge=unityyamlmerge eol=lf
+*.asset text merge=unityyamlmerge eol=lf
+*.meta text eol=lf
+*.ttf binary
+*.png binary
+*.webp binary
+*.mp3 binary
+*.glb binary

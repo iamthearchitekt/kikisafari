@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!-- Renders Kiki's real game meshes/textures (exported by tools/ArtPreview) with materials that mirror the Unity
+     shaders: matte plush (roughness .42, metal 0, velvet rim), UV-purple screen-blend glows, the Rune Stone and portal. -->
+<html><head><meta charset="utf-8"><title>Kiki art preview</title>
+<style>html,body{margin:0;background:#36b6ff;overflow:hidden}canvas{display:block}
+.lbl{position:absolute;font:700 19px/1.1 system-ui,sans-serif;color:#18237a;background:#fff8de;border:3px solid #18237a;border-radius:14px;padding:6px 12px;box-shadow:0 5px 0 #18237a;transform:translateX(-50%);white-space:nowrap}
+.lbl small{display:block;font-size:14px;font-weight:800;letter-spacing:.5px}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+const P = new URLSearchParams(location.search);
+const SCENE = P.get('scene') || 'lineup', ART = P.get('art') || './art/', NIGHT = P.has('night');
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(devicePixelRatio); renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.05, 200);
+
+// Sky: day "sunny meadow" or night "cosmic set".
+const sky = new THREE.Mesh(new THREE.SphereGeometry(80, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { top: { value: new THREE.Color(NIGHT ? '#1f0c52' : '#36b6ff') }, bot: { value: new THREE.Color(NIGHT ? '#52298c' : '#d9f1ff') } },
+  vertexShader: 'varying vec3 d; void main(){ d = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: 'uniform vec3 top, bot; varying vec3 d; void main(){ float t = clamp(normalize(d).y*1.6+.15,0.,1.); gl_FragColor = vec4(mix(bot,top,t),1.); }'
+}));
+scene.add(sky);
+const sun = new THREE.DirectionalLight(0xfff5e0, 2.6); sun.position.set(-3, 5, 6); scene.add(sun);
+scene.add(new THREE.AmbientLight(NIGHT ? 0x8a80c0 : 0xa8a8bc, 1.25));
+const fill = new THREE.DirectionalLight(0xbfe4ff, 0.6); fill.position.set(4, 2, -3); scene.add(fill);
+
+const tl = new THREE.TextureLoader(), obj = new OBJLoader();
+const tex = (n, srgb) => new Promise(r => tl.load(ART + n, t => { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; r(t); }));
+const geo = n => new Promise(r => obj.load(ART + n, o => { const g = o.children[0].geometry; g.computeBoundingBox(); r(g); }));
+
+// Velvet rim like the Unity Plush shader / the claw game's polish().
+function plush(m, rim) {
+  m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    totalEmissiveRadiance += diffuseColor.rgb * pow(1. - clamp(dot(normal, normalize(vViewPosition)), 0., 1.), 2.4) * ${rim.toFixed(2)};`); };
+  return m;
+}
+// Pass 1 of UVGlow.shader: tint toward deep UV purple (keeps the halo saturated in daylight).
+const tintMat = (intensity = 1.25, power = 1.8) => new THREE.ShaderMaterial({
+  side: THREE.BackSide, transparent: true, depthWrite: false,
+  uniforms: { c: { value: new THREE.Color('#7a00ff') }, k: { value: intensity }, p: { value: power } },
+  vertexShader: 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); n = normalize(normalMatrix*normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+  fragmentShader: 'uniform vec3 c; uniform float k, p; varying vec3 n; varying vec3 v; void main(){ float d = clamp(-dot(normalize(n),normalize(v)),0.,1.); gl_FragColor = vec4(c*.55, clamp(pow(d,p)*k,0.,1.)*.6); }'
+});
+const glowMat = (intensity = 1.25, power = 1.8) => new THREE.ShaderMaterial({
+  side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneMinusDstColorFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation,
+  uniforms: { c: { value: new THREE.Color('#7a00ff') }, k: { value: intensity }, p: { value: power } },
+  vertexShader: 'varying vec3 n; varying vec3 v; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); n = normalize(normalMatrix*normal); v = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+  fragmentShader: 'uniform vec3 c; uniform float k, p; varying vec3 n; varying vec3 v; void main(){ float d = clamp(-dot(normalize(n),normalize(v)),0.,1.); gl_FragColor = vec4(c*clamp(pow(d,p)*k + .05*d,0.,1.),1.); }'
+});
+
+async function kiki(v, parts) {
+  const g = new THREE.Group();
+  const [alb, nrm] = await Promise.all([tex(`albedo_${v.tex}.png`, true), tex(`normal_${v.tex}.png`, false)]);
+  const body = new THREE.Mesh(parts.body, plush(new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, normalScale: new THREE.Vector2(.9, .9), roughness: .42, metalness: 0, vertexColors: true }), .4));
+  g.add(body);
+  const limb = plush(new THREE.MeshStandardMaterial({ color: v.body, roughness: .42, metalness: 0 }), .4);
+  g.add(new THREE.Mesh(parts.feet, limb));
+  for (const a of parts.arms) {
+    const piv = new THREE.Object3D(); piv.position.set(a.x, a.y, a.z); piv.rotation.z = a.rz;
+    piv.add(new THREE.Mesh(parts.arm, limb)); g.add(piv);
+  }
+  const crown = await geo(`crown_${v.id}.obj`);
+  g.add(new THREE.Mesh(crown, plush(new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .26, metalness: 0, side: THREE.DoubleSide }), .3)));
+  if (v.glow) for (const mat of [tintMat(1.4, 2.2), glowMat(1.4, 2.2)]) { const s = new THREE.Mesh(parts.body, mat); s.scale.set(1.22, 1.14, 1.22); s.position.y = -0.18; g.add(s); }
+  g.scale.setScalar(v.scale);
+  return g;
+}
+
+function label(x, y, text, sub, color) {
+  const d = document.createElement('div'); d.className = 'lbl'; d.style.left = x + 'px'; d.style.top = y + 'px';
+  d.innerHTML = text + (sub ? `<small style="color:${color}">${sub}</small>` : ''); document.body.appendChild(d);
+}
+const RARITY = { Common: '#4d5aa6', Rare: '#1f6fd6', Epic: '#7a2fd6', Legendary: '#ff8a00' };
+
+const man = await (await fetch(ART + 'manifest.json')).json();
+const parts = { body: await geo('body.obj'), feet: await geo('feet.obj'), arm: await geo('arm.obj'), arms: man.arms };
+// Ground shadow blobs
+const blobTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(10,8,40,.45)'); gr.addColorStop(1, 'rgba(10,8,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const blob = (s) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.6 * s, 2.0 * s), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = .01; return m; };
+const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ color: NIGHT ? '#26325a' : '#6cbf45', roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+if (SCENE === 'lineup') {
+  const order = man.variants;
+  const cols = 6, gx = 4.1, gz = 7.5;
+  for (let i = 0; i < order.length; i++) {
+    const v = order[i], col = i % cols, row = (i / cols) | 0;
+    const k = await kiki(v, parts);
+    k.position.set((col - 2.5) * gx, 0, -row * gz); k.rotation.y = (col - 2.5) * -0.08;
+    scene.add(k); const b = blob(v.scale); b.position.x = k.position.x; b.position.z = k.position.z; scene.add(b);
+  }
+  camera.fov = 30; camera.updateProjectionMatrix(); camera.position.set(0, 3.0, 19.5); camera.lookAt(0, 1.75, 0);
+  renderer.render(scene, camera);
+  for (let i = 0; i < order.length; i++) {
+    const v = order[i], col = i % cols, row = (i / cols) | 0;
+    const p = new THREE.Vector3((col - 2.5) * gx, -0.35, -row * gz).project(camera);
+    label((p.x * .5 + .5) * W, (-p.y * .5 + .5) * H, v.name, v.rarity.toUpperCase(), RARITY[v.rarity]);
+  }
+} else if (SCENE === 'hero') {
+  const v = man.variants.find(x => x.id === (P.get('v') || 'meadow'));
+  const k = await kiki(v, parts); k.rotation.y = +(P.get('yaw') || 0); scene.add(k); scene.add(blob(v.scale));
+  const zoom = +(P.get('zoom') || 1);
+  camera.fov = 26 / zoom; camera.updateProjectionMatrix();
+  camera.position.set(0, 2.2 + (zoom > 1 ? 1.6 : 0), 11.5); camera.lookAt(0, zoom > 1 ? 2.9 : 1.75, 0);
+  renderer.render(scene, camera);
+} else if (SCENE === 'stone') {
+  // Rune Stone close-up (shader ported from RuneStone.shader) and the portal opening behind a Kiki.
+  const stoneGeo = await geo('stone.obj');
+  const stoneMat = new THREE.ShaderMaterial({
+    lights: false,
+    uniforms: { glow: { value: 1.3 } },
+    vertexShader: `varying vec3 op; varying vec3 on; varying vec3 wn; varying vec3 vd;
+      void main(){ op = position; on = normal; vec4 w = modelMatrix*vec4(position,1.); wn = normalize(mat3(modelMatrix)*normal); vd = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform float glow; varying vec3 op; varying vec3 on; varying vec3 wn; varying vec3 vd;
+      float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7)))*43758.5453); }
+      float sd(vec2 p, float m){ float rho = length(p); float ang = atan(p.y, p.x*m); if (ang < 0.) ang += 6.2831853;
+        float maxT = 2.5*6.2831853; float b = .78/maxT; float k0 = floor((rho/b - ang)/6.2831853); float best = 10.;
+        for (int i=-1;i<=1;i++){ float th = ang + (k0+float(i))*6.2831853; if (th>=0. && th<=maxT) best = min(best, abs(b*th-rho)); } return best; }
+      void main(){
+        float speck = step(.86, hash(floor(op*28.)));
+        vec3 col = mix(vec3(.24,.26,.45), vec3(.42,.44,.62), speck*.6);
+        float face = smoothstep(.35,.6,abs(on.y)); float m = on.y >= 0. ? 1. : -1.;
+        float d = sd(op.xz, m); float carve = face*(1.-smoothstep(.06*.7,.06,d));
+        col = mix(col, vec3(.07,.03,.16), carve);
+        vec3 L = normalize(vec3(-.4,.8,.6)); float diff = .45 + .55*max(0., dot(normalize(wn), L));
+        float rim = pow(1.-clamp(dot(normalize(wn), normalize(vd)),0.,1.),3.);
+        vec3 o = col*diff + vec3(.478,0.,1.)*carve*glow + vec3(.42,.44,.62)*rim*.15;
+        gl_FragColor = vec4(pow(o, vec3(1.)),1.); }`
+  });
+  const stone = new THREE.Mesh(stoneGeo, stoneMat); stone.scale.setScalar(.42); stone.position.set(-1.0, 1.35, 2.2); stone.rotation.set(1.15, 0.2, 0.1); scene.add(stone);
+  for (const mat of [tintMat(1.2, 1.6), glowMat(1.2, 1.6)]) { const halo = new THREE.Mesh(stoneGeo, mat); halo.scale.setScalar(.42 * 1.45); halo.position.copy(stone.position); halo.rotation.copy(stone.rotation); scene.add(halo); }
+  // Portal (ported from Portal.shader) with the dark void behind it.
+  const voidTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const id = x.createImageData(128, 128);
+    for (let y = 0; y < 128; y++) for (let X = 0; X < 128; X++) { const dx = (X + .5) / 64 - 1, dy = (y + .5) / 64 - 1, r = Math.hypot(dx, dy), a = Math.pow(Math.min(1, Math.max(0, (1 - r) / .35)), 1.2) * .94; const i = (y * 128 + X) * 4; id.data[i] = 20; id.data[i + 1] = 5; id.data[i + 2] = 51; id.data[i + 3] = a * 255; }
+    x.putImageData(id, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const portal = new THREE.Group(); portal.position.set(1.3, 1.75, -0.7);
+  const vd = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: voidTex, transparent: true, depthWrite: false })); portal.add(vd);
+  const vx = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneMinusDstColorFactor, blendDst: THREE.OneFactor,
+    uniforms: { t: { value: 1.3 }, pull: { value: 2.4 }, speed: { value: 4 } },
+    vertexShader: 'varying vec2 uv2; void main(){ uv2 = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: `uniform float t, pull, speed; varying vec2 uv2;
+      void main(){ vec2 c = uv2*2.-1.; float r = length(c); if (r>1.) discard; float ang = atan(c.y,c.x);
+        float arms = pow(.5+.5*cos(ang*4. + log(r+.04)*3.2*4.*.5 + t*speed), 3.);
+        float streams = pow(.5+.5*cos(ang*9. - log(r+.04)*6. + t*speed*1.7 + r*pull*8.), 8.);
+        float edge = smoothstep(1.,.72,r); float rim = smoothstep(.75,.92,r)*edge; float core = pow(clamp(1.-r*1.6,0.,1.),2.);
+        float k = (arms*.75 + streams*.35 + rim*.9 + core*1.3)*edge;
+        vec3 col = mix(vec3(.25,.05,.85), vec3(.478,0.,1.), clamp(arms+core,0.,1.));
+        gl_FragColor = vec4(col*k*1.4, 1.); }`
+  })); vx.position.z = .01; portal.add(vx); scene.add(portal);
+  // Kiki mid-suck: stretched toward the portal, spinning, shrinking.
+  const k = await kiki(man.variants[0], parts);
+  k.position.set(1.1, 0.75, 0.0); k.scale.set(.42, .58, .42); k.rotation.set(-.25, .7, .45); scene.add(k);
+  // Energy streaks flowing inward.
+  const streak = new THREE.MeshBasicMaterial({ color: '#7a00ff', transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2, r = 1.6 + (i % 3) * .35; const s = new THREE.Mesh(new THREE.PlaneGeometry(.42, .05), streak);
+    s.position.set(portal.position.x + Math.cos(a) * r, portal.position.y + Math.sin(a) * r, portal.position.z + .1); s.rotation.z = a + Math.PI / 2.6; scene.add(s); }
+  camera.fov = 34; camera.updateProjectionMatrix(); camera.position.set(0, 2.0, 8.5); camera.lookAt(0.3, 1.5, 0);
+  renderer.render(scene, camera);
+}
+document.title = 'ready';
+</script></body></html>

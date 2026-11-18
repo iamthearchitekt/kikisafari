@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<!-- KIKI SAFARI logo, in the style of the BIG PLUSH logo: puffy bubble letters (KiKi yellow, SAFARI sky blue), thin
+     white rim inside one thick navy sticker outline, leaves behind, a spiral sun, sparkle ticks, Kiki waving on the
+     left, and spiral dots on the i's (mirrored, like his eyes). Render: node render.js -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Fredoka; src: url(Fredoka.ttf); font-weight: 300 700; font-stretch: 75% 125%; }
+html, body { margin: 0; background: transparent; }
+body.preview { background: #36b6ff; }
+svg { display: block; }
+text { font-family: Fredoka; font-weight: 700; font-variation-settings: 'wght' 700, 'wdth' 104; }
+</style></head><body>
+<svg id="logo" xmlns="http://www.w3.org/2000/svg" width="2300" height="860" viewBox="0 0 2300 860">
+<defs>
+  <linearGradient id="yel" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fffbd6"/><stop offset=".38" stop-color="#ffe45c"/><stop offset=".72" stop-color="#ffc928"/><stop offset="1" stop-color="#f5a300"/>
+  </linearGradient>
+  <linearGradient id="blu" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#eefcff"/><stop offset=".36" stop-color="#8fdcff"/><stop offset=".72" stop-color="#36b6ff"/><stop offset="1" stop-color="#1f86d6"/>
+  </linearGradient>
+  <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#1f7a1a"/><stop offset=".55" stop-color="#3fae2a"/><stop offset="1" stop-color="#8fe05a"/>
+  </linearGradient>
+  <radialGradient id="disc" cx=".4" cy=".35" r=".7">
+    <stop offset="0" stop-color="#fffdf0"/><stop offset="1" stop-color="#ffe9a8"/>
+  </radialGradient>
+  <filter id="sticker" filterUnits="userSpaceOnUse" x="-500" y="-500" width="4000" height="2000">
+    <feMorphology in="SourceAlpha" operator="dilate" radius="9" result="wa"/>
+    <feFlood flood-color="#ffffff"/><feComposite in2="wa" operator="in" result="white"/>
+    <feMorphology in="SourceAlpha" operator="dilate" radius="25" result="na"/>
+    <feFlood flood-color="#18237a"/><feComposite in2="na" operator="in" result="navy"/>
+    <feOffset in="navy" dy="14" result="drop"/>
+    <feMerge><feMergeNode in="drop"/><feMergeNode in="navy"/><feMergeNode in="white"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <!-- Bubble shading: darker band along the bottom inside each letter, a soft light band at the top. -->
+  <filter id="bevelY" x="-10%" y="-10%" width="120%" height="120%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="b"/>
+    <feOffset in="b" dy="-14" result="up"/>
+    <feComposite in="SourceAlpha" in2="up" operator="out" result="bottom"/>
+    <feFlood flood-color="#d97800" flood-opacity=".7"/><feComposite in2="bottom" operator="in" result="shade"/>
+    <feOffset in="b" dy="14" result="down"/>
+    <feComposite in="SourceAlpha" in2="down" operator="out" result="top"/>
+    <feFlood flood-color="#ffffff" flood-opacity=".5"/><feComposite in2="top" operator="in" result="lite"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="shade"/><feMergeNode in="lite"/></feMerge>
+  </filter>
+  <filter id="bevelB" x="-10%" y="-10%" width="120%" height="120%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="b"/>
+    <feOffset in="b" dy="-14" result="up"/>
+    <feComposite in="SourceAlpha" in2="up" operator="out" result="bottom"/>
+    <feFlood flood-color="#0f4fa8" flood-opacity=".65"/><feComposite in2="bottom" operator="in" result="shade"/>
+    <feOffset in="b" dy="14" result="down"/>
+    <feComposite in="SourceAlpha" in2="down" operator="out" result="top"/>
+    <feFlood flood-color="#ffffff" flood-opacity=".55"/><feComposite in2="top" operator="in" result="lite"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="shade"/><feMergeNode in="lite"/></feMerge>
+  </filter>
+</defs>
+<g id="all" filter="url(#sticker)">
+  <g id="back"></g>
+  <g id="letters"></g>
+  <g id="front"></g>
+</g>
+</svg>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const back = document.getElementById('back'), letters = document.getElementById('letters'), front = document.getElementById('front');
+if (location.search.includes('preview')) document.body.className = 'preview';
+
+function spiralPath(cx, cy, r, turns, dir, steps = 160) {
+  let d = '';
+  for (let i = 0; i <= steps; i++) { const t = i / steps, a = t * turns * Math.PI * 2 * dir, rr = r * (.08 + .92 * t);
+    d += (i ? 'L' : 'M') + (cx + Math.cos(a) * rr).toFixed(1) + ' ' + (cy + Math.sin(a) * rr).toFixed(1); }
+  return d;
+}
+function leaf(x, y, len, rot, parent) {
+  const g = el('g', { transform: `translate(${x} ${y}) rotate(${rot})` }, parent);
+  el('path', { d: `M0 0 Q ${len * .45} ${-len * .36} ${len} 0 Q ${len * .45} ${len * .36} 0 0 Z`, fill: 'url(#leaf)' }, g);
+  el('path', { d: `M${len * .06} 0 Q ${len * .5} ${-len * .04} ${len * .9} 0`, stroke: '#c9f59a', 'stroke-width': len * .035, fill: 'none', 'stroke-linecap': 'round', opacity: .8 }, g);
+  el('path', { d: `M${len * .2} ${-len * .1} Q ${len * .45} ${-len * .25} ${len * .7} ${-len * .12}`, stroke: '#ffffff', 'stroke-width': len * .04, fill: 'none', 'stroke-linecap': 'round', opacity: .45 }, g);
+}
+function ticks(cx, cy, r, from, to, n, parent, len = 40) {
+  for (let i = 0; i < n; i++) { const a = (from + (to - from) * i / (n - 1)) * Math.PI / 180;
+    el('line', { x1: cx + Math.cos(a) * r, y1: cy + Math.sin(a) * r, x2: cx + Math.cos(a) * (r + len), y2: cy + Math.sin(a) * (r + len), stroke: '#ffd23f', 'stroke-width': 24, 'stroke-linecap': 'round' }, parent); }
+}
+
+document.fonts.load('700 100px Fredoka').then(() => {
+  // ---- letters ----
+  const size = 350, baseY = 620;
+  const word = (chars, x0, fillId, filterId, bounce) => {
+    let x = x0;
+    const out = [];
+    chars.forEach((ch, i) => {
+      const t = el('text', { x: 0, y: 0, 'font-size': size, fill: `url(#${fillId})`, stroke: `url(#${fillId})`, 'stroke-width': 12,
+        'stroke-linejoin': 'round', 'paint-order': 'stroke', filter: `url(#${filterId})` }, letters);
+      t.textContent = ch;
+      const w = t.getComputedTextLength();
+      const dy = bounce[i % bounce.length], rot = [-5, 3, -3, 4, -2, 3][i % 6];
+      t.setAttribute('transform', `translate(${x} ${baseY + dy}) rotate(${rot} ${w / 2} ${-size * .35})`);
+      out.push({ ch, x, w, dy, rot });
+      x += w - 4;
+    });
+    return { end: x, glyphs: out };
+  };
+  const kiki = word(['K', 'ı', 'K', 'ı'], 590, 'yel', 'bevelY', [0, 14, -8, 12]);
+  const safari = word(['S', 'A', 'F', 'A', 'R', 'I'], kiki.end + 30, 'blu', 'bevelB', [6, -6, 8, -4, 6, -8]);
+
+  // Spiral dots on the dotless i's, mirrored like Kiki's eyes.
+  kiki.glyphs.filter(g => g.ch === 'ı').forEach((g, k) => {
+    const cx = g.x + g.w / 2 + 4, cy = baseY + g.dy - size * .78, r = 54;
+    el('circle', { cx, cy, r, fill: 'url(#disc)' }, letters);
+    el('path', { d: spiralPath(cx, cy, r * .8, 2.4, k ? 1 : -1), stroke: '#4a1a0c', 'stroke-width': 13, fill: 'none', 'stroke-linecap': 'round' }, letters);
+  });
+
+  // ---- behind: leaves, spiral sun, sparkle ticks ----
+  const mid = (kiki.end + safari.glyphs[0].x) / 2;
+  const top = baseY - size * .62;
+  leaf(640, top + 10, 180, -148, back);             // over the first K
+  const F = safari.glyphs[2], sx = F.x + F.w / 2 + 10, sy = top - 120;
+  leaf(sx - 150, top + 20, 190, -132, back);        // flanking the sun
+  leaf(sx + 140, top + 20, 190, -48, back);
+  leaf(kiki.end - 120, top + 40, 150, -112, back);  // peeking between the words
+  leaf(safari.end - 70, top + 40, 180, -38, back);  // right end
+  leaf(safari.end - 30, baseY - 40, 150, 20, back);
+  leaf(mid - 10, baseY + 10, 130, 140, back);       // bottom, between the words
+  leaf(560, baseY + 50, 150, 160, back);            // bottom left, under Kiki
+  el('circle', { cx: sx, cy: sy, r: 84, fill: '#ffd23f' }, back);
+  el('path', { d: spiralPath(sx, sy, 66, 2.2, 1), stroke: '#f08c00', 'stroke-width': 17, fill: 'none', 'stroke-linecap': 'round' }, back);
+  el('path', { d: spiralPath(sx, sy, 66, 2.2, 1), stroke: '#ffe98a', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round', transform: 'translate(-4 -4)' }, back);
+  ticks(sx, sy, 112, 195, 255, 3, back, 36);        // a few sparkle ticks, like the Big Plush sun
+  ticks(sx, sy, 112, 300, 330, 2, back, 30);
+  ticks(140, 410, 100, 195, 265, 3, back, 38);       // sparkles by Kiki's waving hand
+
+  // ---- front: Kiki waving on the left ----
+  el('image', { href: 'mascot.png', x: 20, y: 110, width: 700, height: 700 }, front);
+  // Fit the canvas to the artwork plus room for the outline (25 px) and the drop (14 px).
+  const bb = document.getElementById('all').getBBox(), pad = 44;
+  const svg = document.getElementById('logo');
+  const vx = Math.floor(bb.x - pad), vy = Math.floor(bb.y - pad), vw = Math.ceil(bb.width + pad * 2), vh = Math.ceil(bb.height + pad * 2 + 14);
+  svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`); svg.setAttribute('width', vw); svg.setAttribute('height', vh);
+  document.title = 'ready';
+});
+</script>
+</body></html>
