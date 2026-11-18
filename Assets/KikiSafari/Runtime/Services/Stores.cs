@@ -82,6 +82,13 @@ namespace KikiSafari
             set { PlayerPrefs.SetInt("kiki.forceNight", value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
+        /// <summary>Testing: treat every moment as a Portal Surge.</summary>
+        public static bool ForceSurge
+        {
+            get => PlayerPrefs.GetInt("kiki.forceSurge", 0) == 1;
+            set { PlayerPrefs.SetInt("kiki.forceSurge", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         public static bool ShowOverlay
         {
             get => PlayerPrefs.GetInt("kiki.debugOverlay", 0) == 1;

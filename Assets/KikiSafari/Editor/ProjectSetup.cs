@@ -65,6 +65,7 @@ namespace KikiSafari.EditorTools
 
             // iPhone: ARKit needs Metal, arm64, iOS 15+ and a camera reason.
             PlayerSettings.iOS.cameraUsageDescription = "KIKI SAFARI uses the camera to put Kiki in the world around you.";
+            PlayerSettings.iOS.locationUsageDescription = "KIKI SAFARI uses your location while you play to show the Kikis, supply stops and Rune Circles around you.";
             PlayerSettings.iOS.targetOSVersionString = "15.0";
             PlayerSettings.SetArchitecture(NamedBuildTarget.iOS, 1); // arm64
             PlayerSettings.iOS.appleEnableAutomaticSigning = false;   // signing happens in Unity Build Automation

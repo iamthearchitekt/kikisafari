@@ -224,6 +224,28 @@ namespace KikiSafari.Core.Art
             return new Rgba(((c(r) - 1) * s + 1) * v, ((c(g) - 1) * s + 1) * v, ((c(b) - 1) * s + 1) * v);
         }
 
+        /// <summary>
+        /// A standing stone for a Rune Circle: a tall, slightly tapered slab, 0.84 wide, 2 tall and 0.56 deep, centred
+        /// on the origin. Its broad faces (±Z) carry the spiral carving (RuneStone shader with _AxisZ = 1, _Radius = 0.42).
+        /// </summary>
+        public static MeshData StandingStone() => Cached("standing", () =>
+        {
+            var m = MeshData.Sphere(1, 32, 24);
+            for (int i = 0; i < m.VertexCount; i++)
+            {
+                var p = m.Pos[i];
+                // Push the sphere toward a box (a slab with blunt edges), taper it toward the top, and roughen it.
+                float bx = Math.Sign(p.X) * (float)Math.Pow(Math.Abs(p.X), 0.55);
+                float by = Math.Sign(p.Y) * (float)Math.Pow(Math.Abs(p.Y), 0.75);
+                float bz = Math.Sign(p.Z) * (float)Math.Pow(Math.Abs(p.Z), 0.55);
+                float taper = 1 - 0.22f * Math.Max(0, by);
+                float n = 1 + 0.045f * (float)(Math.Sin(p.X * 7.1 + p.Y * 3.3) * Math.Cos(p.Z * 5.7 - p.Y * 2.1));
+                m.Pos[i] = new V3(bx * 0.42f * taper * n, by * n, bz * 0.2f * taper * n);
+            }
+            m.ComputeNormals();
+            return m.ToUnitySpace();
+        });
+
         /// <summary>The Rune Stone: a flattened river pebble (three SphereGeometry squashed), in Unity space.</summary>
         public static MeshData RuneStone(float radius) => Cached("stone" + radius, () =>
             MeshData.Sphere(radius, 32, 20).Transformed(Mat4.Compose(0, 0, 0, 0, 0, 0, 1f, 0.42f, 0.86f)).ToUnitySpace());

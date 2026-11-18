@@ -71,7 +71,7 @@ namespace KikiSafari.Core
         /// be alive, so callers that want "what is out right now" should use <see cref="ActiveSpawns"/>.
         /// </summary>
         public static List<PlannedSpawn> PlanWindow(IReadOnlyList<VariantDef> variants, long cellX, long cellY, long window,
-            ulong worldSeed, double cellSizeMeters, int spawnsPerWindow, Func<long, SpawnContext> contextAtUnix)
+            ulong worldSeed, double cellSizeMeters, int spawnsPerWindow, Func<long, SpawnContext> contextAtUnix, double chance = 1.0)
         {
             var result = new List<PlannedSpawn>(spawnsPerWindow);
             var rng = new SeededRandom(SeededRandom.Hash((long)worldSeed, cellX, cellY, window));
@@ -83,7 +83,8 @@ namespace KikiSafari.Core
                 double east = rng.NextDouble() * cellSizeMeters;
                 double north = rng.NextDouble() * cellSizeMeters;
                 var pick = Pick(variants, contextAtUnix(start), rng.NextDouble());
-                if (pick == null) continue;
+                bool spawns = rng.NextDouble() < chance; // always drawn, so chance doesn't change the other rolls
+                if (pick == null || !spawns) continue;
                 result.Add(new PlannedSpawn
                 {
                     VariantId = pick.Id, OffsetEast = east, OffsetNorth = north, StartUnix = start, DurationSeconds = duration,
@@ -94,13 +95,13 @@ namespace KikiSafari.Core
 
         /// <summary>All spawns of a cell that are alive at <paramref name="unix"/>.</summary>
         public static List<PlannedSpawn> ActiveSpawns(IReadOnlyList<VariantDef> variants, long cellX, long cellY, long unix,
-            ulong worldSeed, double cellSizeMeters, int spawnsPerWindow, Func<long, SpawnContext> contextAtUnix)
+            ulong worldSeed, double cellSizeMeters, int spawnsPerWindow, Func<long, SpawnContext> contextAtUnix, double chance = 1.0)
         {
             var active = new List<PlannedSpawn>();
             long w = WindowIndex(unix);
             int lookBack = (MaxDurationSeconds + WindowSeconds - 1) / WindowSeconds + 1;
             for (long k = w - lookBack; k <= w; k++)
-                foreach (var s in PlanWindow(variants, cellX, cellY, k, worldSeed, cellSizeMeters, spawnsPerWindow, contextAtUnix))
+                foreach (var s in PlanWindow(variants, cellX, cellY, k, worldSeed, cellSizeMeters, spawnsPerWindow, contextAtUnix, chance))
                     if (s.IsActive(unix)) active.Add(s);
             return active;
         }

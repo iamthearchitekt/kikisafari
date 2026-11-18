@@ -12,6 +12,7 @@ Shader "KikiSafari/RuneStone"
         _Radius ("Mesh radius", Float) = 0.045
         _Turns ("Spiral turns", Float) = 2.5
         _Line ("Line width", Range(0.01,0.2)) = 0.06
+        _AxisZ ("Carve on ±Z faces (standing stones)", Range(0,1)) = 0
     }
     SubShader
     {
@@ -21,7 +22,7 @@ Shader "KikiSafari/RuneStone"
         #pragma target 3.0
 
         fixed4 _Stone, _Speck, _Carve, _GlowColor;
-        half _Glow, _Radius, _Turns, _Line;
+        half _Glow, _Radius, _Turns, _Line, _AxisZ;
 
         struct Input { float3 opos; float3 onrm; float3 viewDir; float3 worldNormal; };
 
@@ -57,9 +58,11 @@ Shader "KikiSafari/RuneStone"
             float speck = step(0.86, hash(floor(IN.opos * 28)));
             fixed3 col = lerp(_Stone.rgb, _Speck.rgb, speck * 0.6);
             // Spiral carved into the flat faces (top and bottom of the stone), mirrored on the back.
-            float face = smoothstep(0.35, 0.6, abs(IN.onrm.y));
-            float mirror = IN.onrm.y >= 0 ? 1 : -1;
-            float d = spiralDist(IN.opos.xz, mirror);
+            float faceN = lerp(IN.onrm.y, IN.onrm.z, _AxisZ);
+            float face = smoothstep(0.35, 0.6, abs(faceN));
+            float mirror = faceN >= 0 ? 1 : -1;
+            float2 coords = lerp(IN.opos.xz, IN.opos.xy, _AxisZ);
+            float d = spiralDist(coords, mirror);
             float carve = face * (1 - smoothstep(_Line * 0.7, _Line, d));
             col = lerp(col, _Carve.rgb, carve);
             o.Albedo = col;

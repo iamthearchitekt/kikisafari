@@ -54,6 +54,24 @@ namespace KikiSafari
 
         public static Material Portal() => new Material(Get("KikiSafari/Portal")) { name = "Portal" };
 
+        /// <summary>Carved standing stone for a Rune Circle (spiral on the broad ±Z faces).</summary>
+        public static Material StandingStone()
+        {
+            var m = new Material(Get("KikiSafari/RuneStone")) { name = "StandingStone" };
+            m.SetFloat("_Radius", 0.42f);
+            m.SetFloat("_AxisZ", 1f);
+            return m;
+        }
+
+        public static Material LightBeam(Color color, float strength, float height)
+        {
+            var m = new Material(Get("KikiSafari/LightBeam")) { name = "LightBeam" };
+            m.SetColor("_GlowColor", color);
+            m.SetFloat("_Strength", strength);
+            m.SetFloat("_Height", height);
+            return m;
+        }
+
         public static Material Unlit(Color color, Texture tex = null, bool additive = false, bool alwaysOnTop = false)
         {
             var m = new Material(Get("KikiSafari/UnlitTransparent")) { name = "Unlit" };

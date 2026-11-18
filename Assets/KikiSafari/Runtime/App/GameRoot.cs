@@ -24,6 +24,9 @@ namespace KikiSafari
 
         Transform _ui;
         MapScreen _map;
+        LiveScreen _live;
+        DeviceLocation _location;
+        bool _inLive;
         ARStage _ar;
         FallbackStage _fallback;
         EncounterController _encounter;
@@ -54,6 +57,7 @@ namespace KikiSafari
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.enabled = false;
 
             Progress = ProgressStore.Load();
+            _location = gameObject.AddComponent<DeviceLocation>();
             Library = VariantLibrary.Load();
             gameObject.AddComponent<SfxPlayer>();
             Haptics.Prepare();
@@ -99,11 +103,29 @@ namespace KikiSafari
         public void ShowTitle()
         {
             if (_map) _map.SetActive(false);
-            TitleScreen.Show(_ui, ShowMap);
+            if (_live) _live.SetActive(false);
+            if (_ar != null && _ar.Active) _ar.SetActive(false); // camera off on the title screen
+            _inLive = false;
+            TitleScreen.Show(_ui, ShowLive, ShowMap);
         }
 
+        /// <summary>Live Safari through the camera, at the player's real location.</summary>
+        public void ShowLive() => StartCoroutine(ShowLiveWhenReady());
+
+        IEnumerator ShowLiveWhenReady()
+        {
+            while (!_arChecked) yield return null;
+            _inLive = true;
+            if (_map) _map.SetActive(false);
+            if (_live == null) _live = LiveScreen.Make(this, Stage(), _location);
+            else _live.SetActive(true);
+        }
+
+        /// <summary>The practice campground (no location needed; also for players under the digital age of consent).</summary>
         public void ShowMap()
         {
+            _inLive = false;
+            if (_live) _live.SetActive(false);
             if (_map == null) _map = MapScreen.Make(this, StartEncounter);
             else _map.SetActive(true);
         }
@@ -112,7 +134,16 @@ namespace KikiSafari
 
         public void SaveProgress() => ProgressStore.Save(Progress);
 
-        void StartEncounter(string spawnKey, string variantId)
+        public LiveScreen Live => _live;
+        public DeviceLocation Location => _location;
+
+        IEncounterStage Stage()
+        {
+            if (_arSupported) return _ar ??= new ARStage(transform);
+            return _fallback ??= new FallbackStage(transform);
+        }
+
+        public void StartEncounter(string spawnKey, string variantId)
         {
             if (_encounter != null) return;
             StartCoroutine(StartEncounterWhenReady(spawnKey, variantId));
@@ -121,24 +152,14 @@ namespace KikiSafari
         IEnumerator StartEncounterWhenReady(string spawnKey, string variantId)
         {
             while (!_arChecked) yield return null;
-            _map.SetActive(false);
-            IEncounterStage stage;
-            if (_arSupported)
-            {
-                _ar ??= new ARStage(transform);
-                stage = _ar;
-            }
-            else
-            {
-                _fallback ??= new FallbackStage(transform);
-                stage = _fallback;
-            }
-            _encounter = EncounterController.Begin(this, stage, variantId, new LocalCatchResolver(), exit =>
+            bool fromLive = _inLive;
+            if (fromLive) _live.gameObject.SetActive(false); else _map.SetActive(false);
+            _encounter = EncounterController.Begin(this, Stage(), variantId, new LocalCatchResolver(), exit =>
             {
                 _encounter = null;
                 if (exit == EncounterExit.Caught) CaughtSpawns.Add(spawnKey);
-                ShowMap();
-            });
+                if (fromLive) _live.SetActive(true); else ShowMap();
+            }, keepStage: fromLive);
         }
 
         void Update()

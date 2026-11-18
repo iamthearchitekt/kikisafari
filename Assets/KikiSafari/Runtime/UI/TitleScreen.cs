@@ -5,14 +5,14 @@ using UnityEngine.UI;
 namespace KikiSafari
 {
     /// <summary>
-    /// Title: the official meadow art, the KIKI SAFARI logo, Play Demo Safari, Live Safari (coming soon), sound and motion
-    /// settings, and the launch reminder to watch your surroundings.
+    /// Title: the official meadow art, the KIKI SAFARI logo, Play (Live Safari through the camera, at your real location),
+    /// the practice campground, sound and motion settings, and the launch reminder to watch your surroundings.
     /// </summary>
     public sealed class TitleScreen : MonoBehaviour
     {
         RectTransform _logo;
 
-        public static TitleScreen Show(Transform parent, Action onPlay)
+        public static TitleScreen Show(Transform parent, Action onPlay, Action onPractice)
         {
             var canvas = Sticker.MakeCanvas("Title", 40, parent);
             var t = canvas.gameObject.AddComponent<TitleScreen>();
@@ -41,14 +41,12 @@ namespace KikiSafari
                 t._logo = logo.rectTransform;
             }
 
-            var play = Sticker.Pill("Play", safe, "Play Demo Safari", Sticker.PlayGradient, Colors.Navy, () => { Destroy(canvas.gameObject); onPlay?.Invoke(); }, 70);
-            Sticker.Place((RectTransform)play.transform, new Vector2(0.5f, 0), new Vector2(0, 560), new Vector2(760, 180));
+            var play = Sticker.Pill("Play", safe, "Play", Sticker.PlayGradient, Colors.Navy, () => { Destroy(canvas.gameObject); onPlay?.Invoke(); }, 84);
+            Sticker.Place((RectTransform)play.transform, new Vector2(0.5f, 0), new Vector2(0, 560), new Vector2(620, 190));
 
-            var live = Sticker.Pill("Live", safe, "Live Safari · coming soon", Sticker.SkyGradient, Color.white, null, 44);
-            Sticker.Place((RectTransform)live.transform, new Vector2(0.5f, 0), new Vector2(0, 400), new Vector2(680, 120));
-            live.interactable = false;
-            live.gameObject.AddComponent<CanvasGroup>().alpha = 0.7f;
-            Sticker.StickerText(live.GetComponentInChildren<Text>(), 3f, 5f);
+            var practice = Sticker.Pill("Practice", safe, "Practice campground", Sticker.SkyGradient, Color.white, () => { Destroy(canvas.gameObject); onPractice?.Invoke(); }, 40);
+            Sticker.Place((RectTransform)practice.transform, new Vector2(0.5f, 0), new Vector2(0, 400), new Vector2(560, 110));
+            Sticker.StickerText(practice.GetComponentInChildren<Text>(), 3f, 5f);
 
             Button sound = null, motion = null;
             sound = Sticker.Pill("Sound", safe, SoundLabel(), Sticker.CreamGradient, Colors.Navy, () =>

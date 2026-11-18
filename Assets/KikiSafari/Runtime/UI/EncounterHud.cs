@@ -28,7 +28,7 @@ namespace KikiSafari
             Sticker.Stretch(hud._shakeRoot);
             hud._safe = Sticker.SafeArea(hud._shakeRoot);
 
-            hud._back = Sticker.Pill("Back", hud._safe, "Map", Sticker.SkyGradient, Color.white, onBack, 44);
+            hud._back = Sticker.Pill("Back", hud._safe, "Back", Sticker.SkyGradient, Color.white, onBack, 44);
             Sticker.Place((RectTransform)hud._back.transform, new Vector2(0, 1), new Vector2(36, -36), new Vector2(230, 110));
             Sticker.StickerText(hud._back.GetComponentInChildren<Text>(), 3f, 5f);
 
@@ -129,9 +129,9 @@ namespace KikiSafari
             Sticker.Place(p, new Vector2(0.5f, 0.5f), new Vector2(0, -80), new Vector2(860, 420));
             var t = Sticker.Label(c, "Out of Rune Stones!", 64, Colors.Navy, Sticker.Display);
             t.alignment = TextAnchor.UpperCenter; t.rectTransform.offsetMax = new Vector2(0, -36);
-            var s = Sticker.Label(c, "Grab more at a Supply Tent.\nKiki will wait for you.", 40, Colors.Muted, Sticker.Body);
+            var s = Sticker.Label(c, "Grab more at a supply stop.\nKiki will wait for you.", 40, Colors.Muted, Sticker.Body);
             s.rectTransform.offsetMax = new Vector2(0, -20);
-            var b = Sticker.Pill("Map", c, "Back to the map", Sticker.PlayGradient, Colors.Navy, onMap, 50);
+            var b = Sticker.Pill("Map", c, "Go find a stop", Sticker.PlayGradient, Colors.Navy, onMap, 50);
             Sticker.Place((RectTransform)b.transform, new Vector2(0.5f, 0), new Vector2(0, 36), new Vector2(520, 120));
             SetHint("");
             _tapThrow.gameObject.SetActive(false);

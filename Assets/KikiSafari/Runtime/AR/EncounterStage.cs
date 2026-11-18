@@ -83,6 +83,31 @@ namespace KikiSafari
         }
 
         public bool Unsupported => ARSession.state == ARSessionState.Unsupported;
+        public bool Tracking => ARSession.state == ARSessionState.SessionTracking;
+
+        /// <summary>Height of the floor: the lowest horizontal plane 0.5–2.2 m below the camera.</summary>
+        public bool TryGetFloorY(out float y)
+        {
+            y = float.MaxValue;
+            float camY = Camera.transform.position.y;
+            foreach (var p in _planes.trackables)
+            {
+                if (p.alignment != PlaneAlignment.HorizontalUp) continue;
+                float py = p.transform.position.y, below = camY - py;
+                if (below > 0.5f && below < 2.2f && py < y) y = py;
+            }
+            return y != float.MaxValue;
+        }
+
+        /// <summary>Depth occlusion on (encounters) or off (the world view, so distant beacons aren't hidden by walls).</summary>
+        public void SetOcclusion(bool on)
+        {
+            _occlusion.requestedEnvironmentDepthMode = on ? EnvironmentDepthMode.Best : EnvironmentDepthMode.Disabled;
+            _occlusion.requestedHumanStencilMode = on ? HumanSegmentationStencilMode.Fastest : HumanSegmentationStencilMode.Disabled;
+            _occlusion.requestedHumanDepthMode = on ? HumanSegmentationDepthMode.Fastest : HumanSegmentationDepthMode.Disabled;
+        }
+
+        public bool Active => _root.activeSelf;
 
         public ARStage(Transform parent)
         {
@@ -140,12 +165,15 @@ namespace KikiSafari
         public void SetActive(bool active)
         {
             _root.SetActive(active);
-            if (active)
-            {
-                _placed = false;
-                _stableFor = 0;
-                if (_reticle) _reticle.gameObject.SetActive(false);
-            }
+            if (active) ResetPlacement();
+        }
+
+        /// <summary>Starts looking for a new spot for Kiki, without restarting the AR session.</summary>
+        public void ResetPlacement()
+        {
+            _placed = false;
+            _stableFor = 0;
+            if (_reticle) _reticle.gameObject.SetActive(false);
         }
 
         public void Tick()
@@ -237,6 +265,7 @@ namespace KikiSafari
             _root.SetActive(active);
             if (active)
             {
+                Camera.transform.SetPositionAndRotation(new Vector3(0, 1.35f, 0), Quaternion.Euler(14f, 0, 0));
                 bool night = DebugFlags.IsNight;
                 RenderSettings.skybox = night
                     ? Materials.Sky(new Color(0.12f, 0.05f, 0.32f), new Color(0.32f, 0.16f, 0.55f))

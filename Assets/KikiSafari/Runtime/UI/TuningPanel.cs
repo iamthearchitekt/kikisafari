@@ -44,6 +44,18 @@ namespace KikiSafari
             y -= 10;
             Toggle(c, ref y, "Force night (Moonbeam)", DebugFlags.ForceNight, v => DebugFlags.ForceNight = v);
             Toggle(c, ref y, "Debug overlay", DebugFlags.ShowOverlay, v => DebugFlags.ShowOverlay = v);
+            Toggle(c, ref y, "Force Portal Surge", DebugFlags.ForceSurge, v => DebugFlags.ForceSurge = v);
+            var pin = Sticker.Pill("Pin", c, "Move test Rune Circle here", Sticker.PinkGradient, Color.white, () =>
+            {
+                var loc = _game.Location;
+                if (_game.Live != null) _game.Live.RepinCircle();
+                else if (loc != null && loc.Ready) TestCircleStore.PinInFront(loc.Fix, loc.Heading);
+            }, 38);
+            var pr = (RectTransform)pin.transform;
+            pr.anchorMin = new Vector2(0, 1); pr.anchorMax = new Vector2(1, 1); pr.pivot = new Vector2(0.5f, 1);
+            pr.offsetMin = new Vector2(60, y - 110); pr.offsetMax = new Vector2(-60, y);
+            Sticker.StickerText(pin.GetComponentInChildren<Text>(), 3f, 5f);
+            y -= 135;
 
             var row = Sticker.Rect("Buttons", c);
             row.anchorMin = new Vector2(0, 0); row.anchorMax = new Vector2(1, 0); row.pivot = new Vector2(0.5f, 0);
@@ -88,7 +100,7 @@ namespace KikiSafari
             s.targetGraphic = handle;
             s.minValue = min; s.maxValue = max; s.value = value;
             s.onValueChanged.AddListener(v => { set(v); Render(v); TuningStore.Save(); });
-            y -= 150;
+            y -= 132;
         }
 
         static void Toggle(RectTransform parent, ref float y, string label, bool value, Action<bool> set)
@@ -100,7 +112,7 @@ namespace KikiSafari
             var rt = (RectTransform)b.transform;
             rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
             rt.offsetMin = new Vector2(60, y - 110); rt.offsetMax = new Vector2(-60, y);
-            y -= 135;
+            y -= 122;
         }
     }
 }

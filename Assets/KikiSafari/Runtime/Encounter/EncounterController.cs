@@ -71,7 +71,10 @@ namespace KikiSafari
         Camera Cam => _stage.Camera;
         TuningValues Tune => TuningStore.Current;
 
-        public static EncounterController Begin(GameRoot game, IEncounterStage stage, string variantId, ICatchResolver resolver, Action<EncounterExit> onExit)
+        bool _keepStage;
+
+        /// <param name="keepStage">Leave the AR session running afterwards (the camera world view continues).</param>
+        public static EncounterController Begin(GameRoot game, IEncounterStage stage, string variantId, ICatchResolver resolver, Action<EncounterExit> onExit, bool keepStage = false)
         {
             var go = new GameObject("Encounter_" + variantId);
             var c = go.AddComponent<EncounterController>();
@@ -81,13 +84,15 @@ namespace KikiSafari
             c._look = game.Library.Look(variantId);
             c._resolver = resolver ?? new LocalCatchResolver();
             c._onExit = onExit;
+            c._keepStage = keepStage;
             c.Setup();
             return c;
         }
 
         void Setup()
         {
-            _stage.SetActive(true);
+            if (_stage is ARStage ar && ar.Active) { ar.ResetPlacement(); ar.SetOcclusion(true); }
+            else _stage.SetActive(true);
             _world = new GameObject("World").transform;
             _world.SetParent(transform, false);
             _hud = EncounterHud.Make(transform, _def, OnLeave, OnTapThrow);
@@ -569,7 +574,7 @@ namespace KikiSafari
         {
             if (_state == State.Done) return;
             _state = State.Done;
-            _stage.SetActive(false);
+            if (!_keepStage) _stage.SetActive(false);
             var cb = _onExit;
             Destroy(gameObject);
             cb?.Invoke(why);

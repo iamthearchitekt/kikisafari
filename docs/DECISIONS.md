@@ -14,6 +14,9 @@ Items marked **(owner)** were decided by the owner. Everything else is Claude's 
   - Demo Safari and the AR encounter
   - server validation and offline pending throws
 - **Changed:** the first milestone is now a complete Demo Safari AR catch on the owner's **iPhone** (see section 11).
+- **Changed again, 2026-11-18 (owner):** the real world is the whole point. **Live Safari through the phone camera** is the main game. The live camera is the main screen, with Kikis, supply stops and Rune Circles pinned at their real GPS spots and a radar for what's around. The fictional campground is now only a practice mode: for when there's no location, and for players under the digital age of consent (section 6).
+- **Gyms become Rune Circles (owner: "something mystical instead of gym").** See section 12.
+- **Testing (owner):** one Rune Circle for now, at the owner's home. It's pinned on the phone at the first good GPS fix (or with "Move test Rune Circle here" in the tuning panel). The address is never looked up online or written into the project.
 
 ## 2. Character
 - In KIKI SAFARI he is always called Kikiwawa or Kiki.
@@ -141,3 +144,13 @@ Rarity colors come from section 4 of the treatment.
   - Optional: a used ARCore Android phone, around $100, installs over USB from Windows in a few minutes. That makes tuning the feel of the throw much faster.
 - **Occlusion:** iPhones with LiDAR (Pro models from the 12 Pro on) get full depth occlusion, so real objects can hide Kiki. Other ARKit iPhones get people occlusion (A12 chip and newer) or none. The game checks this at runtime and falls back gracefully.
 - **Automated tests** run in the Unity editor on Windows with XR Simulation, so no phone is needed for them.
+
+## 12. Rune Circles (owner: mystical, instead of gyms)
+- **What they are:** rings of seven carved standing stones with Kiki's spiral glowing UV purple on each, a low dais, a swirling portal above, a ring of UV light on the ground, and a column of light rising from the portal so you can spot one from down the street. Each has a **Keeper Kiki** standing on the dais.
+- **Spiral Rite (Claude's call):** the challenge. The circle's spiral rune pulses to a slow beat (84 BPM, 16 beats). A ring of light closes on it each beat, and the player taps as it lands.
+  - Scoring: Perfect is within 75 ms and Good within 160 ms. Attunement runs from 0 to 100, with a small bonus for streaks.
+  - Out-attune the Keeper and your Kiki takes the circle. It gathers 20 Sprouts every half hour, up to 12 hours, to collect on your next visit.
+  - Wild Keepers' attunement: 55 (Common), 65 (Rare), 75 (Epic), 85 (Legendary). No fighting and no teams.
+- **Portal Surges (Claude's call):** every 2 hours, for 15 minutes, a circle's portal opens wide and rarer Kikis pour out around it for everyone nearby. This is the Crew Hunts idea from section 4, held at Rune Circles; Golden Spiral is likelier.
+- **A wanderer:** one Kiki always hangs around each circle (a new one every 15-minute spawn window).
+- **Placement:** today, one test circle (above). Next, circles and stops at real landmarks from OpenStreetMap, following the safety rules in section 4. Until a server holds Keepers, a captured circle is remembered on the player's phone.

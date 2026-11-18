@@ -45,6 +45,7 @@ static class Program
         manifest.Append("\n ]\n}\n");
         Write(outDir, "manifest.json", manifest.ToString());
         Write(outDir, "stone.obj", KikiGeometry.RuneStone(1f).ToUnitySpace().ToObj("stone"));
+        Write(outDir, "standing.obj", KikiGeometry.StandingStone().ToUnitySpace().ToObj("standing"));
         Console.WriteLine("Exported to " + Path.GetFullPath(outDir));
         return 0;
     }
