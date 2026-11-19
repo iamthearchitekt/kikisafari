@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as C from '../js/core.js';
 import * as R from '../js/rules.js';
-import { OsmArea, WorldData, placeLandmarks, DATA_CELL, CIRCLE_SPACING, STOP_SPACING } from '../js/osm.js';
+import { OsmArea, WorldData, placeLandmarks, DATA_CELL, CIRCLE_SPACING, STOP_SPACING, insideShape, distToLine, roadHalf } from '../js/osm.js';
 import { decodeTile, tileElements, tileOf } from '../js/tiles.js';
 
 let passed = 0, failed = 0;
@@ -381,6 +381,31 @@ test('map tiles (OpenFreeMap): a real tile becomes roads, buildings, water and l
   const inCell = els.filter(e => e.type === 'node' ? e.lat >= s0 && e.lat <= s0 + c.dLat && e.lon >= w0 && e.lon <= w0 + c.dLon : e.geometry.some(g => g.lat >= s0 && g.lat <= s0 + c.dLat && g.lon >= w0 && g.lon <= w0 + c.dLon));
   const a = OsmArea.fromOverpass({ elements: inCell }, c.center), placed = placeLandmarks(a, c);
   assert.ok(a.features.some(f => f.kind === 'road') && placed.stops.length > 0, 'a playable cell with supply stops');
+});
+test('Kikis stand on streets and footpaths (or in parks), never in yards', () => {
+  const data = new WorldData(); data.add(cell, area);
+  let moved = 0, checked = 0;
+  for (let i = 0; i < 400; i++) {
+    const spot = cell.at(40 + (i * 37) % 720, 40 + (i * 53) % 720), at = data.streetSpot(spot); if (!at) continue; checked++;
+    const lp = area.local(at), inPark = area.features.some(f => f.kind === 'park' && f.poly && insideShape(f, lp));
+    const nearStreet = area.features.some(f => (f.kind === 'road' && distToLine(lp, f.local, false) <= roadHalf(f.cat) + 4.5) || (f.kind === 'path' && distToLine(lp, f.local, false) < 1));
+    assert.ok(inPark || nearStreet, 'on a street, a path or in a park');
+    assert.ok(!area.unsafe(at), 'and somewhere safe');
+    if (C.distance(spot, at) > 1) moved++;
+  }
+  assert.ok(checked > 100 && moved > 50, `${checked} spots, ${moved} moved`);
+});
+test('more Kikis around, and a visitor near you every 5 minutes (even at home)', () => {
+  const me = { lat: 51.5, lon: -0.12 }, t0 = Math.floor(new Date(2026, 10, 19, 13).getTime() / 1000);
+  let total = 0, visitors = new Set();
+  for (let i = 0; i < 12; i++) {
+    const t = t0 + i * 300, list = C.nearby(me, t), kikis = list.filter(x => x.kind === 'kiki');
+    total += kikis.length;
+    const v = kikis.find(x => x.id.startsWith('visit:')); assert.ok(v && v.distance <= 45, 'a visitor within reach'); visitors.add(v.id);
+  }
+  assert.ok(total / 12 >= 25, `about ${Math.round(total / 12)} Kikis within 200 m`);
+  assert.equal(visitors.size, 12, 'a new visitor every 5 minutes');
+  const caught = new Set([...visitors][0].split()); assert.ok(!C.nearby(me, t0, { caught }).some(x => caught.has(x.id)), 'a caught visitor stays caught');
 });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -351,3 +351,17 @@ tiny requests), so the map was stuck on "Loading the map…" / "Map servers are 
 - The map credit reads "OpenFreeMap © OpenMapTiles © OpenStreetMap", as OpenFreeMap asks.
 - Landmark ids changed with the new source, so Rune Circles and stops sit in new spots (and anything kept at an old
   circle is effectively retired).
+
+## 23. Kikis on streets, more of them, and visitors (owner)
+
+"Make sure Kikis are placed on streets. I can't wander into someone's back yard. Also make them more densely packed …
+more random encounters."
+
+- **On streets:** every wild Kiki moves to the nearest footpath, or the pavement beside the nearest street (within
+  50 m), unless it's already in a public park. Driveways and car parks (service roads) don't count, so Kikis aren't
+  put on someone's drive. The usual safety rules still apply after the move (not in the road itself, not by schools,
+  hospitals, water…). Where nothing's mapped yet, spots stay as they were.
+- **Denser:** the spawn grid is 55 m (was 70 m) with a 60% chance (was 45%): about 2 to 2.5 times as many Kikis.
+  On a real Denver street that's about 40 within 200 m.
+- **Visitors:** every 5 minutes a new Kiki turns up within reach (on the street if there's one close enough, otherwise
+  right by you, which at home is your own garden), so there's always something to catch without walking anywhere.

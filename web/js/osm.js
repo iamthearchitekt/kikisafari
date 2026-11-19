@@ -149,6 +149,32 @@ export class OsmArea {
     return this._index.get(Math.floor(p.e / 50) + ',' + Math.floor(p.n / 50)) || [];
   }
 
+  /**
+   * Where a Kiki should stand: public parks are fine as they are; anywhere else it moves onto the nearest footpath, or
+   * onto the pavement beside the nearest street (within 50 m), so a Kiki is never in someone's yard. Service roads
+   * (driveways, car parks) don't count. null when there's no street close enough; the spot itself when this area has
+   * no mapped streets at all (the countryside).
+   */
+  streetSpot(spot) {
+    const p = this.local(spot), near = this.near(p), cands = [];
+    if (near.some(f => f.kind === 'park' && f.poly && insideShape(f, p)) && !this.unsafe(spot)) return spot;
+    for (const f of near) {
+      if (f.kind !== 'path' && !(f.kind === 'road' && f.cat !== 'service' && f.cat !== 'track')) continue;
+      const L = f.local, off = f.kind === 'road' ? roadHalf(f.cat) + 4 : 0;
+      for (let i = 0; i < L.length - 1; i++) {
+        const a = L[i], b = L[i + 1], dx = b.e - a.e, dy = b.n - a.n, l2 = dx * dx + dy * dy; if (!l2) continue;
+        const t = Math.max(0, Math.min(1, ((p.e - a.e) * dx + (p.n - a.n) * dy) / l2)), qe = a.e + dx * t, qn = a.n + dy * t, d = Math.hypot(p.e - qe, p.n - qn);
+        if (d > 50) continue;
+        const len = Math.sqrt(l2); let ne = -dy / len, nn = dx / len; if ((p.e - qe) * ne + (p.n - qn) * nn < 0) { ne = -ne; nn = -nn; }
+        cands.push({ d, e: qe + ne * off, n: qn + nn * off });
+      }
+    }
+    if (!cands.length) return this.features.some(f => f.kind === 'road' || f.kind === 'path') ? null : spot;
+    cands.sort((a, b) => a.d - b.d);
+    for (const c of cands.slice(0, 6)) { const g = fromLocal(this.origin, c.e, c.n); if (!this.unsafe(g)) return g; }
+    return null;
+  }
+
   /** Why a spot is unsafe, or null. Safety exclusions are reported first. */
   unsafe(spot, allowBuildings = false) {
     const p = this.local(spot), near = this.near(p);
@@ -262,6 +288,8 @@ export class WorldData {
   areaAt(p) { const e = this.cells.get(this.key(cellOf(p, DATA_CELL))); return e ? e.area : null; }
   covers(p) { return !!this.areaAt(p); }
   isSafe(p) { const a = this.areaAt(p); return !a || !a.unsafe(p); }
+  /** A Kiki's spot on the street (see OsmArea.streetSpot); unchanged where there's no map data yet. */
+  streetSpot(p) { const a = this.areaAt(p); return a ? a.streetSpot(p) : p; }
   habitatAt(p) { const a = this.areaAt(p); return a ? a.habitatAt(p) : null; }
   *stops() { for (const e of this.cells.values()) yield* e.stops; }
   *circles() { for (const e of this.cells.values()) yield* e.circles; }

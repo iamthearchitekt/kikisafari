@@ -232,7 +232,7 @@ export const progressApi = {
 };
 
 // ---------- the live world ----------
-export const KIKI_CELL = 70, SPAWN_CHANCE = 0.45, STOP_CELL = 250, NEARBY = 200, VISIBLE = 70, ACTION = 40, CIRCLE_RANGE = 400;
+export const KIKI_CELL = 55, SPAWN_CHANCE = 0.6, VISIT_EVERY = 300, STOP_CELL = 250, NEARBY = 200, VISIBLE = 70, ACTION = 40, CIRCLE_RANGE = 400;
 export const WORLD_SEED = 'KIKISAFARI-1';
 
 /** Everything near the player: Kikis, supply stops and Rune Circles (real landmarks when map data is loaded). */
@@ -243,10 +243,23 @@ export function nearby(me, now, { home = null, progress = null, caught = new Set
     const ctr = c.center;
     const ctx = { habitat: (mapped && data.habitatAt(ctr)) || rotatingHabitat(ctr, now, WORLD_SEED), night: isNight(ctr, date), ...mods };
     for (const s of activeSpawns(c.x, c.y, now, WORLD_SEED, KIKI_CELL, ctx, SPAWN_CHANCE)) {
-      const at = c.at(s.e, s.n);
-      if (data && !data.isSafe(at)) continue;
+      let at = c.at(s.e, s.n);
+      if (data) { at = data.streetSpot(at); if (!at || !data.isSafe(at)) continue; }
       addKiki(list, `k:${c.x}:${c.y}:${s.start}`, s.id, at, caught, boost);
     }
+  }
+  { // Visitors: every 5 minutes a Kiki turns up 15 to 35 m from where you are (on the street), so there's always
+    // something to catch, even at home. Anyone standing in the same spot at the same time sees the same visitor.
+    // It's always within reach (40 m): on the street if one is close enough, otherwise right by you (if you're at home,
+    // that's your own garden).
+    const g = cellOf(me, 30), w = Math.floor(now / VISIT_EVERY), r = rng(hash(WORLD_SEED, 'visit', g.x, g.y, w));
+    const ctx = { habitat: (mapped && data.habitatAt(g.center)) || rotatingHabitat(g.center, now, WORLD_SEED), night: isNight(g.center, date), ...mods };
+    const v = pick(ctx, r.next()), a0 = r.next() * Math.PI * 2, spots = [];
+    for (let k = 0; k < 10; k++) { const d = 8 + r.next() * 10, a = a0 + k * 0.63; spots.push(fromLocal(g.center, Math.cos(a) * d, Math.sin(a) * d)); }
+    let at = null;
+    if (v && data) for (const s of spots) { const q = data.streetSpot(s); if (q && data.isSafe(q) && distance(g.center, q) <= 19) { at = q; break; } }
+    if (v && !at) at = spots.find(s => !data || data.isSafe(s)) || null;
+    if (v && at) addKiki(list, `visit:${g.x}:${g.y}:${w}`, v.id, at, caught, boost);
   }
   if (mapped) {
     for (const s of data.stops()) list.push({ kind: 'stop', id: s.id, name: s.name, where: s.where });
