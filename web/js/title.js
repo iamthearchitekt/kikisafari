@@ -35,8 +35,14 @@ function tree(h, side) {
   const trunk = new THREE.Mesh(vgrad(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.42, 10), 0x2a1a12, 0x5a3a26, 0, h), plush({ vertexColors: true, roughness: 0.9 }, 0.25));
   g.add(trunk);
   for (let i = 0; i < 7; i++) { const b = leafy(0.9 + (i % 3) * 0.3); b.position.set(side * (-0.5 - i * 0.28) + (i % 2) * 0.3, h - 0.3 + (i % 3) * 0.45, (i % 2) * 0.4); g.add(b); }
-  for (let v = 0; v < 2; v++) { const vx = side * (-0.55 - v * 0.45), vine = []; for (let i = 0; i <= 8; i++) vine.push(new THREE.Vector3(vx + Math.sin(i * 0.8) * 0.08, h - 0.4 - i * 0.35, 0.5)); g.add(new THREE.Mesh(vgrad(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(vine), 16, 0.035, 5), 0x1f5a2a, 0x3f8a3a, h - 3, h), plush({ vertexColors: true }, 0.2)));
-    for (let i = 1; i < 8; i += 2) { const l = new THREE.Mesh(leafGeometry(0.4, 0.8, 0x1f6a30, 0x8fe05a, true), LEAF); l.position.set(vx, h - 0.4 - i * 0.35, 0.5); l.rotation.set(0.6, (i % 4 ? 1 : -1) * 1.2, 0, 'YXZ'); l.scale.setScalar(0.45); g.add(l); } }
+  // vines drape from the canopy, sag, and swing out past the side of the screen
+  for (let v = 0; v < 2; v++) {
+    const drop = 2.4 + v * 1.6, inward = 1.5 + v * 0.5, vine = [];
+    for (let i = 0; i <= 24; i++) { const t = i / 24; vine.push(new THREE.Vector3(side * (-inward * (1 - t) + 1.2 * t), h - 0.3 - t * drop - Math.sin(t * Math.PI) * 0.7, 0.6 + v * 0.2)); }
+    const curve = new THREE.CatmullRomCurve3(vine);
+    g.add(new THREE.Mesh(vgrad(new THREE.TubeGeometry(curve, 48, 0.04, 6), 0x1f5a2a, 0x3f8a3a, h - drop - 1, h), plush({ vertexColors: true }, 0.2)));
+    for (let i = 1; i < 8; i++) { const p = curve.getPointAt(i / 8), l = new THREE.Mesh(leafGeometry(0.4, 0.8, 0x1f6a30, 0x8fe05a, true), LEAF); l.position.copy(p); l.rotation.set(0.7, (i % 2 ? 1 : -1) * 1.2, 0, 'YXZ'); l.scale.setScalar(0.42); g.add(l); }
+  }
   return g;
 }
 /** Big leaves hanging down from the canopy across the top. */
