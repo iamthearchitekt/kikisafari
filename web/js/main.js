@@ -209,6 +209,8 @@ app.tuningPanel = function tuningPanel() {
     <button class="pill small pink" id="t-pin">Move test Rune Circle here</button>
     <div class="row"><button class="pill small sky" id="t-stones">+30 stones</button><button class="pill small sky" id="t-xp">+5,000 XP</button><button class="pill small sky" id="t-res">+50 Fluff, +5k Sprouts</button></div>
     <div class="row"><button class="pill small sky" id="t-km">Walk 1 km</button><button class="pill small sky" id="t-eggs">+3 eggs</button><button class="pill small sky" id="t-wx"></button></div>
+    <p class="d" style="font-size:13px;margin:0;color:#4d5aa6;overflow-wrap:anywhere">Map: ${app.osm.data.covers(app.loc.fix || { lat: 0, lon: 0 }) ? 'loaded here' : 'not loaded here'}${app.osm.lastError ? ' · last problem: ' + app.osm.lastError.replace(/[<>&]/g, '') : ''}</p>
+    <button class="pill small sky" id="t-map">Try the map again now</button>
     <div class="row"><button class="pill small cream" id="t-reset">Reset sliders</button><button class="pill small cream" id="t-wipe">Start over</button><button class="pill small" id="t-done">Done</button></div></div>`);
   p.root.querySelectorAll('input[type=range]').forEach(i => i.oninput = () => { tuning[i.dataset.k] = +i.value; p.root.querySelector('#tv-' + i.dataset.k).textContent = i.value; saveTuning(); });
   p.root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; debug[k] = !debug[k]; saveDebug(); b.textContent = `${toggles.find(x => x[0] === k)[1]}: ${debug[k] ? 'on' : 'off'}`; app.world.nextPlan = 0; });
@@ -222,6 +224,7 @@ app.tuningPanel = function tuningPanel() {
   wxl(); wxb.onclick = () => { debug.weather = wxs[(wxs.indexOf(debug.weather || null) + 1) % wxs.length]; saveDebug(); wxl(); app.world.nextPlan = 0; };
   p.root.querySelector('#t-reset').onclick = () => { Object.assign(tuning, { strength: 1, ringPeriod: 2.4, aimAssist: 0.35, odds: 1, gravity: 9.81, hitRadius: 0.26 }); saveTuning(); p.close(); app.tuningPanel(); };
   p.root.querySelector('#t-wipe').onclick = async () => { p.close(); if (await confirm('Start over? This deletes your explorer, Kikis and items on this phone.', 'Delete everything')) { localStorage.removeItem('kiki-safari-progress'); location.reload(); } };
+  p.root.querySelector('#t-map').onclick = () => { app.osm.retry.clear(); app.osm.fails.clear(); if (app.loc.fix) app.osm.need(app.loc.fix); toast('Loading the map…'); p.close(); };
   p.root.querySelector('#t-done').onclick = p.close;
 };
 

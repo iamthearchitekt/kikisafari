@@ -272,6 +272,10 @@ Plush mascot is unchanged; this is about how the game presents them.
 - **Battery saver:** 1× pixels and 30 frames a second on the map; catches and battles stay smooth.
 - **Units:** km or miles for distances on screen. Egg names stay "2 km / 5 km / 10 km" (they're names).
 - **Privacy page** (Settings ▸ Privacy) lists what stays on the phone, what goes online and to which service.
+- **Street map reliability:** map data comes from public Overpass servers, which get busy. The game tries
+  overpass-api.de, then overpass.private.coffee, then overpass.kumi.systems, gives each 40 seconds, and remembers the one
+  that answered. Error replies ("query timed out") are never saved on the phone. Settings ▸ Testing tools shows the
+  last map problem and has "Try the map again now". For a big launch, the game should use its own map server.
 
 ## 19. Rare Kikis use names from the Big Plush game (owner)
 

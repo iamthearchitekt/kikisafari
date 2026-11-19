@@ -103,6 +103,31 @@ const norm = d => ((d % 360) + 360) % 360;
 const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
 
 // ---------- map data (OpenStreetMap via Overpass, cached on the phone) ----------
+// Overpass is a free public service, and its servers get busy. The game asks the main one first and moves on to the
+// others if it's busy, down or slow, then remembers which one answered. A reply that is really an error ("timed out")
+// is never kept on the phone, so a busy moment can't leave the map blank for two weeks.
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const OSM_CACHE = 'kiki-osm-v2';
+if (typeof caches !== 'undefined') caches.delete('kiki-osm-v1').catch(() => {}); // the old cache could hold a blank "timed out" reply
+/** Is this a real map reply (not an Overpass error dressed up as data)? */
+export const goodMap = j => !!j && Array.isArray(j.elements) && !(j.remark && /error|timed out|timeout|out of memory|too many/i.test(j.remark));
+let overpassAt = Math.max(0, OVERPASS.indexOf(localStorage.getItem('kiki-overpass')));
+async function fetchOverpass(q) {
+  const errors = [];
+  for (let i = 0; i < OVERPASS.length; i++) {
+    const url = OVERPASS[(overpassAt + i) % OVERPASS.length], host = new URL(url).host, ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 40000);
+    try {
+      const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}${r.status === 429 ? ' (busy)' : r.status === 504 ? ' (timed out)' : ''}`);
+      const text = await r.text(), json = JSON.parse(text);
+      if (!goodMap(json)) throw new Error(json.remark ? json.remark.slice(0, 80) : 'not map data');
+      if (overpassAt !== OVERPASS.indexOf(url)) { overpassAt = OVERPASS.indexOf(url); localStorage.setItem('kiki-overpass', url); }
+      return { text, json };
+    } catch (e) { errors.push(`${host}: ${e.name === 'AbortError' ? 'no answer in 40 s' : e.message}`); }
+    finally { clearTimeout(timer); }
+  }
+  throw new Error(errors.join(' · '));
+}
 export class OsmLoader {
   constructor() { this.data = new WorldData(); this.queue = []; this.busy = false; this.pending = new Set(); this.retry = new Map(); this.fails = new Map(); this.problem = null; this.listeners = []; }
   need(me) {
@@ -121,20 +146,23 @@ export class OsmLoader {
   async load(cell) {
     const key = `https://kiki-safari.local/osm/${cell.x}_${cell.y}.json`;
     let json = null, cache = null;
-    try { cache = await caches.open('kiki-osm-v1'); const hit = await cache.match(key); if (hit && Date.now() - +(hit.headers.get('x-saved') || 0) < 14 * 864e5) json = await hit.json(); } catch (e) {}
+    try {
+      cache = await caches.open(OSM_CACHE);
+      const hit = await cache.match(key);
+      if (hit && Date.now() - +(hit.headers.get('x-saved') || 0) < 14 * 864e5) { const j = await hit.json(); if (goodMap(j)) json = j; }
+    } catch (e) {}
     if (!json) {
       const q = overpassQuery(cell.sw.lat, cell.sw.lon, cell.sw.lat + cell.dLat, cell.sw.lon + cell.dLon);
       try {
-        const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const text = await r.text(); json = JSON.parse(text); this.problem = null;
-        if (cache) cache.put(key, new Response(text, { headers: { 'x-saved': String(Date.now()), 'Content-Type': 'application/json' } })).catch(() => {});
+        const got = await fetchOverpass(q); json = got.json; this.problem = null; this.lastError = null;
+        if (cache) cache.put(key, new Response(got.text, { headers: { 'x-saved': String(Date.now()), 'Content-Type': 'application/json' } })).catch(() => {});
       } catch (e) {
-        if (cache) { const old = await cache.match(key); if (old) json = await old.json(); }
+        this.lastError = e.message; console.warn('map', e.message);
+        if (cache) { try { const old = await cache.match(key); if (old) { const j = await old.json(); if (goodMap(j)) json = j; } } catch (e2) {} }
         if (!json) {
-          this.problem = "Can't load the map here right now. Kikis still spawn; landmarks appear when the map loads.";
+          this.problem = (navigator.onLine === false ? "You're offline, so the map can't load." : "Can't load the map right now (the map servers are busy).") + ' Kikis still spawn; the streets appear when it loads.';
           const k = cell.x + ':' + cell.y, n = (this.fails.get(k) || 0) + 1; this.fails.set(k, n);
-          this.retry.set(k, performance.now() + Math.min(600000, 20000 * 2 ** (n - 1))); // back off: 20 s, 40 s, 80 s … up to 10 min
+          this.retry.set(k, performance.now() + Math.min(300000, 15000 * 2 ** (n - 1))); // back off: 15 s, 30 s, 60 s … up to 5 min
           return;
         }
       }
