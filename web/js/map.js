@@ -4,7 +4,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import { roadHalf } from './osm.js';
-import { makeKiki, KikiMotion, makeRuneStone, makeCircle } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle } from './art.js';
+import { STOP_COOLDOWN } from './rules.js';
 import { reducedMotion } from './services.js';
 
 const DAY = { park: 0x8fd45e, woods: 0x4fa046, grass: 0xa6dc74, water: 0x45d6e6, casing: 0xb9bedd, road: 0xffffff, main: 0xffe58a, path: 0xf3dfa8, rail: 0x6b6f8c, roof: 0xf4ecff, wall: 0xcfc4ea, land: 0xe9f3d6 };
@@ -56,7 +57,7 @@ export class StreetMap {
     this.app = app; this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 2, 4000);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xb0a8d8, 1.8)); const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(-200, 400, 150); this.scene.add(sun);
     this.layers = new THREE.Group(); this.scene.add(this.layers); this.things = new THREE.Group(); this.scene.add(this.things);
-    this.origin = null; this.built = new Set(); this.waiting = []; this.views = new Map(); this.dist = 420; this.yaw = null; this.night = false; this.player = this.makePlayer(); this.scene.add(this.player);
+    this.origin = null; this.built = new Set(); this.waiting = []; this.views = new Map(); this.dist = 230; this.yaw = null; this.night = false; this.player = this.makePlayer(); this.scene.add(this.player); this.walkSpeed = 0; this.facing = 0;
     this.mats = [0, 1, 2, 3, 4].map(i => { const m = new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false, side: THREE.DoubleSide }); return m; });
     this.buildMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   }
@@ -98,44 +99,67 @@ export class StreetMap {
 
   makePlayer() {
     const g = new THREE.Group();
-    const puck = new THREE.Mesh(new THREE.SphereGeometry(3.2, 22, 12), new THREE.MeshLambertMaterial({ color: 0xfff8de })); puck.scale.y = 0.5; puck.position.y = 1.6; g.add(puck);
     const ring = (r0, r1, color, y, op = 1) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: op < 1, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = -2; g.add(m); return m; };
-    ring(3.4, 4.8, 0x18237a, 0.5); ring(C.ACTION - 0.9, C.ACTION, 0xffffff, 0.4, 0.9);
-    const arrow = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.4, 3), new THREE.MeshBasicMaterial({ color: 0xff5d8f })); arrow.rotation.x = -Math.PI / 2; arrow.position.set(0, 0.6, -6.5); g.add(arrow);
+    ring(C.ACTION - 0.9, C.ACTION, 0xffffff, 0.4, 0.9);
+    const e = this.app.progress.explorer; this.setExplorer(g, e.outfit, e.skin);
     return g;
+  }
+  /** Your explorer, about 12 m tall on the map so you can see them at any zoom (things on the map are drawn big, like a board game). */
+  setExplorer(g = this.player, outfit = 0, skin = 1) {
+    if (this.avatar) g.remove(this.avatar);
+    this.avatar = makeExplorer(outfit, skin); this.avatar.scale.setScalar(12); g.add(this.avatar);
   }
 
   makeThing(t) {
     const g = new THREE.Group(); g.userData.thing = t;
-    if (t.kind === 'kiki') {
-      const k = makeKiki(t.variant.id, 6); k.rotation.y = Math.PI * 0.85; g.add(k); g.userData.motion = new KikiMotion(k, reducedMotion);
-      const r = new THREE.Mesh(new THREE.RingGeometry(3.4, 4.6, 48), new THREE.MeshBasicMaterial({ color: C.RARITY[t.variant.rarity].main, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r);
+    if (t.kind === 'kiki' && t.distance > C.VISIBLE) {
+      const r = makeRustle(); r.scale.setScalar(4); g.add(r); g.userData.rustle = r; g.userData.hidden = true;
+    } else if (t.kind === 'kiki') {
+      const k = makeKiki(t.variant.id, 10); k.rotation.y = Math.PI * 0.85; g.add(k); g.userData.motion = new KikiMotion(k, reducedMotion); g.userData.kiki = k;
+      const r = new THREE.Mesh(new THREE.RingGeometry(5, 6.6, 48), new THREE.MeshBasicMaterial({ color: C.RARITY[t.variant.rarity].main, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r);
+      g.userData.base = k.scale.x; k.scale.setScalar(0.0001); g.userData.pop = 0; // pops up out of the leaves
     } else if (t.kind === 'stop') {
-      const s = makeRuneStone(0.04); s.scale.setScalar(70); s.position.y = 7; g.add(s); g.userData.stone = s;
-      const r = new THREE.Mesh(new THREE.RingGeometry(4.5, 6, 48), new THREE.MeshBasicMaterial({ color: 0xff5d8f, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r);
+      const s = makeRuneStone(0.04); s.scale.setScalar(110); s.position.y = 9; g.add(s); g.userData.stone = s;
+      const r = new THREE.Mesh(new THREE.RingGeometry(6, 8, 48), new THREE.MeshBasicMaterial({ color: 0xff5d8f, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r); g.userData.ring = r;
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(6, 40), new THREE.MeshBasicMaterial({ color: 0xff5d8f, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.28; disc.renderOrder = -3; g.add(disc); g.userData.disc = disc;
     } else {
-      const c = makeCircle(t.variant.id); c.scale.setScalar(3.2); g.add(c); g.userData.circle = c;
+      const c = makeCircle(t.variant.id); c.scale.setScalar(3.6); g.add(c); g.userData.circle = c;
     }
-    const hit = new THREE.Mesh(new THREE.SphereGeometry(t.kind === 'circle' ? 11 : 7, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 4; hit.userData.hitFor = g; g.add(hit); g.userData.hit = hit;
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(t.kind === 'circle' ? 9 : 8, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = t.kind === 'circle' ? 5 : 6; hit.userData.hitFor = g; g.add(hit); g.userData.hit = hit;
     return g;
   }
 
   update(dt, time, me, heading, things) {
     this.ensureOrigin(me);
     if (this.yaw === null) this.yaw = heading;
-    const target = this.local(me);
+    const target = this.local(me), prev = this.player.position.clone();
     this.player.position.lerp(target, this.player.position.lengthSq() ? 1 - Math.exp(-dt * 4) : 1);
-    this.player.rotation.y = -heading * Math.PI / 180;
+    const step = this.player.position.clone().sub(prev); step.y = 0;
+    const v = dt > 0 ? step.length() / dt : 0; this.walkSpeed += (Math.min(v, 4) - this.walkSpeed) * Math.min(1, dt * 3);
+    // face where you're walking; standing still, face where the phone points
+    const want = this.walkSpeed > 0.4 && step.lengthSq() > 1e-6 ? Math.atan2(step.x, step.z) : Math.PI - heading * Math.PI / 180;
+    let d = want - this.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); this.facing += d * Math.min(1, dt * 6);
+    this.avatar.rotation.y = this.facing; this.avatar.userData.update(dt, this.walkSpeed > 0.25 ? this.walkSpeed : 0);
     const h = this.yaw * Math.PI / 180, tilt = 54 * Math.PI / 180, f = new THREE.Vector3(Math.sin(h), 0, -Math.cos(h));
     this.camera.position.copy(this.player.position).addScaledVector(f, -this.dist * Math.cos(tilt)).add(new THREE.Vector3(0, this.dist * Math.sin(tilt), 0));
     this.camera.lookAt(this.player.position);
     const keep = new Set();
     for (const t of things) {
       if (t.distance > 400) continue; keep.add(t.id);
-      let v = this.views.get(t.id); if (!v) { v = this.makeThing(t); this.views.set(t.id, v); this.things.add(v); v.position.copy(this.local(t.where)); }
+      let v = this.views.get(t.id);
+      if (v && t.kind === 'kiki' && !!v.userData.hidden !== t.distance > C.VISIBLE + (v.userData.hidden ? 0 : 8)) { this.things.remove(v); this.views.delete(t.id); v = null; } // came into view (or left it)
+      if (!v) { v = this.makeThing(t); this.views.set(t.id, v); this.things.add(v); v.position.copy(this.local(t.where)); }
       v.userData.thing = t; v.position.lerp(this.local(t.where), 1 - Math.exp(-dt * 4));
       if (v.userData.motion) v.userData.motion.update(dt);
-      if (v.userData.stone) { v.userData.stone.rotation.set(-1.2, time, 0); v.userData.stone.userData.update(dt, time); }
+      if (v.userData.rustle) v.userData.rustle.userData.update(dt);
+      if (v.userData.kiki && v.userData.pop < 1) { v.userData.pop = Math.min(1, v.userData.pop + dt * 2.5); const k = v.userData.pop, s = 1 + Math.sin(k * Math.PI) * 0.25; v.userData.kiki.scale.setScalar(Math.max(0.0001, k * s) * v.userData.base); }
+      if (v.userData.stone) {
+        const ready = !this.app.progress.stops[t.id] || Math.floor(Date.now() / 1000) - this.app.progress.stops[t.id] >= STOP_COOLDOWN;
+        v.userData.stone.rotation.set(-1.2, ready ? time : 0.4, 0); v.userData.stone.userData.update(dt, time);
+        const c = ready ? 0xff5d8f : 0x9b8cff; v.userData.ring.material.color.setHex(c); v.userData.disc.material.color.setHex(c);
+      }
+      if (this.app.tracking === t.id) { if (!v.userData.track) { const r = new THREE.Mesh(new THREE.RingGeometry(9, 10.6, 48), new THREE.MeshBasicMaterial({ color: 0xffcf2e, side: THREE.DoubleSide, transparent: true, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.5; r.renderOrder = -1; v.add(r); v.userData.track = r; } const k = (time * 0.8) % 1; v.userData.track.scale.setScalar(0.7 + k * 0.8); v.userData.track.material.opacity = 1 - k; }
+      else if (v.userData.track) { v.remove(v.userData.track); v.userData.track = null; }
       if (v.userData.circle) { v.userData.circle.userData.portal.userData.update(dt, time, this.camera); v.userData.circle.userData.setKeeper(t.variant.id); if (v.userData.circle.userData.motion) v.userData.circle.userData.motion.update(dt); }
     }
     for (const [id, v] of this.views) if (!keep.has(id)) { this.things.remove(v); this.views.delete(id); }
@@ -144,8 +168,15 @@ export class StreetMap {
   tap(x, y) {
     const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
     const hits = ray.intersectObjects([...this.views.values()].map(v => v.userData.hit), false);
-    if (hits.length) this.app.interact(hits[0].object.userData.hitFor.userData.thing);
+    if (!hits.length) return;
+    // Kikis win over stops, stops over Rune Circles (their tap areas overlap when they're close together).
+    const rank = h => ({ kiki: 0, stop: 1, circle: 2 }[h.object.userData.hitFor.userData.thing.kind] ?? 3);
+    hits.sort((a, b) => rank(a) - rank(b) || a.distance - b.distance);
+    const g = hits[0].object.userData.hitFor;
+    if (g.userData.hidden) return this.app.rustleTap(g.userData.thing);
+    this.app.interact(g.userData.thing);
   }
+  north() { this.yaw = 0; }
   rotate(dxPx) { this.yaw = (this.yaw || 0) + dxPx / innerWidth * 180; }
   zoom(f) { this.dist = Math.max(160, Math.min(1100, this.dist * f)); }
 }

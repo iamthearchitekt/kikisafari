@@ -161,3 +161,27 @@ Rarity colors come from section 4 of the treatment.
   - Everything follows the safety rules in section 4.
   - The home test circle stays until it's switched off in the tuning panel.
   - Until a server holds Keepers, a captured circle is remembered on the player's phone.
+
+## 13. Phase 1: the Pokémon GO play loop (owner: "lets tackle phase 1")
+
+The owner asked for the game to play more like Pokémon GO; `docs/ROADMAP.md` lists the objectives. Same loop and
+depth, with KIKI SAFARI's own creatures, names and look. Built in the web version first, since that's the test build.
+
+- **The map is home.** This reverses the camera-first call in section 12: you walk around the street map as your
+  explorer, and Kikis pop up on it. The camera is used for AR catches, with an AR on/off switch (off shows a meadow
+  stand-in). The camera view for looking around is still one tap away.
+- **Your explorer:** four starter outfits and five skin tones, made at the start. Ranger Rue (placeholder) is the guide.
+- **Every Kiki is one of a kind:** level, three hidden stats (Cuddle, Bounce, Zest, 0 to 15), size (XS and XL are rare)
+  and Plush Power. Wild Kikis are up to your explorer level (max 30), and the same spawn always has the same stats.
+- **Items:** Rune Stone, Moon Stone (level 5), Star Stone (level 10), Honey Leaf (level 2: easier catch), Sun Seed (level 6:
+  double Fluff). Bag of 250, collection of 200.
+- **Catching:** the ring's colour shows the odds (green, yellow, orange, red). Higher-level Kikis are harder. A Kiki
+  that breaks out can run away (10 to 15%); starters can't.
+- **Growth:** Sprouts plus that family's Fluff power a Kiki up (up to your level + 2). 25 Fluff evolves a common:
+  Meadow → Grand Meadow, Pine → Elder Pine, Sprout → Bloom (new art: fuller crowns, embroidered tummy spirals, a flower).
+  Sending a Kiki home gives 1 Fluff; favourites can't be sent.
+- **Explorer level:** 1,000 XP for level 2, 3,000 for 3, 6,000 for 4, 10,000 for 5 and so on, up to 40. Level-ups give
+  items. Daily first catch and first stop give bonus XP, with a big bonus on day 7 in a row.
+- **Spawns you catch or scare off stay gone** for you (they used to come back after reloading).
+- **Saves from before Phase 1 carry over:** each earlier catch becomes its own Kiki, stones and Sprouts are kept, and
+  the player just makes an explorer (no starter).

@@ -80,11 +80,18 @@ The `web/` folder is a complete web version that runs in Safari and installs to 
 
 1. In Netlify, choose **Add new site ▸ Import an existing project ▸ GitHub** and pick this repo. The `netlify.toml`
    at the top of the repo already tells Netlify to publish `web/`, so just press **Deploy**.
-2. On your iPhone, open the site in **Safari** and tap **Play ▸ Allow and play** (camera, motion and location).
+2. On your iPhone, open the site in **Safari** and tap **Play ▸ Allow and play** (location and motion; the camera is
+   asked for at your first AR catch).
 3. To make it an app: **Share ▸ Add to Home Screen**.
 
-On a computer you can try it too: there's no camera or motion there, so you get a meadow stand-in. Drag to look
-around, WASD walks. Add `?lat=…&lon=…` to the address to start somewhere specific.
+The first time you play, Ranger Rue walks you through making your explorer and catching a starter Kiki. After that
+the map is home: walk around, tap Kikis to catch them, tap pink supply stops and swipe to spin them. The big stone at
+the bottom opens the menu (your Kikis, the Safari Log, your bag, your explorer, settings). **Settings ▸ Testing tools**
+has the tuning sliders plus shortcuts for testing: extra stones, XP, Fluff and Sprouts, and "Start over".
+
+On a computer you can try it too: there's no camera or motion there, so catches use the meadow stand-in. WASD walks
+(up the map), drag turns the map, scroll zooms. Add `?lat=…&lon=…` to the address to start somewhere specific.
+`web/test/preview.html` shows every Kiki, stone, treat and outfit.
 
 Run the web tests with `node web/test/core.test.mjs`.
 

@@ -1,11 +1,10 @@
 // Saves, settings, haptics, sound and small UI helpers for the web version.
-import { newProgress } from './core.js';
+import { migrate } from './rules.js';
 
 // ---------- saves (this phone only) ----------
 const SAVE = 'kiki-safari-progress';
 export function loadProgress() {
-  try { const p = JSON.parse(localStorage.getItem(SAVE)); if (p && p.v === 1) return Object.assign(newProgress(), p); } catch (e) {}
-  return newProgress();
+  try { return migrate(JSON.parse(localStorage.getItem(SAVE))); } catch (e) { return migrate(null); }
 }
 export const saveProgress = p => { try { localStorage.setItem(SAVE, JSON.stringify(p)); } catch (e) {} };
 

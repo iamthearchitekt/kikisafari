@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as C from '../js/core.js';
+import * as R from '../js/rules.js';
 import { OsmArea, WorldData, placeLandmarks, DATA_CELL, CIRCLE_SPACING, STOP_SPACING } from '../js/osm.js';
 
 let passed = 0, failed = 0;
@@ -118,6 +119,90 @@ test('live world uses real data and keeps Kikis safe', () => {
     assert.ok(list.some(x => x.kind === 'circle'));
     for (const k of list.filter(x => x.kind === 'kiki')) assert.ok(data.isSafe(k.where), k.id + ' ' + area.unsafe(k.where));
   }
+});
+
+// ---------- Phase 1 rules ----------
+test('species table: numbers, families and evolutions line up', () => {
+  assert.deepEqual(R.SPECIES.map(v => v.no), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  for (const v of C.VARIANTS) { assert.ok(v.family && v.base && v.cm && v.kg && v.blurb, v.id); if (v.evolvesTo) assert.equal(C.variant(v.evolvesTo).family, v.family); }
+  assert.equal(R.fluffName('pine'), 'Pine Fluff');
+});
+test('levels and XP', () => {
+  assert.equal(R.levelOf(0), 1); assert.equal(R.levelOf(999), 1); assert.equal(R.levelOf(1000), 2); assert.equal(R.levelOf(10000), 5); assert.equal(R.levelOf(1e9), R.MAX_LEVEL);
+  const p = R.newSave(), ups = R.giveXp(p, 10000);
+  assert.deepEqual(ups.map(u => u.level), [2, 3, 4, 5]);
+  assert.ok(ups.find(u => u.level === 5).unlocks.includes('moon') && p.items.moon === 15);
+});
+test('bag limit', () => {
+  const p = R.newSave(); p.items.rune = R.BAG_MAX - 3;
+  assert.deepEqual(R.addItems(p, { rune: 2, honey: 5 }), { rune: 2, honey: 1 });
+  assert.equal(R.bagCount(p), R.BAG_MAX);
+  assert.ok(R.useItem(p, 'honey') && !R.useItem(p, 'star'));
+});
+test('individual Kikis: power grows with level, wild stats repeat, sizes sensible', () => {
+  const a = R.wildKiki('k:1:2:3', 'meadow', 20), b = R.wildKiki('k:1:2:3', 'meadow', 20);
+  assert.deepEqual(a, b); assert.ok(a.lvl >= 1 && a.lvl <= 20);
+  assert.ok(R.wildKiki('x', 'meadow', 1).lvl === 1);
+  const k = { ...a, lvl: 10 }, k2 = { ...a, lvl: 11 }; assert.ok(R.power(k2) > R.power(k));
+  const r = C.rng(5); let xs = 0, xl = 0;
+  for (let i = 0; i < 5000; i++) { const z = R.rollKiki('pine', 5, r); assert.ok(z.iv.every(x => x >= 0 && x <= 15)); if (z.size === 'XS') xs++; if (z.size === 'XL') xl++; }
+  assert.ok(xs > 100 && xs < 600 && xl > 100 && xl < 600, xs + ' ' + xl);
+  assert.equal(R.appraise({ iv: [15, 15, 15] }).perfect, true); assert.equal(R.appraise({ iv: [0, 5, 5] }).stars, 0);
+});
+test('power up, evolve, send home', () => {
+  const p = R.newSave(); p.xp = R.xpFor(10); p.sprouts = 10000; p.fluff.sprout = 30;
+  const k = R.addKiki(p, R.rollKiki('sprout', 5, C.rng(1)), 1000);
+  const before = R.power(k); assert.ok(R.powerUp(p, k)); assert.equal(k.lvl, 6); assert.ok(R.power(k) > before); assert.equal(p.fluff.sprout, 29); assert.equal(p.sprouts, 9600);
+  k.lvl = 12; assert.equal(R.canPowerUp(p, k).ok, false); // explorer level 10 caps Kikis at 12
+  const e = R.evolve(p, k); assert.equal(e.to.id, 'bloom'); assert.equal(k.sp, 'bloom'); assert.equal(p.fluff.sprout, 4); assert.ok(e.first && p.caught.bloom === 1);
+  assert.equal(R.canEvolve(p, k).ok, false);
+  k.fav = true; assert.equal(R.sendHome(p, k.uid), false); k.fav = false; assert.ok(R.sendHome(p, k.uid)); assert.equal(p.kikis.length, 0); assert.equal(p.fluff.sprout, 5);
+});
+test('catch odds: items and good throws help, high levels are harder, never certain', () => {
+  const o = (opt, lvl = 5) => R.catchOdds('Rare', lvl, opt);
+  assert.ok(o({}) < o({ stone: 'moon' }) && o({ stone: 'moon' }) < o({ stone: 'star' }));
+  assert.ok(o({}) < o({ treat: 'honey' }) && o({}) === o({ treat: 'sunseed' }));
+  assert.ok(o({ q: 'Excellent', spin: true }) > o({ q: 'Nice' }));
+  assert.ok(o({}, 30) < o({}, 1));
+  assert.ok(R.catchOdds('Common', 1, { stone: 'star', treat: 'honey', q: 'Excellent', spin: true, odds: 10 }) <= 0.98);
+  assert.equal(R.ringColor(0.7), '#5fd34b'); assert.equal(R.ringColor(0.1), '#ff4d4d');
+});
+test('break-outs can run away; guaranteed catches always land', () => {
+  const r = C.rng(9); let fled = 0, out = 0;
+  for (let i = 0; i < 20000; i++) { const x = R.resolveCatch('Common', 30, { hit: true, ring: 1 }, r); if (x.result === 'fled') fled++; if (x.result !== 'caught') out++; }
+  assert.ok(Math.abs(fled / out - R.FLEE.Common) < 0.02, String(fled / out));
+  assert.equal(R.resolveCatch('Legendary', 30, { hit: true, ring: 1, guaranteed: true }, r).result, 'caught');
+  assert.equal(R.resolveCatch('Rare', 1, { hit: false }).result, 'missed');
+});
+test('catch rewards and Sun Seed', () => {
+  const p = R.newSave(), a = R.catchRewards(p, 'pine', { quality: 'Great', spin: true });
+  assert.equal(a.xpTotal, 100 + 50 + 10 + 500); assert.equal(a.fluff, 3); assert.equal(a.family, 'pine');
+  assert.equal(R.catchRewards(p, 'golden-spiral', { treat: 'sunseed' }).fluff, 20);
+});
+test('supply stops: 3 to 5 items, only unlocked ones', () => {
+  const r = C.rng(3);
+  for (let i = 0; i < 500; i++) { const a = R.stopRoll(1, r), n = Object.values(a).reduce((x, y) => x + y, 0); assert.ok(n >= 3 && n <= 5); assert.deepEqual(Object.keys(a), ['rune']); }
+  let star = 0; for (let i = 0; i < 500; i++) if (R.stopRoll(12, r).star) star++; assert.ok(star > 50);
+});
+test('daily streaks: once a day, 7 days in a row pays the bonus, a missed day resets', () => {
+  const p = R.newSave(), day = 86400, t0 = Math.floor(new Date(2026, 10, 1, 12).getTime() / 1000);
+  for (let i = 0; i < 6; i++) { const d = R.daily(p, 'catch', t0 + i * day); assert.equal(d.day, i + 1); assert.equal(d.bonus, false); assert.equal(R.daily(p, 'catch', t0 + i * day + 60), null); }
+  const seven = R.daily(p, 'catch', t0 + 6 * day); assert.ok(seven.bonus && seven.xp === R.XP.streak);
+  assert.equal(R.daily(p, 'catch', t0 + 7 * day).day, 1);
+  assert.equal(R.daily(p, 'catch', t0 + 9 * day).day, 1);
+  assert.equal(R.streakNow(p, 'catch', t0 + 9 * day), 1); assert.equal(R.streakNow(p, 'catch', t0 + 12 * day), 0);
+});
+test('spawns you caught or scared off stay gone, then expire', () => {
+  const p = R.newSave(); R.markGone(p, 'k:1', 1000);
+  assert.ok(R.goneSet(p, 2000).has('k:1')); assert.ok(!R.goneSet(p, 1000 + 46 * 60).has('k:1'));
+});
+test('old saves move to the new format', () => {
+  const v1 = { v: 1, stones: 12, sprouts: 900, throws: 20, catches: 3, caught: { meadow: 2, rainbow: 1 }, stops: { a: 5 }, keepers: { c: { variant: 'pine', att: 70, since: 1, last: 1 } } };
+  const s = R.migrate(v1, 5000);
+  assert.equal(s.v, 2); assert.equal(s.items.rune, 12); assert.equal(s.sprouts, 900); assert.equal(s.kikis.length, 3);
+  assert.equal(s.caught.meadow, 2); assert.equal(s.fluff.meadow, 6); assert.equal(s.fluff.rainbow, 5); assert.equal(s.tutorial, 'explorer'); assert.ok(s.keepers.c);
+  assert.equal(R.migrate(null).tutorial, 'start');
+  const again = R.migrate(JSON.parse(JSON.stringify(s))); assert.deepEqual(again, s);
 });
 
 console.log(`${passed} passed, ${failed} failed`);

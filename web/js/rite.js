@@ -66,7 +66,7 @@ export function spiralRite(app, circle, onDone) {
     done = true; el.removeEventListener('pointerdown', onTap);
     const att = rite.attunement, won = att > circle.keeperAtt;
     if (won) { hx.success(); sfx('burst', 0.55); voice('yay'); } else { hx.warning(); sfx('breakout', 0.45); voice('awww'); }
-    const mine = C.VARIANTS.filter(v => app.progress.caught[v.id]).sort((a, b) => C.RARITY[b.rarity].order - C.RARITY[a.rarity].order);
+    const mine = [...new Set(app.progress.kikis.map(k => k.sp))].map(C.variant).sort((a, b) => C.RARITY[b.rarity].order - C.RARITY[a.rarity].order || b.base - a.base);
     let pick = 0;
     const p = panel(`<h2 style="color:${won ? '#7a00ff' : '#ff5d8f'}">${won ? 'The circle chose you!' : 'SO CLOSE!'}</h2>
       <p style="font-size:20px">Your attunement <b>${att}</b><br>Keeper <b>${circle.keeperAtt}</b></p>

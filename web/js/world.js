@@ -5,6 +5,7 @@ import * as C from './core.js';
 import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './osm.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
 import { $, toast, hx, sfx, debug, reducedMotion } from './services.js';
+import { goneSet, STOP_COOLDOWN } from './rules.js';
 
 export const EYE = 1.4; // the camera is about 1.4 m above the ground
 
@@ -14,6 +15,10 @@ export class Location {
     this.fix = null; this.accuracy = 999; this.count = 0; this.speedKmh = 0; this.locked = false; this.problem = null; this.simulated = false; this.last = null;
   }
   start() {
+    if (this.started) return this.started; // Play again from the title: keep the one GPS watch
+    return this.started = this._start();
+  }
+  _start() {
     const q = new URLSearchParams(location.search);
     if (q.has('lat') || !('geolocation' in navigator)) return this.simulate(q);
     return new Promise(resolve => {
@@ -62,9 +67,13 @@ export class Orientation {
   constructor(camera) {
     this.camera = camera; this.target = new THREE.Quaternion(); this.have = false; this.offset = 0; this.offsetSet = false; this.absolute = false;
     this.yaw = 0; this.pitch = -0.12; // drag-to-look fallback
+    this.locked = false; // AR off: a fixed view, the phone's motion is ignored
     this.onEvent = e => {
       if (e.alpha == null) return;
       if (e.type === 'deviceorientationabsolute') this.absolute = true; else if (this.absolute) return;
+      // Compass heading of the phone's top edge (for the map, where the phone is held flat).
+      if (typeof e.webkitCompassHeading === 'number') this.compass = e.webkitCompassHeading;
+      else if (this.absolute || e.absolute) this.compass = norm(360 - e.alpha - (((screen.orientation && screen.orientation.angle) || 0)));
       const orient = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
       const eu = new THREE.Euler(e.beta * Math.PI / 180, e.alpha * Math.PI / 180, -e.gamma * Math.PI / 180, 'YXZ');
       this.target.setFromEuler(eu).multiply(q1).multiply(new THREE.Quaternion().setFromAxisAngle(zee, -orient));
@@ -80,13 +89,15 @@ export class Orientation {
   }
   /** Heading of a camera orientation in the sensor frame (degrees clockwise from the frame's -Z). */
   rawHeading(q) { const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q); return norm(Math.atan2(f.x, -f.z) * 180 / Math.PI); }
+  /** Which way you're facing for the map: the compass if there is one, else the camera's heading. */
+  get facing() { return this.compass != null && !this.locked ? this.compass : this.heading; }
   /** True compass heading of the camera. */
   get heading() { return norm(this.rawHeading(this.camera.quaternion) + this.offset); }
   update(dt) {
-    if (this.have) this.camera.quaternion.slerp(this.target, 1 - Math.exp(-dt * 18));
+    if (this.have && !this.locked) this.camera.quaternion.slerp(this.target, 1 - Math.exp(-dt * 18));
     else this.camera.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
   }
-  drag(dx, dy) { if (this.have) return; this.yaw -= dx * 0.005; this.pitch = Math.max(-1.2, Math.min(0.8, this.pitch - dy * 0.005)); }
+  drag(dx, dy) { if (this.have && !this.locked) return; this.yaw -= dx * 0.005; this.pitch = Math.max(-1.2, Math.min(0.8, this.pitch - dy * 0.005)); }
 }
 const norm = d => ((d % 360) + 360) % 360;
 const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
@@ -137,7 +148,6 @@ export class OsmLoader {
 }
 
 // ---------- the world view ----------
-const STOP_COOLDOWN = 5 * 60, STOP_REWARD = 5;
 
 export class WorldView {
   constructor(app) {
@@ -155,15 +165,23 @@ export class WorldView {
   /** Stand-in when there's no camera: a sky and meadow behind the 3D. */
   setStandIn(on, night) {
     $('sky').hidden = !on; $('sky').classList.toggle('night', !!night); $('cam').hidden = on;
-    if (on && !this.ground) {
-      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-      g.fillStyle = night ? '#26325a' : '#6cbf45'; g.fillRect(0, 0, 64, 64);
-      for (let i = 0; i < 90; i++) { g.fillStyle = night ? 'rgba(160,140,255,.25)' : (i % 3 ? 'rgba(255,255,255,.45)' : 'rgba(255,210,63,.7)'); g.fillRect(Math.random() * 64, Math.random() * 64, 2, 2); }
-      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(300, 300); t.colorSpace = THREE.SRGBColorSpace;
+    if (on && (!this.ground || this.groundNight !== !!night)) {
+      if (this.ground) { this.scene.remove(this.ground); this.ground.material.map.dispose(); }
+      // A grassy meadow: soft blades of grass on a 128 px tile (about 4 m), fading into the sky at the horizon.
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = C.rng(11);
+      g.fillStyle = night ? '#2c4a5c' : '#6cbf45'; g.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 520; i++) {
+        const x = r.next() * 128, y = r.next() * 128, h = 3 + r.next() * 6, lean = (r.next() - 0.5) * 3, k = r.next();
+        g.strokeStyle = night ? (k < 0.5 ? 'rgba(90,140,150,.55)' : 'rgba(20,40,60,.4)') : (k < 0.5 ? 'rgba(160,225,110,.65)' : 'rgba(60,140,40,.5)');
+        g.lineWidth = 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - h); g.stroke();
+      }
+      for (let i = 0; i < 14; i++) { g.fillStyle = night ? 'rgba(200,170,255,.7)' : ['#fff8de', '#ffd23f', '#ff9dba'][i % 3]; g.beginPath(); g.arc(r.next() * 128, r.next() * 128, 1.6, 0, 7); g.fill(); }
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(300, 300); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
       this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshBasicMaterial({ map: t }));
-      this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -EYE - 0.01; this.scene.add(this.ground);
+      this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -EYE - 0.01; this.scene.add(this.ground); this.groundNight = !!night;
     }
     if (this.ground) this.ground.visible = on;
+    this.scene.fog = on ? new THREE.Fog(night ? 0x52298c : 0xd9f1ff, 6, 70) : null;
   }
 
   /** Position in the 3D world (x = east, z = south) of a real place, relative to the player. */
@@ -181,7 +199,12 @@ export class WorldView {
     let now = Math.floor(Date.now() / 1000);
     if (debug.surge && !C.surgeActive(now)) now = Math.floor(now / C.SURGE_EVERY) * C.SURGE_EVERY + 60;
     const home = debug.home ? JSON.parse(localStorage.getItem('kiki-home') || 'null') : null;
-    this.things = C.nearby(me, now, { home, progress: app.progress, caught: app.caught, data: app.osm.data });
+    const gone = goneSet(app.progress, now); for (const id of app.caught) gone.add(id);
+    this.things = C.nearby(me, now, { home, progress: app.progress, caught: gone, data: app.osm.data });
+    if (app.extraThings && app.extraThings.length) { // the tutorial's starters
+      for (const t of app.extraThings) { t.distance = C.distance(me, t.where); t.bearing = C.bearing(me, t.where); }
+      this.things = [...app.extraThings, ...this.things.filter(t => t.kind !== 'kiki')].sort((a, b) => a.distance - b.distance);
+    }
     if (debug.night) for (const t of this.things) if (t.kind === 'kiki' && t.variant.time === 'day') t.variant = C.variant('moonbeam');
     if (app.mapMode) return;
     const keep = new Set();
@@ -221,6 +244,7 @@ export class WorldView {
     this.orient.update(dt);
     if (!app.loc.fix) return;
     if (this.time >= this.nextPlan) { this.nextPlan = this.time + 1; this.plan(); }
+    this.sparkles.update(dt); // catches started from the map use these too
     if (app.mapMode) return;
     const camPos = this.camera.position, now = Date.now() / 1000;
     for (const v of this.views.values()) {
@@ -244,7 +268,6 @@ export class WorldView {
         if (t.surge && Math.random() < dt * 6) this.sparkles.burst(v.position.clone().add(new THREE.Vector3((Math.random() - .5) * 1.6, 2.25 + (Math.random() - .5) * 1.6, 0)), 3, 0x7a00ff, 0.12, 0.6, 0.8);
       }
     }
-    this.sparkles.update(dt);
     this.updateLabels();
   }
 
@@ -272,6 +295,8 @@ export class WorldView {
   tap(x, y) {
     const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
     const hits = ray.intersectObjects([...this.views.values()].map(v => v.userData.hit), false);
+    const rank = h => ({ kiki: 0, stop: 1, circle: 2 }[h.object.userData.hitFor.userData.thing.kind] ?? 3);
+    hits.sort((a, b) => rank(a) - rank(b) || a.distance - b.distance);
     if (hits.length) this.app.interact(hits[0].object.userData.hitFor.userData.thing);
   }
 

@@ -29,14 +29,28 @@ export const RARITY = {
   Legendary: { order: 3, label: 'LEGENDARY', main: '#ffd23f', second: '#ff8a00', wobbles: 3, chance: 0.15, reward: 1000, keeper: 85 },
 };
 
-// The six variants (decisions doc, section 3). Only the crown, embroidery and glow change.
+// The species. The first six are the decisions doc's variants (section 3: only the crown, embroidery and glow change);
+// Phase 1 adds an evolved form for each of the three commons. `no` is the Safari Log number, `family` shares Fluff,
+// `base` sets Plush Power, `cm`/`kg` are average sizes. Names marked * in the roadmap are placeholders.
 export const VARIANTS = [
-  { id: 'meadow', name: 'Meadow Kiki', rarity: 'Common', weight: 10, habitats: ['Meadow'], boost: 3, outside: 0.6, time: 'day' },
-  { id: 'pine', name: 'Pine Kiki', rarity: 'Common', weight: 10, habitats: ['Woods'], boost: 3, outside: 0.4 },
-  { id: 'sprout', name: 'Sprout Kiki', rarity: 'Common', weight: 10, habitats: ['Town'], boost: 2, outside: 1 },
-  { id: 'rainbow', name: 'Rainbow Kiki', rarity: 'Rare', weight: 2.5, habitats: ['Water'], boost: 4, outside: 0.25 },
-  { id: 'moonbeam', name: 'Moonbeam Kiki', rarity: 'Epic', weight: 1.2, time: 'night' },
-  { id: 'golden-spiral', name: 'Golden Spiral Kiki', rarity: 'Legendary', weight: 0.15, crewBoost: 6 },
+  { id: 'meadow', no: 1, name: 'Meadow Kiki', rarity: 'Common', weight: 10, habitats: ['Meadow'], boost: 3, outside: 0.6, time: 'day', family: 'meadow', evolvesTo: 'grand-meadow', cost: 25, base: 60, cm: 42, kg: 0.6,
+    blurb: 'Naps in sunny grass and wakes up whenever someone laughs nearby. Its leaf crown turns to follow the sun.' },
+  { id: 'grand-meadow', no: 2, name: 'Grand Meadow Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Meadow'], boost: 3, outside: 0.3, time: 'day', family: 'meadow', base: 115, cm: 55, kg: 1.1,
+    blurb: 'A Meadow Kiki that has soaked up a whole summer. The spiral stitched on its tummy is said to grow one loop each year.' },
+  { id: 'pine', no: 3, name: 'Pine Kiki', rarity: 'Common', weight: 10, habitats: ['Woods'], boost: 3, outside: 0.4, family: 'pine', evolvesTo: 'elder-pine', cost: 25, base: 62, cm: 44, kg: 0.7,
+    blurb: 'Hides among tree roots and hums when the wind blows. Smells faintly of pine needles and campfire.' },
+  { id: 'elder-pine', no: 4, name: 'Elder Pine Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Woods'], boost: 3, outside: 0.2, family: 'pine', base: 120, cm: 60, kg: 1.3,
+    blurb: 'Its tall crown keeps a dusting of frost even in summer. Younger Pine Kikis follow it around the forest.' },
+  { id: 'sprout', no: 5, name: 'Sprout Kiki', rarity: 'Common', weight: 10, habitats: ['Town'], boost: 2, outside: 1, family: 'sprout', evolvesTo: 'bloom', cost: 25, base: 55, cm: 33, kg: 0.4,
+    blurb: 'Pops up in flower beds, window boxes and cracks in the pavement. Waters its own seedling when nobody is looking.' },
+  { id: 'bloom', no: 6, name: 'Bloom Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Town'], boost: 2, outside: 0.6, family: 'sprout', base: 110, cm: 46, kg: 0.8,
+    blurb: 'Its seedling finally flowered. It shares the pollen with every bee in the neighbourhood.' },
+  { id: 'rainbow', no: 7, name: 'Rainbow Kiki', rarity: 'Rare', weight: 2.5, habitats: ['Water'], boost: 4, outside: 0.25, family: 'rainbow', base: 95, cm: 42, kg: 0.6,
+    blurb: 'Appears near water after a rain shower. Each leaf of its crown is a different colour, and no two are the same.' },
+  { id: 'moonbeam', no: 8, name: 'Moonbeam Kiki', rarity: 'Epic', weight: 1.2, time: 'night', family: 'moonbeam', base: 130, cm: 44, kg: 0.5,
+    blurb: 'Only comes out after sunset. Its embroidered stars glow a soft purple, so it never gets lost in the dark.' },
+  { id: 'golden-spiral', no: 9, name: 'Golden Spiral Kiki', rarity: 'Legendary', weight: 0.15, crewBoost: 6, family: 'golden-spiral', base: 200, cm: 48, kg: 0.9,
+    blurb: 'The keeper of the portals. Legends say the spiral on every Rune Stone was copied from its tummy.' },
 ];
 export const variant = id => VARIANTS.find(v => v.id === id) || VARIANTS[0];
 

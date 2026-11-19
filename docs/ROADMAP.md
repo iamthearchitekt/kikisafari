@@ -9,26 +9,30 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 
 ## Phase 1: the core loop (no server needed)
 
-- [ ] 1. **Map is the home screen.** Walk around a stylised map, Kikis pop up on it, tap one to start an
+**Done in the web version** (`web/`, the test build). The Unity project hasn't been brought up to Phase 1 yet. Numbers
+(XP per level, unlock levels, costs, odds) are in `web/js/rules.js` and covered by `web/test/core.test.mjs`.
+
+- [x] 1. **Map is the home screen.** Walk around a stylised map, Kikis pop up on it, tap one to start an
       encounter. The camera moves into encounters, with an AR on/off switch. (Reverses the earlier
       camera-first call; owner decision.)
-- [ ] 2. **Your explorer on the map.** An animated avatar that walks when you walk, with a few starter outfits.
-- [ ] 3. **Nearby panel.** Kikis around you, with silhouettes for ones you haven't caught. Rustling leaves on
+- [x] 2. **Your explorer on the map.** An animated avatar that walks when you walk, with a few starter outfits.
+- [x] 3. **Nearby panel.** Kikis around you, with silhouettes for ones you haven't caught. Rustling leaves on
       the map where something is hiding.
-- [ ] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured catch ring
+- [x] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured catch ring
       (green, yellow, red) shows how hard each one is. Every Kiki shows its Plush Power*.
-- [ ] 5. **Stone tiers and treats.** Rune Stone, Moon Stone*, Star Stone* with better catch rates. Honey Leaf*
+- [x] 5. **Stone tiers and treats.** Rune Stone, Moon Stone*, Star Stone* with better catch rates. Honey Leaf*
       makes a catch easier; Sun Seed* doubles the reward.
-- [ ] 6. **Every Kiki is its own.** Plush Power, size (XS to XL), hidden stats, catch date and place. Nickname,
+- [x] 6. **Every Kiki is its own.** Plush Power, size (XS to XL), hidden stats, catch date and place. Nickname,
       favourite, sort and filter.
-- [ ] 7. **Growth.** Sprouts (from everything) plus that family's Fluff* (from catching it) power a Kiki up.
-      Fluff evolves it. Send extras home for more Fluff.
-- [ ] 8. **Limits.** A bag size and a collection size, so choices matter.
-- [ ] 9. **Better supply stops.** A mix of items (stones, treats, eggs); the stop changes colour once used.
+- [x] 7. **Growth.** Sprouts (from everything) plus that family's Fluff* (from catching it) power a Kiki up.
+      Fluff evolves it. Send extras home for more Fluff. The three commons each evolve once for now: Meadow → Grand
+      Meadow*, Pine → Elder Pine*, Sprout → Bloom*. The full roster is Phase 2.
+- [x] 8. **Limits.** A bag size and a collection size, so choices matter.
+- [x] 9. **Better supply stops.** A mix of items (stones and treats; eggs join in Phase 2); the stop changes colour once used.
       First catch and first stop of the day, with a 7-day streak bonus.
-- [ ] 10. **Explorer level and XP** from catches, stops, new Log entries and evolutions. Level-up rewards;
+- [x] 10. **Explorer level and XP** from catches, stops, new Log entries and evolutions. Level-up rewards;
       better stones unlock by level.
-- [ ] 11. **First-time tutorial.** Pick 1 of 3 starter Kikis, a guided first catch, then the first stop.
+- [x] 11. **First-time tutorial.** Pick 1 of 3 starter Kikis, a guided first catch, then the first stop.
 
 ## Phase 2: a world worth exploring
 
@@ -75,7 +79,8 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 
 ## Decisions for the owner
 
-- **Home screen:** map first, with the camera in encounters (recommended; this is how Pokémon GO plays), or keep camera first.
+- ~~**Home screen:** map first, with the camera in encounters, or keep camera first.~~ Map first (owner: "lets tackle phase 1"). The camera view stays one tap away (the AR button).
 - **Server for Phase 4:** Supabase recommended (free tier, works with Netlify).
-- **Names:** Plush Power, Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, elements, factions. Approve or rename.
+- **Names:** Plush Power, Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), Grand Meadow / Elder Pine /
+  Bloom Kiki, the hidden stats Cuddle / Bounce / Zest, elements, factions. Approve or rename.
 - **New creatures:** Kiki variants only, or Kiki plus friends (other creatures in the same plush style)?
