@@ -7,11 +7,11 @@ import * as R from './rules.js';
 import { WorldView, Location, OsmLoader, drawRadar, renderNearby } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
-import { spiralRite } from './rite.js';
 import { portrait } from './art.js';
 import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
+import { circlePanel, healKiki } from './battle.js';
 import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug } from './services.js';
 
 const app = {
@@ -22,6 +22,7 @@ const app = {
 };
 app.loc = new Location();
 app.mods = () => mods(app);
+app.healKiki = k => healKiki(app, k);
 app.did = ev => did(app, ev);
 app.open = name => ({ eggs: openEggs, tasks: openTasks, medals: openMedals, events: openEvents })[name](app);
 app.osm = new OsmLoader();
@@ -138,7 +139,7 @@ app.interact = t => {
   if (d > C.ACTION) { hx.light(); return toast(`${t.kind === 'stop' ? 'That supply stop' : t.kind === 'circle' ? t.name : 'That Kiki'} is ${Math.round(d)} m away. Get inside the white circle.`); }
   if (t.kind === 'kiki') startEncounter(t);
   else if (t.kind === 'stop') { sfx('button', 0.35); hx.light(); stopPanel(app, t); }
-  else circlePanel(t);
+  else circlePanel(app, t);
 };
 app.rustleTap = t => { hx.light(); app.tracking = t.id; refreshHud(true); toast('Something is rustling in the leaves… Walk closer! (Tracking it for you.)', 3200); };
 app.pinHome = () => {
@@ -160,13 +161,15 @@ app.setEncounterAR = async on => {
   layers();
 };
 
+/** Catch a raid boss you just beat: a set number of Raid Stones. */
+app.raidCatch = (raid, stones) => { const v = C.variant(raid.sp); startEncounter({ kind: 'kiki', id: 'raid:' + raid.id, name: v.name, variant: v, where: { ...app.loc.fix }, raid: { raid, stones } }); };
 /** A Kiki from a task or the story, right where you are (it can't run away). */
 app.rewardEncounter = sp => { const v = C.variant(sp); startEncounter({ kind: 'kiki', id: 'reward:' + sp + ':' + Date.now(), name: v.name, variant: v, where: { ...app.loc.fix }, reward: true }); };
 
 async function startEncounter(t) {
   if (app.encounter) return;
   if (app.progress.kikis.length >= R.KIKI_MAX) { hx.warning(); return toast(`Your collection is full (${R.KIKI_MAX}). Send some Kikis home from the menu first.`, 3600); }
-  if (!R.STONES.some(id => app.progress.items[id] > 0)) { hx.warning(); return toast('Out of stones! Spin a supply stop to get more.', 3200); }
+  if (!t.raid && !R.STONES.some(id => app.progress.items[id] > 0)) { hx.warning(); return toast('Out of stones! Spin a supply stop to get more.', 3200); }
   hx.medium(); sfx('pickup', 0.35);
   app.encounter = { pending: true };
   app.world.setVisible(false);
@@ -179,27 +182,6 @@ async function startEncounter(t) {
     if (why === 'caught' && enc.ups && enc.ups.length) await levelUps(app, enc.ups);
     if (why === 'caught' && t.starter && app.onStarterCaught) app.onStarterCaught();
   }, { starter: !!t.starter });
-}
-
-function circlePanel(t) {
-  const now = Math.floor(Date.now() / 1000), next = C.surgeNextIn(now);
-  const surge = C.surgeActive(now) ? `<p style="color:#ff5d8f">PORTAL SURGE! Rare Kikis are pouring out (${Math.ceil(C.surgeLeft(now) / 60)} min left)</p>`
-    : `<p style="color:#4d5aa6">Next Portal Surge in ${Math.floor(next / 3600)}h ${String(Math.floor(next % 3600 / 60)).padStart(2, '0')}m</p>`;
-  const hasKiki = app.progress.kikis.length > 0;
-  const p = panel(`<h2 style="color:#7a00ff">${t.name}</h2>${surge}
-    <p style="font-size:20px">${t.mine ? `Your ${t.variant.name} keeps this circle.` : `Keeper: a wild ${t.variant.name}`}<br>Attunement ${t.keeperAtt}</p>
-    <p style="color:#4d5aa6">${t.mine ? 'While your Kiki keeps it, the circle gathers Sprouts for you. Come back to collect them.' : 'Begin the Spiral Rite: tap as each ring of light lands on the rune. Out-attune the Keeper and your Kiki takes the circle.'}</p>
-    <div class="stack">${t.mine ? '<button class="pill" id="c-collect">Collect Sprouts</button>' : `<button class="pill" id="c-begin"${hasKiki ? '' : ' style="opacity:.6"'}>${hasKiki ? 'Begin the Spiral Rite' : 'Catch a Kiki first'}</button>`}
-    <button class="pill small cream" id="c-close">Close</button></div>`);
-  p.root.querySelector('#c-close').onclick = p.close;
-  if (t.mine) p.root.querySelector('#c-collect').onclick = () => {
-    const got = C.progressApi.collectCircle(app.progress, t.id, Math.floor(Date.now() / 1000)); app.save();
-    toast(got ? `+${got} Sprouts from the circle!` : 'Nothing yet. Circles gather 20 Sprouts every half hour.'); if (got) { hx.success(); sfx('pickup', 0.5); }
-  };
-  else p.root.querySelector('#c-begin').onclick = () => {
-    if (!hasKiki) return toast('Catch a Kiki first, then come back to challenge the Keeper.');
-    p.close(); spiralRite(app, t, () => { app.world.nextPlan = 0; });
-  };
 }
 
 // ---------- testing tools (Settings ▸ Testing tools) ----------

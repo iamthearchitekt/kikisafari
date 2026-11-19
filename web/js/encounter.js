@@ -15,7 +15,7 @@ const HAND = new THREE.Vector3(0, -0.12, -0.46), STONE_R = 0.04;
 
 export class Encounter {
   constructor(app, thing, onDone, { starter = false } = {}) {
-    this.app = app; this.thing = thing; this.v = thing.variant; this.onDone = onDone; this.starter = starter; this.reward = !!thing.reward;
+    this.app = app; this.thing = thing; this.v = thing.variant; this.onDone = onDone; this.starter = starter; this.reward = !!thing.reward; this.raid = thing.raid || null; this.raidStones = this.raid ? this.raid.stones : 0;
     this.mods = app.mods ? app.mods() : { sparkle: 1, xp: 1, sprouts: 1 };
     this.scene = app.world.scene; this.camera = app.world.camera; this.sparkles = app.world.sparkles;
     this.group = new THREE.Group(); this.scene.add(this.group);
@@ -24,6 +24,7 @@ export class Encounter {
     // This Kiki's own level, hidden stats and size (the same each time you meet the same spawn).
     const odds = R.SPARKLE_ODDS / (this.mods.sparkle || 1);
     if (starter) this.rec = R.rollKiki(this.v.id, 3, C.rng(C.hash(thing.id, Date.now())));
+    else if (this.raid) { this.rec = R.raidCatchKiki(this.raid.raid, C.sysRng); if (R.isSparkle(thing.id, odds)) this.rec.sparkle = true; }
     else if (this.reward) { const r = C.rng(C.hash(thing.id, Date.now())); this.rec = R.rollKiki(this.v.id, Math.min(25, Math.max(5, R.levelOf(p.xp))), r); this.rec.iv = this.rec.iv.map(() => 10 + r.int(0, 6)); if (R.isSparkle(thing.id + Date.now(), odds)) this.rec.sparkle = true; }
     else this.rec = R.wildKiki(thing.id, this.v.id, R.levelOf(p.xp), { boosted: !!thing.boosted, sparkleOdds: odds });
     p.seen[this.v.id] = (p.seen[this.v.id] || 0) + 1;
@@ -66,7 +67,7 @@ export class Encounter {
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d); this.kiki.position.copy(this.home);
   }
   /** Ring colour from the odds: green is easy, red is hard. */
-  recolor() { this.odds = R.catchOdds(this.v.rarity, this.rec.lvl, { stone: this.stoneId, treat: this.treat, odds: tuning.odds }); this.ring.userData.setColor(R.ringColor(this.odds)); }
+  recolor() { this.odds = R.catchOdds(this.v.rarity, this.rec.lvl, { stone: this.raid ? 'moon' : this.stoneId, treat: this.treat, odds: tuning.odds }); this.ring.userData.setColor(R.ringColor(this.odds)); }
 
   get center() { return this.kiki.position.clone().add(new THREE.Vector3(0, GROUND * this.scale, 0)); }
 
@@ -82,7 +83,8 @@ export class Encounter {
   }
   stones() {
     const p = this.app.progress, sb = $('enc-stone'), fb = $('enc-food');
-    sb.querySelector('img').src = portrait('item:' + this.stoneId, 128); sb.querySelector('b').textContent = p.items[this.stoneId] || 0;
+    if (this.raid) { sb.querySelector('img').src = portrait('item:star', 128); sb.querySelector('b').textContent = this.raidStones; }
+    else { sb.querySelector('img').src = portrait('item:' + this.stoneId, 128); sb.querySelector('b').textContent = p.items[this.stoneId] || 0; }
     const t = this.treat || R.TREATS.find(id => p.items[id] > 0) || 'honey';
     fb.querySelector('img').src = portrait('item:' + t, 128); fb.querySelector('b').textContent = R.TREATS.reduce((a, id) => a + (p.items[id] || 0), 0);
     fb.style.opacity = this.treat ? 0.5 : 1;
@@ -92,6 +94,7 @@ export class Encounter {
     const el = $('enc-tray'), p = this.app.progress, L = R.levelOf(p.xp);
     if (!el.hidden && el.dataset.kind === kind) { el.hidden = true; return; }
     if (this.state !== 'ready' && this.state !== 'out') return;
+    if (this.raid && kind === 'stone') { toast('Raid Stones only for this catch.'); return; }
     const ids = kind === 'stone' ? R.STONES : R.TREATS;
     el.dataset.kind = kind; el.hidden = false; sfx('button', 0.3);
     el.innerHTML = ids.map(id => { const locked = L < R.ITEMS[id].unlock, n = p.items[id] || 0;
@@ -181,7 +184,8 @@ export class Encounter {
 
   launch(o, v, spin) {
     const app = this.app;
-    if (!R.useItem(app.progress, this.stoneId)) return this.outOfStones();
+    if (this.raid) { if (this.raidStones <= 0) return this.outOfStones(); this.raidStones--; }
+    else if (!R.useItem(app.progress, this.stoneId)) return this.outOfStones();
     app.progress.stats.throws++; app.save(); this.stones(); this.hint(null); this.taught = true; $('enc-tray').hidden = true;
     this.releaseRing = C.ringScale(this.clock, tuning.ringPeriod); this.spinThrow = spin;
     this.pos = o; this.vel = v; this.flight = 0; this.state = 'fly';
@@ -189,6 +193,7 @@ export class Encounter {
   }
 
   outOfStones() {
+    if (this.raid) { this.state = 'out'; pop('It slipped away!', '#ff5d8f'); this.hint('Out of Raid Stones. The boss went back through the portal.'); setTimeout(() => this.finish('fled'), 2200); return; }
     const other = R.STONES.find(id => this.app.progress.items[id] > 0);
     if (other) { this.setStone(other); this.state = 'ready'; toast(`Switched to ${R.ITEMS[other].plural}`); return; }
     this.state = 'out';
@@ -239,7 +244,7 @@ export class Encounter {
   async resolve(hit) {
     this.state = 'resolving';
     const app = this.app, p = app.progress;
-    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.releaseRing, spin: this.spinThrow, stone: this.stoneId, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter || this.reward }, C.sysRng);
+    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.releaseRing, spin: this.spinThrow, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter || this.reward || !!this.raid, stone: this.raid ? 'moon' : this.stoneId }, C.sysRng);
     let steps = C.revealSteps(o.result === 'fled' ? { ...o, result: 'brokeout' } : o, this.v.rarity, reducedMotion());
     if (o.result === 'fled') steps = steps.map(s => s.kind === 'soClose' ? { kind: 'flee', dur: 1.3, haptic: 'warning', voice: 'awww', voiceChance: 0.6 } : s);
     this.o = o;
@@ -270,7 +275,7 @@ export class Encounter {
     if (o.result === 'fled') { this.finish('fled'); return; }
     this.ring.visible = true; this.kiki.visible = true; this.motion.idling = true;
     this.state = 'ready'; this.stone.scale.setScalar(1); this.stone.userData.body.rotation.set(0, 0, 0); this.recolor(); this.stones();
-    if (!(app.progress.items[this.stoneId] > 0)) this.outOfStones();
+    if (this.raid ? this.raidStones <= 0 : !(app.progress.items[this.stoneId] > 0)) this.outOfStones();
   }
 
   async beat(s, hitPoint) {

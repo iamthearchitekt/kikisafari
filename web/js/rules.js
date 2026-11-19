@@ -11,8 +11,10 @@ export const MAX_LEVEL = 40;
 export const xpFor = level => 500 * level * (level - 1);
 export function levelOf(xp) { let L = 1; while (L < MAX_LEVEL && xp >= xpFor(L + 1)) L++; return L; }
 export const XP = { catch: 100, Nice: 10, Great: 50, Excellent: 100, spin: 10, newSpecies: 500, stop: 50, newStop: 250, evolve: 500, daily: 500, streak: 2500 };
-/** Items you get for reaching a level. Better stones and treats unlock along the way. */
-export function levelRewards(L) {
+/** Items you get for reaching a level. Better stones and treats unlock along the way (battle supplies from level 5). */
+let levelRewardsImpl = null;
+export const levelRewards = L => levelRewardsImpl ? levelRewardsImpl(L) : baseLevelRewards(L);
+function baseLevelRewards(L) {
   const r = { rune: L < 10 ? 15 : 20 };
   if (L >= 2) r.honey = L < 10 ? 5 : 10;
   if (L >= 5) r.moon = L === 5 ? 15 : 10;
@@ -95,7 +97,7 @@ export function evolve(p, k) {
 }
 /** Send a Kiki home to the ranger for 1 Fluff. Favourites stay. */
 export function sendHome(p, uid) {
-  const i = p.kikis.findIndex(k => k.uid === uid); if (i < 0 || p.kikis[i].fav) return false;
+  const i = p.kikis.findIndex(k => k.uid === uid); if (i < 0 || p.kikis[i].fav || p.kikis[i].keeping) return false;
   const [k] = p.kikis.splice(i, 1), fam = familyOf(k.sp); p.fluff[fam] = (p.fluff[fam] || 0) + 1; return true;
 }
 
@@ -137,7 +139,7 @@ export function catchRewards(p, sp, { quality: q = null, spin = false, treat = n
 export const STOP_COOLDOWN = 5 * 60;
 /** 3 to 5 items; better stones and treats once you've unlocked them. */
 export function stopRoll(level, r = sysRng) {
-  const table = [['rune', 60], ['honey', 20], ['moon', 25], ['sunseed', 8], ['star', 12]].filter(([id]) => level >= ITEMS[id].unlock);
+  const table = [['rune', 60], ['honey', 20], ['moon', 25], ['sunseed', 8], ['star', 12], ['stitch', 18], ['superstitch', 6], ['pillow', 6]].filter(([id]) => ITEMS[id] && level >= ITEMS[id].unlock);
   const total = table.reduce((a, t) => a + t[1], 0), n = 3 + r.int(0, 3), out = {};
   for (let i = 0; i < n; i++) { let x = r.next() * total; for (const [id, w] of table) { if ((x -= w) < 0) { out[id] = (out[id] || 0) + 1; break; } } }
   return out;
@@ -162,9 +164,11 @@ export function newSave() {
   return {
     v: 2, xp: 0, sprouts: 0, items: { rune: 30, moon: 0, star: 0, honey: 0, sunseed: 0 }, fluff: {}, kikis: [], nextUid: 1,
     caught: {}, seen: {}, stops: {}, visited: {}, keepers: {}, gone: {}, daily: {},
-    explorer: { name: '', outfit: 0, skin: 1 }, tutorial: 'start', stats: { throws: 0, catches: 0, fled: 0, km: 0, stops: 0, evolved: 0, excellent: 0, hatched: 0, sparkles: 0, buddyKm: 0, tasks: 0, el: {} },
+    explorer: { name: '', outfit: 0, skin: 1 }, tutorial: 'start', stats: { throws: 0, catches: 0, fled: 0, km: 0, stops: 0, evolved: 0, excellent: 0, hatched: 0, sparkles: 0, buddyKm: 0, tasks: 0, el: {}, wins: 0, raids: 0 },
     // Phase 2
     eggs: [], nests: [{ id: 'warm', uses: -1, egg: null }], buddy: null, tasks: [], stamps: { last: '', n: 0 }, story: { ch: 0, prog: [] }, medals: {},
+    // Phase 3
+    faction: null, raidDay: '', raidsDone: {},
   };
 }
 /** Add a caught Kiki to the collection. */
@@ -195,7 +199,7 @@ export function migrate(raw, now = Math.floor(Date.now() / 1000)) {
   if (raw.v === 2) {
     const out = Object.assign(s, raw);
     for (const k of ['items', 'stats', 'explorer', 'stamps', 'story']) out[k] = Object.assign(newSave()[k], raw[k]);
-    for (const k of ['fluff', 'caught', 'seen', 'stops', 'visited', 'keepers', 'gone', 'daily', 'medals']) out[k] = raw[k] || {};
+    for (const k of ['fluff', 'caught', 'seen', 'stops', 'visited', 'keepers', 'gone', 'daily', 'medals', 'raidsDone']) out[k] = raw[k] || {};
     for (const k of ['kikis', 'eggs', 'tasks']) out[k] = Array.isArray(raw[k]) ? raw[k] : [];
     out.nests = Array.isArray(raw.nests) && raw.nests.length ? raw.nests : newSave().nests;
     out.stats.el = out.stats.el || {};
@@ -416,3 +420,144 @@ export function eventMods(evs) {
   for (const e of evs) { if (e.boost) m.boost.push(...e.boost); if (e.featured) m.featured = e.featured; if (e.sparkle) m.sparkle = Math.max(m.sparkle, e.sparkle); if (e.xp) m.xp = Math.max(m.xp, e.xp); if (e.sprouts) m.sprouts = Math.max(m.sprouts, e.sprouts); }
   return m;
 }
+
+// =====================================================================================================================
+// Phase 3: battles, healing, Rune Circles, factions and raids
+// =====================================================================================================================
+export const BATTLE_LEVEL = 5; // battles, factions and raids open at explorer level 5
+ITEMS.stitch = { plural: 'Stitch Kits', name: 'Stitch Kit', kind: 'heal', heal: 60, unlock: BATTLE_LEVEL, blurb: 'Needle, thread and a hug. Restores 60 HP to a Kiki.' };
+ITEMS.superstitch = { plural: 'Super Stitch Kits', name: 'Super Stitch Kit', kind: 'heal', heal: 200, unlock: 12, blurb: 'Extra-soft stuffing. Restores 200 HP to a Kiki.' };
+ITEMS.pillow = { plural: 'Revive Pillows', name: 'Revive Pillow', kind: 'revive', unlock: BATTLE_LEVEL, blurb: 'A nap on this and a fainted Kiki is back on its feet with half its HP.' };
+ITEMS.key = { plural: 'Portal Keys', name: 'Portal Key', kind: 'raid', unlock: BATTLE_LEVEL, blurb: 'Opens a Portal Surge raid. Your first raid each day is free.' };
+export const HEALS = ['stitch', 'superstitch', 'pillow'];
+{ // battle supplies in level-up rewards and supply stops
+  levelRewardsImpl = L => { const r = baseLevelRewards(L); if (L >= BATTLE_LEVEL) { r.stitch = L === BATTLE_LEVEL ? 10 : 5; r.pillow = L === BATTLE_LEVEL ? 5 : 2; r.key = 1; } if (L >= 12) r.superstitch = 3; return r; };
+}
+
+// ---------- fighters ----------
+const SHAPE = { atk: [1.2, 0.9, 0.95], def: [0.9, 1.25, 1.0], hp: [0.9, 0.95, 1.25], bal: [1, 1, 1] };
+/** Battle stats from a Kiki: attack (Zest), defence (Bounce) and HP (Cuddle), all growing with level. */
+export function battleStats(k) {
+  const v = variant(k.sp), [a, d, h] = SHAPE[v.shape || 'bal'], m = levelMult(k.lvl);
+  return { atk: (v.base * a + 2 * k.iv[2]) * m, def: (v.base * d + 2 * k.iv[1]) * m, maxHp: Math.round((v.base * h + 2 * k.iv[0]) * m * 1.2) };
+}
+export const hpOf = k => k.hp == null ? battleStats(k).maxHp : k.hp;
+export const MOVES = {
+  Leaf: ['Leaf Flick', 'Petal Storm'], Water: ['Splash', 'Bubble Burst'], Ember: ['Ember Puff', 'Flare Spin'],
+  Spark: ['Zap', 'Thunder Hug'], Stone: ['Pebble Pop', 'Rock Roll'], Moon: ['Moon Glimmer', 'Dream Spiral'],
+};
+export const QUICK = { power: 10, energy: 9, cooldown: 0.5 }, CHARGED = { power: 70, cost: 50 };
+export const damage = (power, att, def) => Math.floor(power * (att.atk / def.def) * effectiveness(att.el, def.el) * 0.5) + 1;
+export function fighter(k, opts = {}) {
+  const s = battleStats(k), v = variant(k.sp);
+  const maxHp = Math.round(s.maxHp * (opts.hpMult || 1));
+  return { uid: k.uid, sp: k.sp, name: k.nick || v.name, el: v.element, lvl: k.lvl, sparkle: !!k.sparkle, atk: s.atk, def: s.def, maxHp, hp: opts.full ? maxHp : Math.min(maxHp, hpOf(k)), energy: 0 };
+}
+
+/**
+ * A real-time battle: your team against theirs, one Kiki out at a time on each side. You tap for quick moves
+ * (they build energy), unleash a charged move when the meter is full, and swipe to dodge. The other side attacks on a
+ * timer and telegraphs its charged moves so you can dodge them. update(dt) and the player actions return events for
+ * the screen to animate: hit, faint, switch, telegraph, end.
+ */
+export class Battle {
+  constructor(mine, theirs, { time = 120, aiQuick = 1.7, aiCharged = 9, raid = false } = {}) {
+    this.sides = [mine.filter(f => f.hp > 0), theirs]; this.cur = [0, 0]; this.time = time; this.t = 0; this.done = null;
+    this.aiQuick = aiQuick; this.aiCharged = aiCharged; this.raid = raid;
+    this.cool = 0; this.aiT = aiQuick; this.aiC = aiCharged; this.tele = null; this.dodgeT = -9; this.log = [];
+  }
+  get me() { return this.sides[0][this.cur[0]]; }
+  get them() { return this.sides[1][this.cur[1]]; }
+  hit(side, power, charged) {
+    const att = side === 0 ? this.me : this.them, def = side === 0 ? this.them : this.me;
+    let dmg = damage(power, att, def), dodged = false;
+    if (side === 1 && this.t - this.dodgeT < 0.6) { dmg = Math.max(1, Math.floor(dmg * 0.25)); dodged = true; }
+    def.hp = Math.max(0, def.hp - dmg);
+    const ev = [{ type: 'hit', side, dmg, eff: effectiveness(att.el, def.el), charged, dodged }];
+    if (def.hp === 0) ev.push(...this.faint(1 - side));
+    return ev;
+  }
+  faint(side) {
+    const ev = [{ type: 'faint', side, who: this.sides[side][this.cur[side]] }];
+    const next = this.sides[side].findIndex((f, i) => i > this.cur[side] && f.hp > 0);
+    if (next < 0) { this.done = side === 1 ? 'win' : 'lose'; ev.push({ type: 'end', win: side === 1 }); }
+    else { this.cur[side] = next; if (side === 1) { this.aiT = this.aiQuick; this.aiC = this.aiCharged; this.tele = null; } ev.push({ type: 'switch', side, who: this.sides[side][next] }); }
+    return ev;
+  }
+  quick() {
+    if (this.done || this.cool > 0) return [];
+    this.cool = QUICK.cooldown; this.me.energy = Math.min(100, this.me.energy + QUICK.energy);
+    return this.hit(0, QUICK.power, false);
+  }
+  charged() {
+    if (this.done || this.me.energy < CHARGED.cost) return [];
+    this.me.energy -= CHARGED.cost; this.cool = 0.8;
+    return this.hit(0, CHARGED.power, true);
+  }
+  dodge() { if (this.done) return []; this.dodgeT = this.t; return [{ type: 'dodge' }]; }
+  update(dt) {
+    if (this.done) return [];
+    const ev = []; this.t += dt; this.cool = Math.max(0, this.cool - dt);
+    if (this.t >= this.time) { this.done = 'timeout'; return [{ type: 'end', win: false, timeout: true }]; }
+    if (this.tele) { this.tele.left -= dt; if (this.tele.left <= 0) { this.tele = null; ev.push(...this.hit(1, CHARGED.power, true)); } return ev; }
+    this.aiT -= dt; this.aiC -= dt;
+    if (this.aiC <= 0) { this.aiC = this.aiCharged * (0.85 + Math.random() * 0.3); this.tele = { left: 1.1 }; ev.push({ type: 'telegraph', left: 1.1 }); }
+    else if (this.aiT <= 0) { this.aiT = this.aiQuick * (0.85 + Math.random() * 0.3); ev.push(...this.hit(1, QUICK.power, false)); }
+    return ev;
+  }
+}
+/** Use a healing item on a Kiki. Returns HP gained (or false). */
+export function heal(p, k, item) {
+  const max = battleStats(k).maxHp, hp = hpOf(k), it = ITEMS[item];
+  if (!it || !(p.items[item] > 0)) return false;
+  if (it.kind === 'revive' ? hp > 0 : hp === 0 || hp >= max) return false;
+  p.items[item]--; const to = it.kind === 'revive' ? Math.ceil(max / 2) : Math.min(max, hp + it.heal);
+  if (to >= max) delete k.hp; else k.hp = to;
+  return to - hp;
+}
+/** The strongest healthy Kikis that aren't busy keeping a circle. */
+export const bestTeam = (p, n) => p.kikis.filter(k => hpOf(k) > 0 && !k.keeping).sort((a, b) => power(b) - power(a)).slice(0, n);
+
+// ---------- factions ----------
+export const FACTIONS = {
+  dusk: { name: 'Dusk Weavers', color: '#8c4dff', motto: 'We follow the spirals into the night. Every portal has a story.' },
+  tide: { name: 'Tide Keepers', color: '#14b8a6', motto: 'Steady as the sea. We look after the circles and every Kiki in them.' },
+  bloom: { name: 'Bloom Wardens', color: '#ff6f61', motto: 'Grow, explore, be brave. Wherever we walk, something new blooms.' },
+};
+
+// ---------- Rune Circle keepers ----------
+const wildPool = () => VARIANTS.filter(v => v.weight > 0 && v.rarity !== 'Legendary');
+/** Today's wild Keepers at a circle: 1 to 3 Kikis around your level. */
+export function keeperTeam(circleId, sec, explorerLevel) {
+  const r = rng(hash(circleId, dayKey(sec), 'keepers')), pool = wildPool(), n = 1 + r.int(0, 3), out = [];
+  for (let i = 0; i < n; i++) { const sp = pool[r.int(0, pool.length)].id, lvl = Math.max(3, Math.min(30, explorerLevel - 3 + r.int(0, 5))); out.push({ uid: -1 - i, ...rollKiki(sp, lvl, r) }); }
+  return out;
+}
+export function takeCircle(p, circleId, k, sec) {
+  for (const x of p.kikis) if (x.keeping === circleId) delete x.keeping;
+  k.keeping = circleId; p.keepers[circleId] = { uid: k.uid, variant: k.sp, att: 0, since: sec, last: sec };
+}
+export function callHome(p, circleId) { const k = p.kikis.find(x => x.keeping === circleId); if (k) delete k.keeping; delete p.keepers[circleId]; }
+
+// ---------- Portal Surge raids ----------
+export const LEGENDARIES = () => VARIANTS.filter(v => v.rarity === 'Legendary').map(v => v.id);
+export const RAID_TIERS = { 1: { level: 15, hpMult: 7, xp: 2000, stones: 6, items: { stitch: 4, rune: 10 } }, 3: { level: 20, hpMult: 3, xp: 4000, stones: 7, items: { stitch: 6, moon: 6, superstitch: 1 } }, 5: { level: 25, hpMult: 1.7, xp: 8000, stones: 8, items: { superstitch: 3, star: 6, pillow: 2 } } };
+/** The boss at a circle during a Portal Surge (the same on every phone). */
+export function raidAt(circleId, surgeIndex) {
+  const r = rng(hash(circleId, surgeIndex, 'raid')), x = r.next(), tier = x < 0.4 ? 1 : x < 0.8 ? 3 : 5;
+  const pool = tier === 5 ? LEGENDARIES() : tier === 3 ? VARIANTS.filter(v => v.rarity === 'Epic').map(v => v.id) : VARIANTS.filter(v => v.rarity === 'Rare' && v.weight > 0).map(v => v.id);
+  return { id: circleId + '#' + surgeIndex, sp: pool[r.int(0, pool.length)], tier };
+}
+export function raidBoss(raid) {
+  const t = RAID_TIERS[raid.tier], k = { uid: -100, sp: raid.sp, lvl: t.level, iv: [15, 15, 15] };
+  return fighter(k, { hpMult: t.hpMult, full: true });
+}
+/** One free raid a day, then Portal Keys. */
+export function canRaid(p, sec) { return p.raidDay !== dayKey(sec) || (p.items.key || 0) > 0; }
+export function payRaid(p, sec) { if (p.raidDay !== dayKey(sec)) { p.raidDay = dayKey(sec); return 'free'; } if (useItem(p, 'key')) return 'key'; return null; }
+/** The Kiki you get to catch after a raid: level 20 (25 for legendaries), strong hidden stats. */
+export function raidCatchKiki(raid, r = sysRng) {
+  const k = rollKiki(raid.sp, raid.tier === 5 ? 25 : 20, r); k.iv = k.iv.map(() => 10 + r.int(0, 6)); return k;
+}
+TASKS.push({ type: 'battle', n: 1, text: 'Win a battle at a Rune Circle', reward: { items: { stitch: 5, pillow: 2 } } }, { type: 'raid', n: 1, text: 'Win a Portal Surge raid', reward: { items: { key: 1, star: 3 } } });
+MEDALS.push({ id: 'battler', name: 'Champion', what: 'battles won', get: p => p.stats.wins || 0, tiers: [10, 100, 1000] }, { id: 'raider', name: 'Portal Diver', what: 'raids won', get: p => p.stats.raids || 0, tiers: [5, 50, 500] });

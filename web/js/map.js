@@ -161,7 +161,7 @@ export class StreetMap {
       }
       if (this.app.tracking === t.id) { if (!v.userData.track) { const r = new THREE.Mesh(new THREE.RingGeometry(9, 10.6, 48), new THREE.MeshBasicMaterial({ color: 0xffcf2e, side: THREE.DoubleSide, transparent: true, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.5; r.renderOrder = -1; v.add(r); v.userData.track = r; } const k = (time * 0.8) % 1; v.userData.track.scale.setScalar(0.7 + k * 0.8); v.userData.track.material.opacity = 1 - k; }
       else if (v.userData.track) { v.remove(v.userData.track); v.userData.track = null; }
-      if (v.userData.circle) { v.userData.circle.userData.portal.userData.update(dt, time, this.camera); v.userData.circle.userData.setKeeper(t.variant.id); if (v.userData.circle.userData.motion) v.userData.circle.userData.motion.update(dt); }
+      if (v.userData.circle) { v.userData.circle.userData.portal.userData.update(dt, time, this.camera); v.userData.circle.userData.setKeeper(t.raid ? t.raid.sp : t.variant.id); v.userData.circle.userData.setColor(t.raid ? 0xff2d8a : t.color || 0x7a00ff); if (v.userData.circle.userData.motion) v.userData.circle.userData.motion.update(dt); }
     }
     for (const [id, v] of this.views) if (!keep.has(id)) { this.things.remove(v); this.views.delete(id); }
   }

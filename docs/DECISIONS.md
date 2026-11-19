@@ -208,3 +208,25 @@ depth, with KIKI SAFARI's own creatures, names and look. Built in the web versio
 - **Events** follow a calendar every phone works out the same way: element weekends (2× Sprouts), a Kiki Parade on
   Wednesdays 6 to 8 pm (2× XP), Kiki Day on the first Saturday of the month 2 to 5 pm (3× XP, Sparkles 25× as likely),
   and Full Moon nights. Portal Surge Kikis follow the event.
+
+## 15. Phase 3: battles (owner: "when complete phase 3")
+
+- **Battles** are real time: tap for your quick move (it builds energy), tap the round button for the charged move
+  when it's full, swipe sideways to dodge. The other side attacks on a timer and shows a red "!" before its charged
+  move; dodging cuts that hit to a quarter. Each element has a quick and a charged move (Leaf Flick / Petal Storm,
+  Splash / Bubble Burst, Ember Puff / Flare Spin, Zap / Thunder Hug, Pebble Pop / Rock Roll, Moon Glimmer / Dream
+  Spiral). Stats come from the species plus the hidden stats: Zest is attack, Bounce defence, Cuddle HP.
+- **Damage stays** after a battle. Stitch Kits, Super Stitch Kits and Revive Pillows (all placeholders) heal; they
+  come from supply stops and level-ups from level 5.
+- **Rune Circles:** today's wild Keepers (1 to 3, around your level, the same on every phone). Beat them with up to
+  3 Kikis and one of yours keeps the circle in your faction's colour, gathering Sprouts until you call it home. A
+  keeping Kiki can't battle or be sent home. The Spiral Rite is now a daily attunement: attunement × 3 Sprouts, once
+  per circle per day.
+- **Factions** at level 5 (placeholders): Dusk Weavers (purple), Tide Keepers (teal), Bloom Wardens (coral). Cosmetic
+  for now; they matter more once circles are shared online (Phase 4).
+- **Raids:** during a Portal Surge every circle has a boss (40% one-star rare, 40% three-star epic, 20% five-star
+  legendary). Up to 6 Kikis, 3 minutes. One free raid a day, then a Portal Key (one per level-up from level 5, and from
+  tasks). Win for items and XP, then catch the boss with 6 to 8 Raid Stones (2 more if your Kiki keeps that circle).
+  Difficulty was tuned by simulation: one-star takes three level-20 Kikis about 40 seconds; five-star needs six and
+  good dodging.
+- Raids are solo in the web version. Co-op raids, shared circles and other players need the Phase 4 server.

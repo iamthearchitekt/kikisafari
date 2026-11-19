@@ -1,11 +1,11 @@
 // The Spiral Rite at a Rune Circle: the rune pulses to the beat, a ring of UV light closes on it each beat, and you
-// tap as it lands. Out-attune the Keeper and your Kiki takes the circle.
+// tap as it lands. Since Phase 3 circles are won in battle; the Rite attunes you for Sprouts once a day per circle.
 import * as C from './core.js';
 import { $, hx, sfx, voice, panel } from './services.js';
 
 export function spiralRite(app, circle, onDone) {
   const rite = new C.SpiralRite(), el = document.createElement('div'); el.className = 'rite';
-  el.innerHTML = `<h2>The Spiral Rite</h2><div class="keeper">Keeper: ${circle.mine ? 'your' : 'a wild'} ${circle.variant.name} · attunement ${circle.keeperAtt}</div>
+  el.innerHTML = `<h2>The Spiral Rite</h2><div class="keeper">${circle.name}</div>
     <canvas width="720" height="720"></canvas><div class="judge"></div><div class="score">Attunement 0</div><div class="beats">${'<i></i>'.repeat(rite.beats)}</div>
     <div class="tip">Tap anywhere as each ring lands on the rune</div>`;
   $('overlay').appendChild(el);
@@ -64,21 +64,12 @@ export function spiralRite(app, circle, onDone) {
 
   function finish() {
     done = true; el.removeEventListener('pointerdown', onTap);
-    const att = rite.attunement, won = att > circle.keeperAtt;
-    if (won) { hx.success(); sfx('burst', 0.55); voice('yay'); } else { hx.warning(); sfx('breakout', 0.45); voice('awww'); }
-    const mine = [...new Set(app.progress.kikis.map(k => k.sp))].map(C.variant).sort((a, b) => C.RARITY[b.rarity].order - C.RARITY[a.rarity].order || b.base - a.base);
-    let pick = 0;
-    const p = panel(`<h2 style="color:${won ? '#7a00ff' : '#ff5d8f'}">${won ? 'The circle chose you!' : 'SO CLOSE!'}</h2>
-      <p style="font-size:20px">Your attunement <b>${att}</b><br>Keeper <b>${circle.keeperAtt}</b></p>
-      <div class="stack">${won ? `<button class="pill small sky" id="rite-pick"></button><button class="pill" id="rite-place">Place my Kiki</button>` : `<button class="pill" id="rite-again">Try again</button>`}
-      <button class="pill small cream" id="rite-close">Close</button></div>`);
-    const close = () => { p.close(); el.remove(); onDone(); };
-    if (won) {
-      const label = () => { p.root.querySelector('#rite-pick').textContent = `Keeper: ${mine[pick].name}${mine.length > 1 ? ' (tap to switch)' : ''}`; };
-      label();
-      p.root.querySelector('#rite-pick').onclick = () => { pick = (pick + 1) % mine.length; label(); };
-      p.root.querySelector('#rite-place').onclick = () => { app.progressApi.takeCircle(app.progress, circle.id, mine[pick].id, att, Math.floor(Date.now() / 1000)); app.save(); close(); };
-    } else p.root.querySelector('#rite-again').onclick = () => { p.close(); el.remove(); spiralRite(app, circle, onDone); };
-    p.root.querySelector('#rite-close').onclick = close;
+    const att = rite.attunement;
+    if (att >= 60) { hx.success(); sfx('burst', 0.55); voice('yay'); } else { hx.warning(); sfx('breakout', 0.45); voice('awww'); }
+    const p = panel(`<h2 style="color:#7a00ff">${att >= 85 ? 'Perfectly attuned!' : att >= 60 ? 'Nicely attuned!' : 'A little out of tune'}</h2>
+      <p style="font-size:20px">Attunement <b>${att}</b></p>
+      <div class="stack"><button class="pill" id="rite-ok">Done</button><button class="pill small cream" id="rite-again">Try again</button></div>`);
+    p.root.querySelector('#rite-ok').onclick = () => { p.close(); el.remove(); onDone(att); };
+    p.root.querySelector('#rite-again').onclick = () => { p.close(); el.remove(); spiralRite(app, circle, onDone); };
   }
 }

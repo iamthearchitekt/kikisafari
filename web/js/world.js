@@ -5,7 +5,7 @@ import * as C from './core.js';
 import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './osm.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
 import { $, toast, hx, sfx, debug, reducedMotion } from './services.js';
-import { goneSet, STOP_COOLDOWN } from './rules.js';
+import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
 
 export const EYE = 1.4; // the camera is about 1.4 m above the ground
 
@@ -207,6 +207,15 @@ export class WorldView {
       this.things = [...app.extraThings, ...this.things.filter(t => t.kind !== 'kiki')].sort((a, b) => a.distance - b.distance);
     }
     if (debug.night) for (const t of this.things) if (t.kind === 'kiki' && t.variant.time === 'day') t.variant = C.variant('moonbeam');
+    // Phase 3: today's wild Keepers stand on circles you don't hold; during a Portal Surge, the raid boss does.
+    const L = levelOf(app.progress.xp), surge = C.surgeActive(now) || debug.surge;
+    for (const t of this.things) if (t.kind === 'circle') {
+      const mine = app.progress.keepers[t.id];
+      t.mine = !!mine; t.keepers = mine ? [] : keeperTeam(t.id, now, L);
+      if (mine) t.variant = C.variant(mine.variant); else t.variant = C.variant(t.keepers[0].sp);
+      t.raid = surge ? raidAt(t.id, Math.floor(now / C.SURGE_EVERY)) : null; if (t.raid && app.progress.raidsDone[t.raid.id]) t.raid = null;
+      t.color = mine && app.progress.faction ? FACTIONS[app.progress.faction].color : null;
+    }
     if (app.mapMode) return;
     const keep = new Set();
     for (const t of this.things) {
@@ -215,7 +224,7 @@ export class WorldView {
       let v = this.views.get(t.id);
       if (!v) { v = this.make(t); this.views.set(t.id, v); v.position.copy(this.place(t.where)); }
       v.userData.thing = t;
-      if (t.kind === 'circle') { v.userData.setKeeper(t.variant.id); v.userData.portal.userData.size = t.surge ? 2.8 : 1.9; v.userData.portal.userData.boost = t.surge ? 0.8 : 0; }
+      if (t.kind === 'circle') { v.userData.setKeeper(t.raid ? t.raid.sp : t.variant.id); v.userData.setColor(t.raid ? 0xff2d8a : t.color || 0x7a00ff); v.userData.portal.userData.size = t.surge ? 2.8 : 1.9; v.userData.portal.userData.boost = t.surge ? 0.8 : 0; }
     }
     for (const [id, v] of this.views) if (!keep.has(id)) { this.root.remove(v); this.views.delete(id); }
   }

@@ -15,6 +15,7 @@ const day = sec => new Date(sec * 1000).toLocaleDateString(undefined, { day: 'nu
 const kp = k => 'kiki:' + k.sp + (k.sparkle ? ':s' : ''); // portrait of one of your Kikis
 const elChip = el => `<span class="el-chip" style="background:${R.ELEMENT_COLOR[el]}">${el}</span>`;
 const did = (app, ev) => app.did && app.did(ev);
+const hpLine = k => { const max = R.battleStats(k).maxHp, hp = R.hpOf(k); return hp >= max ? '' : `<div class="hpbar"><i style="width:${hp / max * 100}%;background:${hp / max > 0.5 ? '#5fd34b' : hp / max > 0.2 ? '#ffcf2e' : '#ff4d4d'}"></i></div>`; };
 
 /** A full-screen sheet over the game. */
 function screen(html, { dark = false } = {}) {
@@ -99,7 +100,7 @@ export function openMenu(app) {
 
 // ---------- your Kikis ----------
 const SORTS = [['recent', 'Recent'], ['power', 'Power'], ['number', 'Number'], ['name', 'Name'], ['fav', '★']];
-export function openKikis(app, onPick = null, title = 'Kikis') {
+export function openKikis(app, onPick = null, title = 'Kikis', only = null) {
   const p = app.progress;
   const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>${title}</h2><span class="count sticker" style="padding:2px 10px">${p.kikis.length} / ${R.KIKI_MAX}</span></div>
     <div class="tabs">${SORTS.map(([k, l]) => `<button data-s="${k}">${l}</button>`).join('')}</div>
@@ -109,10 +110,10 @@ export function openKikis(app, onPick = null, title = 'Kikis') {
   const render = () => {
     s.root.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', b.dataset.s === sort));
     const q = s.q('.search').value.trim().toLowerCase();
-    let list = p.kikis.filter(k => !q || kikiName(k).toLowerCase().includes(q) || C.variant(k.sp).name.toLowerCase().includes(q) || C.variant(k.sp).element.toLowerCase() === q || (q === 'sparkle' && k.sparkle));
+    let list = p.kikis.filter(k => !only || only(k)).filter(k => !q || kikiName(k).toLowerCase().includes(q) || C.variant(k.sp).name.toLowerCase().includes(q) || C.variant(k.sp).element.toLowerCase() === q || (q === 'sparkle' && k.sparkle));
     const by = { recent: (a, b) => b.at - a.at || b.uid - a.uid, power: (a, b) => R.power(b) - R.power(a), number: (a, b) => C.variant(a.sp).no - C.variant(b.sp).no || R.power(b) - R.power(a), name: (a, b) => kikiName(a).localeCompare(kikiName(b)), fav: (a, b) => (b.fav - a.fav) || b.at - a.at };
     list.sort(by[sort]);
-    s.q('.cards').innerHTML = list.length ? list.map(k => `<div class="card sticker" data-uid="${k.uid}">${k.size ? `<span class="sz">${k.size}</span>` : ''}${k.fav ? '<span class="fav">★</span>' : ''}${k.sparkle ? '<span class="spk">✦</span>' : ''}${app.progress.buddy && app.progress.buddy.uid === k.uid ? '<span class="bud">buddy</span>' : ''}${img(kp(k), '', 192)}<div class="pw">POWER ${R.power(k)}</div><div class="nm">${esc(kikiName(k))}</div></div>`).join('')
+    s.q('.cards').innerHTML = list.length ? list.map(k => `<div class="card sticker" data-uid="${k.uid}">${k.size ? `<span class="sz">${k.size}</span>` : ''}${k.fav ? '<span class="fav">★</span>' : ''}${k.sparkle ? '<span class="spk">✦</span>' : ''}${app.progress.buddy && app.progress.buddy.uid === k.uid ? '<span class="bud">buddy</span>' : ''}${img(kp(k), '', 192)}<div class="pw">POWER ${R.power(k)}</div><div class="nm">${esc(kikiName(k))}</div>${hpLine(k)}${k.keeping ? '<div class="no">keeping a circle</div>' : ''}</div>`).join('')
       : `<div class="empty sticker" style="grid-column:1/-1">${p.kikis.length ? 'No Kikis match that.' : 'No Kikis yet. Tap one on the map to catch it!'}</div>`;
     s.root.querySelectorAll('[data-uid]').forEach(c => c.onclick = () => { sfx('button', 0.3); const k = p.kikis.find(x => x.uid === +c.dataset.uid); if (onPick) { s.close(); onPick(k); } else openKiki(app, k.uid, render); });
   };
@@ -141,6 +142,7 @@ export function openKiki(app, uid, onChange = () => {}) {
       <div class="detail-power">POWER <b>${R.power(k)}</b></div>
       <div class="detail-name"><span>${k.sparkle ? '✦ ' : ''}${esc(kikiName(k))}</span><button data-nick aria-label="Rename">✏️</button></div>
       <div style="text-align:center;margin:-2px 0 6px">${elChip(v.element)} <span class="d" style="font-size:13px">strong vs ${R.STRONG[v.element].join(', ')} · weak to ${R.weakTo(v.element).join(', ')}</span></div>
+      ${(() => { const st2 = R.battleStats(k), hp = R.hpOf(k); return `<div class="hprow"><span>HP ${hp} / ${st2.maxHp}</span>${hp < st2.maxHp ? '<button class="mini" data-heal>Heal</button>' : ''}</div><div class="hpbar big"><i style="width:${hp / st2.maxHp * 100}%;background:${hp / st2.maxHp > 0.5 ? '#5fd34b' : hp / st2.maxHp > 0.2 ? '#ffcf2e' : '#ff4d4d'}"></i></div><div class="d" style="text-align:center;font-size:13px;margin:2px 0 8px">Moves: ${R.MOVES[v.element][0]} · ${R.MOVES[v.element][1]}${k.keeping ? ' · keeping a Rune Circle' : ''}</div>`; })()}
       <div style="display:flex;justify-content:space-between;font-size:14px"><span>Level ${k.lvl}</span><span>max ${maxL}</span></div>
       <div class="lvlbar"><i style="width:${Math.min(100, k.lvl / maxL * 100)}%"></i></div>
       <div class="stats3">
@@ -178,12 +180,14 @@ export function openKiki(app, uid, onChange = () => {}) {
       render(); await levelUps(app, ups);
     };
     b('[data-ap]').onclick = () => appraisePanel(k);
+    if (b('[data-heal]')) b('[data-heal]').onclick = () => { if (app.healKiki(k)) render(); };
     b('[data-buddy]').onclick = () => {
       if (p.buddy && p.buddy.uid === k.uid) { R.setBuddy(p, null); app.save(); app.map.setBuddy && app.map.setBuddy(null); toast('Buddy sent back to your collection. Pick a new one!'); return render(); }
       R.setBuddy(p, k.uid); app.save(); sfx('pickup', 0.45); hx.success(); st.api.motion.play(st.api.motion.randomDance()); toast(`${kikiName(k)} is your buddy now. Go for a walk!`); render();
     };
     b('[data-home]').onclick = async () => {
       if (k.fav) { hx.warning(); return toast("Favourites can't be sent home. Tap ☆ to unfavourite it first."); }
+      if (k.keeping) { hx.warning(); return toast('This Kiki is keeping a Rune Circle. Call it home from the circle first.'); }
       if (!await confirm(`Send ${esc(kikiName(k))} home to Ranger Rue? You'll get 1 ${R.fluffName(fam)}.`, 'Send home')) return;
       if (p.buddy && p.buddy.uid === k.uid) R.setBuddy(p, null);
       R.sendHome(p, k.uid); app.save(); sfx('pickup', 0.4); toast(`Bye bye, ${kikiName(k)}! +1 ${R.fluffName(fam)}`); close();
@@ -285,9 +289,14 @@ export function openBag(app) {
     s.q('.sheet-body').innerHTML = Object.entries(R.ITEMS).map(([id, it]) => {
       const n = p.items[id] || 0, locked = L < it.unlock;
       if (locked && !n) return `<div class="list-row sticker" style="opacity:.55"><div style="width:56px;height:56px;display:grid;place-items:center;font-size:26px">🔒</div><div class="grow"><div class="t">???</div><div class="d">Unlocks at explorer level ${it.unlock}</div></div></div>`;
-      return `<div class="list-row sticker">${img('item:' + id, '', 128)}<div class="grow"><div class="t">${it.name}</div><div class="d">${esc(it.blurb)}</div></div><div style="text-align:center"><div class="n">${n}</div>${n ? `<button class="mini" data-drop="${id}">Discard</button>` : ''}</div></div>`;
+      return `<div class="list-row sticker">${img('item:' + id, '', 128)}<div class="grow"><div class="t">${it.name}</div><div class="d">${esc(it.blurb)}</div></div><div style="text-align:center"><div class="n">${n}</div>${n && (it.kind === 'heal' || it.kind === 'revive') ? `<button class="mini" data-use="${id}">Use</button> ` : ''}${n ? `<button class="mini" data-drop="${id}">Discard</button>` : ''}</div></div>`;
     }).join('') + `<p class="d" style="text-align:center;color:#4d5aa6">Your bag holds ${R.BAG_MAX} items. Supply stops can't give you more when it's full.</p>`;
     s.root.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => discard(app, b.dataset.drop, render));
+    s.root.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+      const id = b.dataset.use, revive = R.ITEMS[id].kind === 'revive', hurt = p.kikis.filter(k => revive ? R.hpOf(k) === 0 : R.hpOf(k) > 0 && R.hpOf(k) < R.battleStats(k).maxHp);
+      if (!hurt.length) return toast(revive ? 'No fainted Kikis. Great!' : 'All your Kikis are full of stuffing!');
+      openKikis(app, k => { const got = R.heal(p, k, id); app.save(); if (got) { sfx('pickup', 0.45); toast(`${kikiName(k)}: +${got} HP`); } render(); }, revive ? 'Revive which Kiki?' : 'Heal which Kiki?', k => hurt.includes(k));
+    });
   };
   s.q('[data-x]').onclick = () => { sfx('button', 0.3); s.close(); };
   render();
@@ -310,10 +319,12 @@ export function openExplorer(app) {
       ${img(`explorer-full:${p.explorer.outfit}:${p.explorer.skin}`, 'big-explorer', 512)}
       <div class="row"><button class="pill small sky" data-look>Change look</button><button class="pill small" data-medals>Medals</button></div>
       ${p.buddy && p.kikis.find(k => k.uid === p.buddy.uid) ? (() => { const b = p.kikis.find(k => k.uid === p.buddy.uid); return `<div class="list-row sticker" style="margin-top:12px">${img(kp(b), '', 128)}<div class="grow"><div class="t">Buddy: ${esc(kikiName(b))}</div><div class="d">${p.buddy.km.toFixed(1)} / ${R.BUDDY_KM[C.variant(b.sp).rarity]} km to the next ${R.fluffName(R.familyOf(b.sp))}</div></div></div>`; })() : ''}
+      ${p.faction ? `<div class="sticker" style="padding:6px 12px;margin-top:12px;border-color:${R.FACTIONS[p.faction].color}"><b style="color:${R.FACTIONS[p.faction].color};font-family:Lilita One;font-size:20px">${R.FACTIONS[p.faction].name}</b></div>` : ''}
       <div class="sticker" style="padding:8px 14px;margin:14px 0 6px"><div style="font-family:Lilita One;font-size:26px">Level ${L}</div>
         <div class="lvlbar"><i style="width:${L >= R.MAX_LEVEL ? 100 : (p.xp - lo) / (hi - lo) * 100}%"></i></div>
         <div style="font-size:14px">${L >= R.MAX_LEVEL ? fmt(p.xp) + ' XP' : `${fmt(p.xp - lo)} / ${fmt(hi - lo)} XP to level ${L + 1}`}</div></div>
       <div class="stats3"><div class="sticker"><b>${p.stats.catches}</b><span>Kikis caught</span></div><div class="sticker"><b>${R.SPECIES.filter(v => p.caught[v.id]).length}/${R.SPECIES.length}</b><span>Safari Log</span></div><div class="sticker"><b>${p.stats.stops}</b><span>Stops spun</span></div></div>
+      <div class="stats3"><div class="sticker"><b>${p.stats.wins || 0}</b><span>Battles won</span></div><div class="sticker"><b>${p.stats.raids || 0}</b><span>Raids won</span></div><div class="sticker"><b>${Object.keys(p.keepers).length}</b><span>Circles kept</span></div></div>
       <div class="stats3"><div class="sticker"><b>${p.stats.km.toFixed(1)}</b><span>km walked</span></div><div class="sticker"><b>${p.stats.excellent}</b><span>Excellent throws</span></div><div class="sticker"><b>${p.stats.evolved}</b><span>Evolved</span></div></div>
       <div class="sticker" style="padding:8px">First catch of the day${dots('catch')}First stop of the day${dots('stop')}<span style="font-size:13px;color:#4d5aa6">Day 7 in a row gives a big bonus.</span></div>
     </div>`);

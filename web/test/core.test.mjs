@@ -280,5 +280,61 @@ test('event calendar: weekends, parades, Kiki Day, full moon', () => {
   const m = R.eventMods([{ boost: ['Leaf'], sprouts: 2 }, { featured: 'zap', xp: 3, sparkle: 18 }]); assert.deepEqual([m.boost, m.featured, m.xp, m.sprouts, m.sparkle], [['Leaf'], 'zap', 3, 2, 18]);
 });
 
+// ---------- Phase 3 ----------
+/** A simulated player: taps twice a second, fires charged moves when ready, dodges some telegraphed attacks. */
+function simulate(b, dodgeRate, r = C.rng(5)) {
+  let tap = 0, dodgeAt = null;
+  for (let i = 0; i < 20000 && !b.done; i++) {
+    const dt = 0.05; tap -= dt;
+    for (const e of b.update(dt)) if (e.type === 'telegraph' && r.next() < dodgeRate) dodgeAt = b.t + 0.7;
+    if (dodgeAt != null && b.t >= dodgeAt) { b.dodge(); dodgeAt = null; }
+    if (b.me && b.me.energy >= R.CHARGED.cost) b.charged(); else if (tap <= 0) { b.quick(); tap = 0.5; }
+  }
+  return b.done;
+}
+const kid = (sp, lvl, iv = [10, 10, 10]) => ({ uid: Math.random(), sp, lvl, iv });
+test('battle maths: elements matter, stats grow with level', () => {
+  const w = R.fighter(kid('puddle', 10)), e = R.fighter(kid('ember', 10));
+  assert.ok(R.damage(R.CHARGED.power, w, e) > R.damage(R.CHARGED.power, e, w) * 1.5);
+  assert.ok(R.battleStats(kid('pine', 20)).maxHp > R.battleStats(kid('pine', 10)).maxHp);
+  assert.equal(R.MOVES.Leaf.length, 2);
+});
+test('battles end: faint, switch, win, lose, time out', () => {
+  const mine = [R.fighter(kid('blaze', 15)), R.fighter(kid('volt', 15))], theirs = [R.fighter(kid('acorn', 6), { full: true })];
+  const b = new R.Battle(mine, theirs); assert.equal(simulate(b, 0.5), 'win');
+  const weak = new R.Battle([R.fighter(kid('sprout', 2))], [R.fighter(kid('tide', 30), { full: true })]); assert.equal(simulate(weak, 0), 'lose');
+  const slow = new R.Battle([R.fighter(kid('boulder', 30))], [R.fighter(kid('crystal', 30), { full: true, hpMult: 50 })], { time: 20 }); assert.equal(simulate(slow, 1), 'timeout');
+  const f = R.fighter(kid('zap', 5)); f.hp = 0; assert.equal(new R.Battle([f, R.fighter(kid('pine', 5))], [R.fighter(kid('pine', 5))]).sides[0].length, 1);
+});
+test('dodging telegraphed charged moves cuts their damage to a quarter', () => {
+  const b = new R.Battle([R.fighter(kid('pebble', 10))], [R.fighter(kid('pebble', 10), { full: true })]);
+  b.tele = { left: 0.3 }; b.dodge(); const hp = b.me.hp; const ev = b.update(0.31).find(e => e.type === 'hit');
+  assert.ok(ev.dodged && hp - b.me.hp === ev.dmg && ev.dmg <= Math.floor(R.damage(R.CHARGED.power, b.them, b.me) * 0.25) + 1);
+});
+test('raids: winnable with a good team and some dodging, hard without', () => {
+  const team = n => ['blaze', 'brook', 'volt', 'boulder', 'glowcap', 'oak'].slice(0, n).map(sp => R.fighter(kid(sp, 20)));
+  const odds = (tier, n, dodge) => { let w = 0; for (let i = 0; i < 12; i++) { const raid = { sp: tier === 5 ? 'summit' : tier === 3 ? 'crystal' : 'grand-meadow', tier }; if (simulate(new R.Battle(team(n), [R.raidBoss(raid)], { time: 180, aiQuick: 1.6, aiCharged: 8, raid: true }), dodge, C.rng(i)) === 'win') w++; } return w / 12; };
+  assert.ok(odds(1, 3, 0.5) > 0.8, 'tier 1 with 3'); assert.ok(odds(3, 6, 0.6) > 0.6, 'tier 3 with 6'); assert.ok(odds(5, 6, 0.8) > 0.3, 'tier 5 with 6 and good dodging');
+  assert.ok(odds(5, 3, 0) < 0.3, 'tier 5 is hard with 3 and no dodging');
+});
+test('healing and reviving', () => {
+  const p = R.newSave(), k = R.addKiki(p, R.rollKiki('pine', 10, C.rng(1)), 1), max = R.battleStats(k).maxHp;
+  p.items.stitch = 2; p.items.pillow = 1; k.hp = 0;
+  assert.equal(R.heal(p, k, 'stitch'), false); assert.ok(R.heal(p, k, 'pillow') > 0); assert.equal(k.hp, Math.ceil(max / 2));
+  assert.ok(R.heal(p, k, 'stitch') > 0); assert.equal(R.heal(p, k, 'stitch'), false); assert.equal(R.hpOf(k), max); assert.equal(k.hp, undefined); assert.equal(p.items.stitch, 1);
+});
+test('circle keepers and raids are the same on every phone; one free raid a day', () => {
+  const a = R.keeperTeam('osm:n1', 1800000000, 12), b = R.keeperTeam('osm:n1', 1800000000, 12);
+  assert.deepEqual(a, b); assert.ok(a.length >= 1 && a.length <= 3 && a.every(k => k.lvl >= 3 && k.lvl <= 30));
+  const tiers = { 1: 0, 3: 0, 5: 0 }; for (let i = 0; i < 600; i++) tiers[R.raidAt('c' + i, 7).tier]++;
+  assert.ok(tiers[1] > 180 && tiers[3] > 180 && tiers[5] > 60, JSON.stringify(tiers));
+  assert.ok(C.variant(R.raidAt('c1', 7).sp)); assert.deepEqual(R.raidAt('c1', 7), R.raidAt('c1', 7));
+  const p = R.newSave(), t = Math.floor(new Date(2026, 10, 5, 12).getTime() / 1000);
+  assert.equal(R.payRaid(p, t), 'free'); assert.equal(R.canRaid(p, t), false); p.items.key = 1; assert.equal(R.payRaid(p, t), 'key'); assert.equal(R.payRaid(p, t + 86400), 'free');
+  const k = R.addKiki(p, R.rollKiki('pine', 10, C.rng(1)), 1); R.takeCircle(p, 'c9', k, t); assert.equal(k.keeping, 'c9'); assert.equal(R.sendHome(p, k.uid), false);
+  assert.ok(!R.bestTeam(p, 3).includes(k)); R.callHome(p, 'c9'); assert.ok(!k.keeping && !p.keepers.c9);
+  const ups = R.giveXp(p, R.xpFor(5)); assert.ok(ups.find(u => u.level === 5).items.stitch === 10 && p.items.key >= 1);
+});
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

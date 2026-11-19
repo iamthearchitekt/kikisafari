@@ -753,7 +753,7 @@ export function makeCircle(keeperId) {
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; g.add(ring);
   const portal = makePortal(1.9); portal.position.y = 2.25; portal.userData.target = 1; g.add(portal);
   const beam = makeBeam(16, 0.5); beam.position.y = 2.25; g.add(beam);
-  g.userData = { portal, keeper: null, keeperId: null, motion: null };
+  g.userData = { portal, keeper: null, keeperId: null, motion: null, setColor: hex => { ring.material.color.set(hex); beam.material.uniforms.c.value.set(hex); } };
   g.userData.setKeeper = id => {
     if (g.userData.keeperId === id) return;
     if (g.userData.keeper) g.remove(g.userData.keeper);
