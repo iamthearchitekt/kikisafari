@@ -61,7 +61,8 @@ button { font: inherit; color: inherit; }
 .stones { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 8px; font-family: 'Lilita One'; font-weight: 400; font-size: 26px; }
 .stone-icon { width: 34px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #5a5f96, #3d4275 60%); border: 2px solid var(--navy); position: relative; }
 .stone-icon::after { content: ''; position: absolute; inset: 5px 8px; border-radius: 50%; border: 3px solid #a24dff; border-left-color: transparent; transform: rotate(30deg); }
-.status { position: absolute; bottom: calc(var(--sab) + 112px); left: 12px; right: 12px; padding: 5px 12px; font-size: 14px; text-align: center; }
+/* Notices (map loading, weak GPS, moving fast) are a compact chip under the other chips, never over the middle of the map. */
+.status { max-width: calc(100vw - 100px); padding: 4px 12px; font-size: 13px; line-height: 1.25; font-weight: 600; background: #fff8de; }
 .status:empty { display: none; }
 /* Map HUD (Phase 1): explorer badge, menu, nearby; AR walk shows the radar and chips instead of the badge. */
 .topbar .col.right { align-items: flex-end; margin-left: auto; }
@@ -85,17 +86,19 @@ button { font: inherit; color: inherit; }
 .near-label { font-family: 'Lilita One'; font-weight: 400; font-size: 14px; }
 .near-btn.tracking { background: #fff27a; }
 .sil { filter: brightness(0) opacity(.72); }
-.ar-only { position: absolute; left: 12px; right: 12px; bottom: calc(var(--sab) + 120px); display: flex; gap: 10px; align-items: flex-end; pointer-events: none; }
+/* AR view: just a small radar in the top-right corner, under the Map button. (The Nearby button and the labels on
+   things already say what's where, so there's no list over the camera picture.) */
+.ar-only { position: absolute; right: 12px; top: calc(var(--sat) + 74px); pointer-events: none; }
 .ar-only > * { pointer-events: auto; }
-#radar { width: 130px; height: 130px; border-radius: 50%; border: 3px solid var(--navy); box-shadow: 0 5px 0 var(--navy); background: var(--cream); flex: none; }
-#nearby { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+#radar { width: 88px; height: 88px; border-radius: 50%; border: 3px solid var(--navy); box-shadow: 0 5px 0 var(--navy); background: var(--cream); flex: none; }
+#nearby { display: none; }
 .chip { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 14px; box-shadow: 0 4px 0 var(--navy); font-size: 15px; }
 .chip .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--navy); flex: none; }
 .chip .nm { flex: 1; font-family: 'Lilita One'; font-weight: 400; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip .ds { color: var(--muted); }
 .chip .ar { width: 18px; height: 18px; flex: none; }
 .chip.near { background: #fff27a; }
-.attribution { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + 2px); white-space: nowrap; padding: 2px 10px; font-size: 12px; font-weight: 500; box-shadow: none; }
+.attribution { white-space: nowrap; padding: 1px 6px; font-size: 10px; font-weight: 600; color: var(--navy); background: rgba(255, 255, 255, .7); border-radius: 6px; }
 #enc-hud .namecard { display: flex; flex-direction: column; align-items: center; padding: 2px 16px 6px; }
 #enc-hud .namecard .pp { font-family: 'Lilita One'; font-size: 15px; letter-spacing: .5px; color: var(--muted); }
 #enc-hud .namecard b { font-family: 'Lilita One'; font-weight: 400; font-size: 22px; }
@@ -143,17 +146,29 @@ button { font: inherit; color: inherit; }
 .reveal .cosmic { position: absolute; left: 50%; top: 52%; width: 190vmax; height: 190vmax; margin: -95vmax 0 0 -95vmax; animation: spin 60s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .reveal .cosmic { animation: none; } }
 @keyframes spin { to { transform: rotate(-360deg); } }
-.reveal .kiki { position: absolute; left: 50%; top: 50%; width: min(100vw, 70vh); height: min(100vw, 70vh); transform: translate(-50%, -50%); }
+/* The caught screen is a column: rarity, name and Power on top, Kiki in the middle (taking whatever room is left),
+   rewards and the button at the bottom. Nothing is stacked on top of Kiki. */
+.reveal { display: flex; flex-direction: column; align-items: center; padding: calc(var(--sat) + 10px) 14px calc(var(--sab) + 14px); }
+.reveal > .rv-top, .reveal > .kiki, .reveal > .rv-bottom { position: relative; z-index: 1; }
+.reveal .rv-top { flex: none; width: 100%; text-align: center; color: #fff; font-family: 'Lilita One'; }
+.reveal .stamp { font-size: clamp(40px, 12vw, 60px); line-height: 1.05; min-height: 1.05em; -webkit-text-stroke: 4px var(--navy); paint-order: stroke fill; text-shadow: 0 6px 0 var(--navy); transform: rotate(-5deg) scale(2.4); opacity: 0; transition: transform .28s cubic-bezier(.2,.9,.3,1), opacity .1s; }
+.reveal .stamp.in { transform: rotate(-5deg) scale(1); opacity: 1; }
+.reveal .vname { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; margin-top: 8px; font-size: clamp(26px, 8vw, 34px); line-height: 1.1; -webkit-text-stroke: 3px var(--navy); paint-order: stroke fill; text-shadow: 0 4px 0 var(--navy); }
+.reveal .vname .nm { overflow-wrap: anywhere; }
+.reveal .new { display: inline-block; background: var(--pink); color: #fff; font-size: 18px; line-height: 1; padding: 5px 10px 6px; transform: rotate(6deg); -webkit-text-stroke: 1.2px var(--navy); text-shadow: none; }
+.reveal .vsub { margin-top: 2px; font-size: 18px; letter-spacing: .5px; -webkit-text-stroke: 2px var(--navy); paint-order: stroke fill; }
+.reveal .kiki { flex: 1 1 auto; min-height: 140px; width: 100%; max-width: 520px; }
 .reveal .kiki canvas { width: 100%; height: 100%; display: block; }
-.reveal .stamp { position: absolute; top: calc(var(--sat) + 6vh); left: 0; right: 0; text-align: center; font-family: 'Lilita One'; font-size: 64px; -webkit-text-stroke: 4px var(--navy); paint-order: stroke fill; text-shadow: 0 7px 0 var(--navy); transform: rotate(-6deg) scale(2.6); opacity: 0; transition: transform .28s cubic-bezier(.2,.9,.3,1), opacity .1s; }
-.reveal .stamp.in { transform: rotate(-6deg) scale(1); opacity: 1; }
-.reveal .vname { position: absolute; top: calc(var(--sat) + 6vh + 78px); left: 0; right: 0; text-align: center; font-family: 'Lilita One'; font-size: 32px; color: #fff; -webkit-text-stroke: 3px var(--navy); paint-order: stroke fill; text-shadow: 0 5px 0 var(--navy); }
-.reveal .new { position: absolute; top: calc(var(--sat) + 6vh + 70px); right: 8%; background: var(--pink); color: #fff; font-family: 'Lilita One'; font-size: 24px; padding: 4px 12px; transform: rotate(12deg); -webkit-text-stroke: 1.5px var(--navy); paint-order: stroke fill; }
-.reveal .reward { position: absolute; left: 50%; bottom: calc(var(--sab) + 110px); transform: translateX(-50%); width: min(92vw, 420px); padding: 12px 18px; text-align: left; font-size: 18px; }
-.reveal .reward .ln span { color: var(--leaf); }
-.reveal .reward .tot { text-align: center; font-family: 'Lilita One'; font-weight: 400; font-size: 28px; margin-top: 4px; }
-.reveal .keep { position: absolute; left: 50%; bottom: calc(var(--sab) + 24px); transform: translateX(-50%); white-space: nowrap; font-size: 32px; padding: 12px 40px 16px; }
-.reveal .keep:active { transform: translate(-50%, 5px); }
+.reveal .rv-bottom { flex: none; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.reveal .reward { width: min(100%, 420px); padding: 8px 16px 10px; text-align: left; font-size: 15px; line-height: 1.35; }
+.reveal .reward .ln { display: flex; justify-content: space-between; gap: 10px; }
+.reveal .reward .ln span { color: var(--leaf); white-space: nowrap; }
+.reveal .reward .tot { text-align: center; font-family: 'Lilita One'; font-weight: 400; font-size: 24px; margin-top: 2px; }
+.reveal .reward .extra { display: flex; justify-content: center; gap: 16px; font-size: 15px; font-weight: 600; }
+.reveal .reward .wait { visibility: hidden; }
+.reveal .keep { white-space: nowrap; font-size: 28px; padding: 10px 40px 14px; }
+.reveal .keep:active { transform: translateY(5px); }
+.reveal .hide { visibility: hidden; }
 .reveal .flash { position: absolute; inset: 0; background: var(--uv); animation: flash .35s forwards; pointer-events: none; }
 @keyframes flash { to { opacity: 0; } }
 
@@ -295,7 +310,7 @@ button { font: inherit; color: inherit; }
 .hatch-info { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .new-chip { background: var(--pink); color: #fff; font-size: 14px; border-radius: 8px; padding: 0 6px; border: 2px solid var(--navy); vertical-align: 3px; }
 .menu-grid { max-height: 70vh; overflow-y: auto; }
-#hud.ar .status { bottom: calc(var(--sab) + 268px); }
+
 
 /* Phase 3: battles */
 .hpbar { height: 8px; border-radius: 4px; border: 2px solid var(--navy); background: #fff; overflow: hidden; margin: 3px 4px 0; }

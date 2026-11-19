@@ -4,7 +4,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { WorldView, Location, OsmLoader, drawRadar, renderNearby } from './world.js';
+import { WorldView, Location, OsmLoader, drawRadar } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
 import { portrait } from './art.js';
@@ -286,7 +286,7 @@ function refreshHud(force) {
 }
 function hud() {
   const p = app.progress, facing = app.world.orient.facing, things = app.world.things;
-  if (!app.mapMode) { drawRadar($('radar'), things, app.world.orient.heading); renderNearby($('nearby'), things, app.world.orient.heading); }
+  if (!app.mapMode) drawRadar($('radar'), things, app.world.orient.heading);
   // Nearby button: the three closest Kikis (silhouettes until caught), or the one you're tracking.
   const kikis = things.filter(t => t.kind === 'kiki'), tracked = app.tracking && kikis.find(t => t.id === app.tracking);
   if (app.tracking && !tracked && things.length) app.tracking = null; // it's gone

@@ -56,20 +56,19 @@
   <div id="labels"></div>
   <div id="hud" class="safe">
     <div class="topbar">
-      <div class="col chips"><button type="button" class="sticker chip-status on-chip" id="on-chip" hidden></button><div class="sticker chip-status" id="surge-chip" hidden></div></div>
+      <div class="col chips"><button type="button" class="sticker chip-status on-chip" id="on-chip" hidden></button><div class="sticker chip-status" id="surge-chip" hidden></div><div class="sticker status" id="status" role="status" hidden></div></div>
       <div class="col right">
         <button type="button" class="round sticker" id="btn-view" aria-label="Switch to the camera view">AR</button>
         <button type="button" class="round sticker" id="btn-north" aria-label="Point the map north">N</button>
+        <div class="attribution" id="attribution">© OpenStreetMap</div>
       </div>
     </div>
-    <div class="sticker status" id="status" hidden></div>
     <div class="ar-only" id="ar-bits" hidden><canvas id="radar" width="320" height="320"></canvas><div id="nearby"></div></div>
     <div class="dock">
       <button type="button" class="me sticker" id="btn-me" aria-label="Your explorer"><img id="me-face" alt=""><span class="lvl" id="me-lvl">1</span><span class="xpbar"><i id="me-xp"></i></span></button>
       <button type="button" class="menu-btn" id="btn-menu" aria-label="Menu"><span class="menu-stone"></span></button>
       <button type="button" class="near-btn sticker" id="btn-nearby" aria-label="Nearby Kikis"><span id="near-mini"></span><span class="near-label" id="near-label">Nearby</span></button>
     </div>
-    <div class="sticker attribution" id="attribution">© OpenStreetMap contributors</div>
   </div>
   <div id="enc-hud" class="safe" hidden>
     <div class="topbar">

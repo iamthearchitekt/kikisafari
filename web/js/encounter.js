@@ -45,7 +45,7 @@ export class Encounter {
     d = Math.max(1.0, Math.min(2.2, d));
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d);
     // No motion sensors (stand-in or a computer): tilt the view down to Kiki.
-    if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) + 0.08;
+    if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) - 0.06; // Kiki a little above the middle, clear of the stone in your hand
     this.kiki = makeKiki(this.v.id, 0.42 * (this.rec.h / this.v.cm) ** 0.5, !!this.rec.sparkle); this.kiki.position.copy(this.home); this.group.add(this.kiki);
     this.kiki.rotation.y = Math.atan2(-this.home.x, -this.home.z);
     this.motion = new KikiMotion(this.kiki, reducedMotion);
@@ -78,7 +78,7 @@ export class Encounter {
   replace() {
     if (this.state !== 'ready' && this.state !== 'out') return;
     const o = this.app.world.orient, h = o.rawHeading(this.camera.quaternion) * Math.PI / 180, d = 1.6;
-    if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) + 0.08;
+    if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) - 0.06; // Kiki a little above the middle, clear of the stone in your hand
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d); this.kiki.position.copy(this.home);
   }
   /** How hard the catch is, as the dot on the name card: green is easy, red is hard. */
@@ -382,27 +382,37 @@ export class Encounter {
 
   // ---------- the reveal ----------
   reveal(o, rw, first, steps) {
+    // A stacked layout (top: rarity, name, Power; middle: Kiki; bottom: rewards, button). Every slot is there from the
+    // start (hidden until its moment), so nothing jumps or overlaps as the reveal plays out.
     const el = document.createElement('div'); el.className = 'reveal';
     if (!Encounter.cosmicUrl) Encounter.cosmicUrl = cosmicCanvas(512).toDataURL();
-    el.innerHTML = `<img class="cosmic" src="${Encounter.cosmicUrl}" alt=""><div class="kiki"></div><div class="flash"></div>`;
+    const sub = `POWER ${R.power(this.rec)}${this.rec.size ? ' · ' + this.rec.size : ''}${this.rec.sparkle ? ' · SPARKLE' : ''}`;
+    el.innerHTML = `<img class="cosmic" src="${Encounter.cosmicUrl}" alt=""><div class="flash"></div>
+      <div class="rv-top"><div class="stamp" style="color:${C.RARITY[this.v.rarity].main}"></div>
+        <div class="vname hide"><span class="nm">${this.rec.sparkle ? '✦ ' : ''}${this.v.name}</span>${first ? '<span class="new sticker">NEW!</span>' : ''}</div>
+        <div class="vsub hide">${sub}</div></div>
+      <div class="kiki"></div>
+      <div class="rv-bottom"><div class="sticker reward hide">${rw.xp.map(([label, amount]) => `<div class="ln">${label} <span>+${amount}</span></div>`).join('')}<div class="tot">+0 XP</div>
+        <div class="extra"><span>+${rw.sprouts} Sprouts</span><span>+${rw.fluff} ${R.fluffName(rw.family)}</span></div></div>
+        <button type="button" class="pill play keep hide">Keep playing</button></div>`;
     $('overlay').appendChild(el); $('enc-hud').hidden = true;
+    const q = sel => el.querySelector(sel), show = n => n.classList.remove('hide');
     // Kiki on the cosmic spiral, on the shared screen stage.
     let k, motion;
-    const st = liveStage(el.querySelector('.kiki'), (scene, cam) => {
+    const st = liveStage(q('.kiki'), (scene, cam) => {
       cam.position.set(0, 0.33, 1.55); cam.lookAt(0, 0.26, 0);
       k = makeKiki(this.v.id, 0.42, !!this.rec.sparkle); k.visible = false; scene.add(k);
       motion = new KikiMotion(k, reducedMotion); motion.idling = false;
       return { update: dt => motion.update(dt) };
     });
-    const add = html => { const d = document.createElement('div'); d.innerHTML = html; const n = d.firstElementChild; el.appendChild(n); return n; };
     const sleep = ms => new Promise(res => setTimeout(res, ms));
     (async () => {
       await sleep(350);
       for (const s of steps.slice(steps.findIndex(x => x.kind === 'stamp'))) {
         hx.play(s.haptic); if (s.sfx) sfx(s.sfx, 0.55); if (s.voice) voice(s.voice, s.voiceChance);
         if (s.kind === 'stamp') {
-          const stp = add(`<div class="stamp" style="color:${C.RARITY[this.v.rarity].main}">${s.text}</div>`); requestAnimationFrame(() => requestAnimationFrame(() => stp.classList.add('in')));
-          await sleep(280); add(`<div class="vname">${this.rec.sparkle ? '✦ ' : ''}${this.v.name}<div style="font-size:20px">POWER ${R.power(this.rec)}${this.rec.size ? ' · ' + this.rec.size : ''}${this.rec.sparkle ? ' · SPARKLE' : ''}</div></div>`); if (first) add('<div class="new sticker">NEW!</div>');
+          const stp = q('.stamp'); stp.textContent = s.text; requestAnimationFrame(() => requestAnimationFrame(() => stp.classList.add('in')));
+          await sleep(280); show(q('.vname')); show(q('.vsub'));
           await sleep(220);
         } else if (s.kind === 'dropIn') {
           k.visible = true; const t0 = performance.now();
@@ -413,18 +423,17 @@ export class Encounter {
           while ((motion.busy || performance.now() - t0 < s.dur * 1000) && performance.now() - t0 < 4000) await sleep(50);
           motion.idling = true;
         } else if (s.kind === 'countUp') {
-          const box = add(`<div class="sticker reward">${rw.xp.map(() => '<div class="ln"></div>').join('')}<div class="tot">+0 XP</div><div class="extra"></div></div>`);
-          const lns = box.querySelectorAll('.ln'), tot = box.querySelector('.tot'); let run = 0;
+          const box = q('.reward'), lns = box.querySelectorAll('.ln'), tot = box.querySelector('.tot'); let run = 0;
+          lns.forEach(l => l.classList.add('wait')); box.querySelector('.extra').classList.add('wait'); show(box);
           for (let i = 0; i < rw.xp.length; i++) {
-            const [label, amount] = rw.xp[i]; lns[i].innerHTML = `${label} <span>+${amount}</span>`; sfx('count', 0.4);
+            const amount = rw.xp[i][1]; lns[i].classList.remove('wait'); sfx('count', 0.4);
             const from = run, dur = Math.min(450, s.dur * 1000 / rw.xp.length), t0 = performance.now(); let ticks = 0;
             while (performance.now() - t0 < dur) { run = Math.round(from + amount * (performance.now() - t0) / dur); tot.textContent = `+${run} XP`; if (++ticks % 4 === 0) { hx.tick(); sfx('count', 0.25, 1 + (performance.now() - t0) / dur); } await sleep(16); }
             run = from + amount; tot.textContent = `+${run} XP`;
           }
-          box.querySelector('.extra').innerHTML = `<div class="got" style="justify-content:center;gap:16px;font-size:17px"><span>+${rw.sprouts} Sprouts</span><span>+${rw.fluff} ${R.fluffName(rw.family)}</span></div>`;
-          sfx('pickup', 0.4);
+          box.querySelector('.extra').classList.remove('wait'); sfx('pickup', 0.4);
         } else if (s.kind === 'keepPlaying') {
-          const b = add('<button type="button" class="pill play keep">Keep playing</button>');
+          const b = q('.keep'); show(b);
           b.onclick = () => { sfx('button', 0.35); hx.light(); st.stop(); el.remove(); this.finish('caught'); };
           return; // never closes by itself
         }

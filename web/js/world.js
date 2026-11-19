@@ -160,7 +160,7 @@ export class OsmLoader {
         this.lastError = e.message; console.warn('map', e.message);
         if (cache) { try { const old = await cache.match(key); if (old) { const j = await old.json(); if (goodMap(j)) json = j; } } catch (e2) {} }
         if (!json) {
-          this.problem = (navigator.onLine === false ? "You're offline, so the map can't load." : "Can't load the map right now (the map servers are busy).") + ' Kikis still spawn; the streets appear when it loads.';
+          this.problem = navigator.onLine === false ? "You're offline. The map loads when you're back." : 'Map servers are busy. Trying again… (Kikis still spawn.)';
           const k = cell.x + ':' + cell.y, n = (this.fails.get(k) || 0) + 1; this.fails.set(k, n);
           this.retry.set(k, performance.now() + Math.min(300000, 15000 * 2 ** (n - 1))); // back off: 15 s, 30 s, 60 s … up to 5 min
           return;
