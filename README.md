@@ -74,6 +74,20 @@ Press **Play**, then **Play** on the title screen.
 - **No phone camera:** you see a meadow stand-in that turns as you do.
 - **Real AR in the editor:** turn on XR Simulation (Project Settings ▸ XR Plug-in Management ▸ Windows).
 
+## Play it on your iPhone (web version, no App Store needed)
+
+The `web/` folder is a complete web version that runs in Safari and installs to your Home Screen like Big Plush.
+
+1. In Netlify, choose **Add new site ▸ Import an existing project ▸ GitHub** and pick this repo. The `netlify.toml`
+   at the top of the repo already tells Netlify to publish `web/`, so just press **Deploy**.
+2. On your iPhone, open the site in **Safari** and tap **Play ▸ Allow and play** (camera, motion and location).
+3. To make it an app: **Share ▸ Add to Home Screen**.
+
+On a computer you can try it too: there's no camera or motion there, so you get a meadow stand-in. Drag to look
+around, WASD walks, Q/E not needed. Add `?lat=…&lon=…` to the address to start somewhere specific.
+
+Run the web tests with `node web/test/core.test.mjs`.
+
 ## Open it (Windows)
 
 1. Install **Unity Hub** and **Unity 6 (6000.0 LTS)**, with **iOS Build Support** and **Android Build Support**.
