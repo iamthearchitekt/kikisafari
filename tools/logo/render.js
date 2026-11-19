@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch();
   for (const [q, out] of [['', 'logo.png'], ['?preview', 'logo-preview.png']]) {
-    const p = await b.newPage({ viewport: { width: 3200, height: 1100 }, deviceScaleFactor: 1 });
+    const p = await b.newPage({ viewport: { width: 2600, height: 1800 }, deviceScaleFactor: 1 });
     await p.goto('http://localhost:8766/logo.html' + q);
     await p.waitForFunction(() => document.title === 'ready');
     await p.waitForTimeout(300);

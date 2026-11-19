@@ -12,6 +12,8 @@ import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm } fro
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
 import { circlePanel, healKiki } from './battle.js';
+import { startTitle } from './title.js';
+import { cosmicCanvas } from './art.js';
 import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug } from './services.js';
 
 const app = {
@@ -40,6 +42,10 @@ function resize() {
 addEventListener('resize', resize); resize();
 
 // ---------- title ----------
+let titleScene = null;
+function showTitleScene() { if (!titleScene && !$('title').hidden) titleScene = startTitle($('title-stage')); }
+function hideTitleScene() { if (titleScene) { titleScene.stop(); titleScene = null; } }
+setTimeout(() => { $('title-bg').querySelector('img').src = cosmicCanvas(768).toDataURL(); showTitleScene(); }, 0);
 const soundBtn = $('sound-toggle'), motionBtn = $('motion-toggle');
 const motionLabels = { auto: 'Motion: auto', reduced: 'Motion: reduced', full: 'Motion: full' };
 const refreshTitle = () => { soundBtn.textContent = settings.get('sound', true) ? 'Sound: on' : 'Sound: off'; motionBtn.textContent = motionLabels[settings.get('motion', 'auto')]; };
@@ -103,7 +109,7 @@ function startSensors() {
     ? DeviceOrientationEvent.requestPermission().catch(() => 'denied') : Promise.resolve('granted');
   const pLoc = app.loc.start();
   pOri.then(ori => {
-    $('title').hidden = true; $('perms').hidden = true; $('game').hidden = false;
+    hideTitleScene(); $('title').hidden = true; $('perms').hidden = true; $('game').hidden = false;
     app.mapMode = true; applyMode(); refreshHud(true);
     if (ori !== 'granted') toast("No motion access: the map won't turn with you. Drag to turn it.", 4200);
     runTutorial(app);
@@ -116,7 +122,7 @@ function startSensors() {
 app.goHome = function goHome() {
   if (app.encounter) return;
   camOff(); camTapToResume = false;
-  $('game').hidden = true; $('title').hidden = false; app.mapMode = true; applyMode();
+  $('game').hidden = true; $('title').hidden = false; app.mapMode = true; applyMode(); showTitleScene();
 };
 $('btn-view').onclick = () => { app.mapMode = !app.mapMode; applyMode(); sfx('button', 0.35); hx.light(); };
 $('btn-north').onclick = () => { app.map.north(); sfx('button', 0.3); };

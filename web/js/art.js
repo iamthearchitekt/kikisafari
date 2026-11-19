@@ -174,7 +174,7 @@ function hsv(h, s, v) {
   return new THREE.Color(f(5), f(3), f(1));
 }
 /** One leaf, stem at z=0 to tip at z=1: folded up along the midrib, arching with a drooping tip. */
-function leafGeometry(width, round, base, tip, strongTip) {
+export function leafGeometry(width, round, base, tip, strongTip) {
   const g = new THREE.SphereGeometry(1, 14, 22); g.rotateX(Math.PI / 2);
   const p = g.attributes.position, cols = [], b = C(base), t = C(tip);
   for (let i = 0; i < p.count; i++) {
