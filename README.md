@@ -84,7 +84,7 @@ The `web/` folder is a complete web version that runs in Safari and installs to 
 3. To make it an app: **Share ▸ Add to Home Screen**.
 
 On a computer you can try it too: there's no camera or motion there, so you get a meadow stand-in. Drag to look
-around, WASD walks, Q/E not needed. Add `?lat=…&lon=…` to the address to start somewhere specific.
+around, WASD walks. Add `?lat=…&lon=…` to the address to start somewhere specific.
 
 Run the web tests with `node web/test/core.test.mjs`.
 
