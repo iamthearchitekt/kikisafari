@@ -123,8 +123,9 @@ test('live world uses real data and keeps Kikis safe', () => {
 
 // ---------- Phase 1 rules ----------
 test('species table: numbers, families and evolutions line up', () => {
-  assert.deepEqual(R.SPECIES.map(v => v.no), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  for (const v of C.VARIANTS) { assert.ok(v.family && v.base && v.cm && v.kg && v.blurb, v.id); if (v.evolvesTo) assert.equal(C.variant(v.evolvesTo).family, v.family); }
+  assert.deepEqual(R.SPECIES.map(v => v.no), R.SPECIES.map((v, i) => i + 1)); assert.ok(R.SPECIES.length >= 40);
+  assert.equal(new Set(C.VARIANTS.map(v => v.id)).size, C.VARIANTS.length);
+  for (const v of C.VARIANTS) { assert.ok(v.family && v.base && v.cm && v.kg && v.blurb && R.ELEMENTS.includes(v.element), v.id); if (v.evolvesTo) { assert.equal(C.variant(v.evolvesTo).family, v.family); assert.equal(C.variant(v.evolvesTo).element, v.element); } }
   assert.equal(R.fluffName('pine'), 'Pine Fluff');
 });
 test('levels and XP', () => {
@@ -203,6 +204,80 @@ test('old saves move to the new format', () => {
   assert.equal(s.caught.meadow, 2); assert.equal(s.fluff.meadow, 6); assert.equal(s.fluff.rainbow, 5); assert.equal(s.tutorial, 'explorer'); assert.ok(s.keepers.c);
   assert.equal(R.migrate(null).tutorial, 'start');
   const again = R.migrate(JSON.parse(JSON.stringify(s))); assert.deepEqual(again, s);
+});
+
+// ---------- Phase 2 ----------
+test('element wheel: two strengths and two weaknesses each, never both ways', () => {
+  for (const a of R.ELEMENTS) { assert.equal(R.STRONG[a].length, 2); assert.equal(R.weakTo(a).length, 2); for (const b of R.STRONG[a]) assert.ok(!R.STRONG[b].includes(a), a + b); }
+  assert.equal(R.effectiveness('Water', 'Ember'), 1.6); assert.equal(R.effectiveness('Ember', 'Water'), 0.625); assert.equal(R.effectiveness('Leaf', 'Moon'), 1);
+});
+test('every element can spawn in the wild and hatch from an egg; legendaries only from raids and rewards', () => {
+  for (const el of R.ELEMENTS) { assert.ok(C.VARIANTS.some(v => v.element === el && v.weight > 0), el); assert.ok(C.VARIANTS.some(v => v.element === el && v.egg), el); }
+  for (const km of R.EGG_KM) assert.ok(R.eggPool(km).length >= 2);
+  assert.ok(C.VARIANTS.filter(v => v.rarity === 'Legendary' && !v.weight).length >= 5);
+});
+test('weather codes and boosts', () => {
+  assert.equal(R.weatherFrom(0, true), 'sunny'); assert.equal(R.weatherFrom(1, false), 'clear'); assert.equal(R.weatherFrom(3, true), 'cloudy'); assert.equal(R.weatherFrom(61, true), 'rain');
+  assert.equal(R.weatherFrom(95, true), 'storm'); assert.equal(R.weatherFrom(73, true), 'snow'); assert.equal(R.weatherFrom(45, true), 'fog'); assert.equal(R.weatherFrom(2, true, 40), 'windy');
+  for (const el of R.ELEMENTS) assert.ok(Object.values(R.WEATHER).some(w => w.boost.includes(el)), el);
+  const r = C.rng(4); let leaf = 0, leafB = 0; for (let i = 0; i < 20000; i++) { if (C.pick({ habitat: 'Town' }, r.next()).element === 'Leaf') leaf++; if (C.pick({ habitat: 'Town', boost: ['Leaf'] }, r.next()).element === 'Leaf') leafB++; }
+  assert.ok(leafB > leaf * 1.5, leaf + ' ' + leafB);
+  const k = R.wildKiki('k:x', 'meadow', 10, { boosted: true }); assert.ok(k.boosted && k.lvl >= 4);
+});
+test('night Kikis and featured events', () => {
+  const r = C.rng(8); let dusk = 0, duskN = 0, feat = 0;
+  for (let i = 0; i < 20000; i++) { if (C.pick({ habitat: 'Meadow' }, r.next()).id === 'dusk') dusk++; if (C.pick({ habitat: 'Meadow', night: true }, r.next()).id === 'dusk') duskN++; if (C.pick({ habitat: 'Meadow', featured: 'pebble' }, r.next()).id === 'pebble') feat++; }
+  assert.ok(duskN > dusk * 2); assert.ok(feat > 4000, String(feat));
+});
+test('sparkle odds', () => { let n = 0; for (let i = 0; i < 90000; i++) if (R.isSparkle('k:' + i)) n++; assert.ok(n > 120 && n < 290, String(n)); let m = 0; for (let i = 0; i < 9000; i++) if (R.isSparkle('k:' + i, 18)) m++; assert.ok(m > 350 && m < 650); });
+test('eggs: from stops, warm in a nest, hatch by walking, extra nests wear out', () => {
+  const p = R.newSave(), r = C.rng(2);
+  for (let i = 0; i < 12; i++) R.newEgg(p, r);
+  assert.equal(p.eggs.length, R.EGG_MAX); assert.ok(p.eggs.every(e => R.eggPool(e.km).some(v => v.id === e.sp)));
+  const e2 = p.eggs.find(e => e.km === 2) || p.eggs[0];
+  assert.ok(R.incubate(p, e2.id, 'warm')); assert.ok(!R.incubate(p, p.eggs.find(e => e !== e2).id, 'warm'));
+  p.nests.push({ id: 'cozy', uses: 1, egg: null }); const e5 = p.eggs.find(e => e !== e2); R.incubate(p, e5.id, 'cozy');
+  assert.equal(R.walkEggs(p, e2.km - 0.5).length, e2.km - 0.5 >= e5.km ? 1 : 0);
+  const hatched = R.walkEggs(p, 20); assert.ok(hatched.some(e => e.id === e2.id) && hatched.some(e => e.id === e5.id));
+  assert.equal(p.nests.length, 1); assert.equal(p.nests[0].egg, null);
+  const k = R.hatchKiki(e2, 30, r); assert.ok(k.lvl === 20 && k.iv.every(x => x >= 10));
+});
+test('buddy finds Fluff as you walk', () => {
+  const p = R.newSave(), k = R.addKiki(p, R.rollKiki('pine', 5, C.rng(1)), 1); R.setBuddy(p, k.uid);
+  assert.equal(R.walkBuddy(p, 0.6), 0); assert.equal(R.walkBuddy(p, 0.6), 1); assert.equal(p.fluff.pine, 1); assert.ok(Math.abs(p.buddy.km - 0.2) < 1e-9);
+  assert.equal(R.walkBuddy(p, 2.05), 2);
+});
+test('tasks: one per stop per day, tracked, claimed for a stamp; seven stamps fill the card', () => {
+  const p = R.newSave(), t0 = Math.floor(new Date(2026, 10, 2, 12).getTime() / 1000);
+  const a = R.giveTask(p, 'stop1', t0); R.giveTask(p, 'stop2', t0); R.giveTask(p, 'stop3', t0); assert.equal(R.giveTask(p, 'stop4', t0), null);
+  a.type = 'catch'; a.el = 'Water'; a.q = undefined; a.n = 2;
+  assert.equal(R.track(p, { type: 'catch', el: 'Leaf' }).filter(x => !x.story).length, 0);
+  R.track(p, { type: 'catch', el: 'Water' }); const done = R.track(p, { type: 'catch', el: 'Water' }).filter(x => !x.story);
+  assert.ok(done.includes(a)); const c = R.claimTask(p, a.id, t0); assert.ok(c.stamp && !c.card && p.stamps.n === 1);
+  const q = { id: 99, type: 'throw', q: 'Nice', n: 1, got: 0 }; p.tasks.push(q); R.track(p, { type: 'throw', q: 'Excellent' }); assert.equal(q.got, 1);
+  assert.equal(R.claimTask(p, 99, t0).stamp, false); // one stamp a day
+  p.stamps.n = 6; const t = { id: 100, type: 'spin', n: 1, got: 1 }; p.tasks.push(t); assert.ok(R.claimTask(p, 100, t0 + 86400).card);
+});
+test('story chapters advance', () => {
+  const p = R.newSave();
+  for (let i = 0; i < 3; i++) R.track(p, { type: 'catch' }); R.track(p, { type: 'spin', n: 2 }); assert.ok(!R.chapterReady(p));
+  for (let i = 0; i < 3; i++) R.track(p, { type: 'throw', q: 'Great' });
+  assert.ok(R.chapterReady(p)); assert.equal(R.claimChapter(p).title, R.STORY[0].title); assert.equal(p.story.ch, 1);
+  assert.equal(R.STORY[R.STORY.length - 1].reward.kiki, 'golden-spiral');
+});
+test('medals reach tiers once', () => {
+  const p = R.newSave(); p.stats.catches = 12; p.stats.el.Leaf = 11;
+  const got = R.newMedals(p).map(x => x.m.id + x.tier); assert.ok(got.includes('collector1') && got.includes('el-Leaf1'));
+  assert.equal(R.newMedals(p).length, 0); p.stats.catches = 150; assert.deepEqual(R.newMedals(p).map(x => x.m.id + x.tier), ['collector2']);
+});
+test('event calendar: weekends, parades, Kiki Day, full moon', () => {
+  const at = (y, m, d, h) => Math.floor(new Date(y, m, d, h).getTime() / 1000);
+  assert.ok(R.eventsAt(at(2026, 10, 21, 12)).some(e => e.name.endsWith('Weekend'))); // a Saturday
+  assert.equal(R.eventsAt(at(2026, 10, 17, 12)).length, 0); // a Tuesday noon
+  assert.ok(R.eventsAt(at(2026, 10, 18, 18)).some(e => e.featured && e.xp === 2)); // Wednesday 6 pm
+  assert.ok(R.eventsAt(at(2026, 10, 7, 15)).some(e => e.name === 'Kiki Day')); // first Saturday
+  let full = 0; for (let d = 0; d < 60; d++) if (R.eventsAt(at(2026, 0, 1 + d, 22)).some(e => e.name === 'Full Moon')) full++; assert.ok(full >= 2 && full <= 6, String(full));
+  const m = R.eventMods([{ boost: ['Leaf'], sprouts: 2 }, { featured: 'zap', xp: 3, sparkle: 18 }]); assert.deepEqual([m.boost, m.featured, m.xp, m.sprouts, m.sparkle], [['Leaf'], 'zap', 3, 2, 18]);
 });
 
 console.log(`${passed} passed, ${failed} failed`);

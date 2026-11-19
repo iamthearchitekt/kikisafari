@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- Art check: open /test/preview.html (served from web/) to see every Kiki, stone, treat and outfit. ?show=kikis|items|explorers|map -->
 <html><head><meta charset="utf-8"><title>KIKI SAFARI art preview</title>
-<style>body{margin:0;background:#bfe6ff;font:14px system-ui} canvas{display:block} .grid{display:flex;flex-wrap:wrap;gap:8px;padding:8px} .grid div{text-align:center;background:#fff8de;border:3px solid #18237a;border-radius:14px;padding:4px} img{width:150px;height:150px;display:block}</style></head>
+<style>body{margin:0;background:#bfe6ff;font:14px system-ui} canvas{display:block} .grid{display:flex;flex-wrap:wrap;gap:8px;padding:8px} .grid div{text-align:center;background:#fff8de;border:3px solid #18237a;border-radius:14px;padding:4px;width:150px;font-size:12px} img{width:150px;height:150px;display:block}</style></head>
 <body><canvas id="c"></canvas><div class="grid" id="g"></div>
 <script type="module">
 import * as THREE from '../vendor/three.module.min.js';
@@ -12,10 +12,11 @@ const W = 1600, H = 520, r = new THREE.WebGLRenderer({ canvas: c, antialias: tru
 const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xfff5e0, 0x8a80c0, 1.6)); const sun = new THREE.DirectionalLight(0xfff5e0, 2); sun.position.set(-3, 6, 4); scene.add(sun);
 const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshLambertMaterial({ color: 0x8fd45e })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
-if (show === 'kikis') {
-  SPECIES.forEach((v, i) => { const k = makeKiki(v.id, 0.42); k.position.x = (i - 4) * 0.62; scene.add(k); });
+if (show === 'kikis' || show === 'sparkle') {
+  const list = SPECIES.slice(+(new URLSearchParams(location.search).get('from') || 0), +(new URLSearchParams(location.search).get('to') || 99));
+  list.slice(0, 9).forEach((v, i) => { const k = makeKiki(v.id, 0.42, show === 'sparkle'); k.position.x = (i - 4) * 0.62; scene.add(k); });
   cam.position.set(0, 0.55, 4.6); cam.lookAt(0, 0.28, 0);
-  for (const v of SPECIES) g.insertAdjacentHTML('beforeend', `<div><img src="${portrait('kiki:' + v.id, 256)}">${v.name}</div>`);
+  for (const v of list) g.insertAdjacentHTML('beforeend', `<div><img src="${portrait('kiki:' + v.id + (show === 'sparkle' ? ':s' : ''), 256)}">#${v.no} ${v.name}<br><small>${v.element}</small></div>`);
 } else if (show === 'items') {
   ['rune', 'moon', 'star'].forEach((t, i) => { const s = makeRuneStone(0.09, t); s.position.set((i - 2) * 0.5, 0.25, 0); s.rotation.set(-1.0, 0, 0.2); s.userData.update(0, 0.25); scene.add(s); });
   ['honey', 'sunseed'].forEach((t, i) => { const s = makeTreat(t, 0.25); s.position.set((i + 1.2) * 0.5, 0.25, 0); s.rotation.set(t === 'honey' ? 1.2 : 0.2, t === 'honey' ? Math.PI - 0.7 : 0.5, 0); scene.add(s); });

@@ -140,6 +140,7 @@ export class StreetMap {
     const want = this.walkSpeed > 0.4 && step.lengthSq() > 1e-6 ? Math.atan2(step.x, step.z) : Math.PI - heading * Math.PI / 180;
     let d = want - this.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); this.facing += d * Math.min(1, dt * 6);
     this.avatar.rotation.y = this.facing; this.avatar.userData.update(dt, this.walkSpeed > 0.25 ? this.walkSpeed : 0);
+    this.updateBuddy(dt); this.updateWeather(dt);
     const h = this.yaw * Math.PI / 180, tilt = 54 * Math.PI / 180, f = new THREE.Vector3(Math.sin(h), 0, -Math.cos(h));
     this.camera.position.copy(this.player.position).addScaledVector(f, -this.dist * Math.cos(tilt)).add(new THREE.Vector3(0, this.dist * Math.sin(tilt), 0));
     this.camera.lookAt(this.player.position);
@@ -177,6 +178,46 @@ export class StreetMap {
     this.app.interact(g.userData.thing);
   }
   north() { this.yaw = 0; }
+
+  /** Your buddy trots along behind your explorer (Phase 2). */
+  setBuddy(rec) {
+    if (this.buddy) { this.scene.remove(this.buddy); this.buddy = null; }
+    this.buddyKey = rec ? rec.uid + rec.sp + !!rec.sparkle : null;
+    if (!rec) return;
+    this.buddy = makeKiki(rec.sp, 6, !!rec.sparkle); this.buddy.userData.motionCtl = new KikiMotion(this.buddy, reducedMotion); this.scene.add(this.buddy);
+    this.buddy.position.copy(this.player.position);
+  }
+  updateBuddy(dt) {
+    const p = this.app.progress, rec = p.buddy && p.kikis.find(k => k.uid === p.buddy.uid);
+    const key = rec ? rec.uid + rec.sp + !!rec.sparkle : null; if (key !== this.buddyKey) this.setBuddy(rec || null);
+    if (!this.buddy) return;
+    const f = this.facing, target = this.player.position.clone().add(new THREE.Vector3(Math.sin(f) * -7 + Math.cos(f) * 6, 0, Math.cos(f) * -7 - Math.sin(f) * 6));
+    const gap = this.buddy.position.distanceTo(target); this.buddy.position.lerp(target, 1 - Math.exp(-dt * 2.5));
+    this.buddy.rotation.y = gap > 1.5 ? Math.atan2(target.x - this.buddy.position.x, target.z - this.buddy.position.z) : f;
+    const m = this.buddy.userData.motionCtl; if (gap > 2 && !m.busy) m.play(m.tinyHops()); m.update(dt);
+  }
+  /** Rain or snow falling on the map when that's the real weather. */
+  updateWeather(dt) {
+    const w = this.app.weatherNow, kind = w === 'rain' || w === 'storm' ? 'rain' : w === 'snow' ? 'snow' : null;
+    if (kind !== this.fxKind) {
+      if (this.fx) { this.scene.remove(this.fx); this.fx.geometry.dispose(); this.fx = null; }
+      this.fxKind = kind;
+      if (kind) {
+        const n = kind === 'rain' ? 900 : 600, pos = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 400; pos[i * 3 + 1] = Math.random() * 160; pos[i * 3 + 2] = (Math.random() - 0.5) * 400; }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d');
+        if (kind === 'rain') { const gr = x.createLinearGradient(0, 0, 0, 32); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); x.fillStyle = gr; x.fillRect(14, 0, 4, 32); }
+        else { const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); }
+        this.fx = new THREE.Points(g, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(c), color: kind === 'rain' ? 0xbfe6ff : 0xffffff, size: kind === 'rain' ? 9 : 6, transparent: true, opacity: kind === 'rain' ? 0.75 : 0.95, depthWrite: false }));
+        this.fx.renderOrder = 5; this.scene.add(this.fx);
+      }
+    }
+    if (!this.fx) return;
+    const a = this.fx.geometry.attributes.position, fall = (this.fxKind === 'rain' ? 70 : 9) * dt;
+    for (let i = 0; i < a.count; i++) { let y = a.getY(i) - fall; if (y < 0) y += 160; a.setY(i, y); if (this.fxKind === 'snow') a.setX(i, a.getX(i) + Math.sin(y * 0.1 + i) * 0.05); }
+    a.needsUpdate = true; this.fx.position.set(this.player.position.x, 0, this.player.position.z);
+  }
   rotate(dxPx) { this.yaw = (this.yaw || 0) + dxPx / innerWidth * 180; }
   zoom(f) { this.dist = Math.max(160, Math.min(1100, this.dist * f)); }
 }

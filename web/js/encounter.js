@@ -15,13 +15,17 @@ const HAND = new THREE.Vector3(0, -0.12, -0.46), STONE_R = 0.04;
 
 export class Encounter {
   constructor(app, thing, onDone, { starter = false } = {}) {
-    this.app = app; this.thing = thing; this.v = thing.variant; this.onDone = onDone; this.starter = starter;
+    this.app = app; this.thing = thing; this.v = thing.variant; this.onDone = onDone; this.starter = starter; this.reward = !!thing.reward;
+    this.mods = app.mods ? app.mods() : { sparkle: 1, xp: 1, sprouts: 1 };
     this.scene = app.world.scene; this.camera = app.world.camera; this.sparkles = app.world.sparkles;
     this.group = new THREE.Group(); this.scene.add(this.group);
     this.state = 'ready'; this.clock = 0; this.samples = []; this.taught = false;
     const p = app.progress;
     // This Kiki's own level, hidden stats and size (the same each time you meet the same spawn).
-    this.rec = starter ? R.rollKiki(this.v.id, 3, C.rng(C.hash(thing.id, Date.now()))) : R.wildKiki(thing.id, this.v.id, R.levelOf(p.xp));
+    const odds = R.SPARKLE_ODDS / (this.mods.sparkle || 1);
+    if (starter) this.rec = R.rollKiki(this.v.id, 3, C.rng(C.hash(thing.id, Date.now())));
+    else if (this.reward) { const r = C.rng(C.hash(thing.id, Date.now())); this.rec = R.rollKiki(this.v.id, Math.min(25, Math.max(5, R.levelOf(p.xp))), r); this.rec.iv = this.rec.iv.map(() => 10 + r.int(0, 6)); if (R.isSparkle(thing.id + Date.now(), odds)) this.rec.sparkle = true; }
+    else this.rec = R.wildKiki(thing.id, this.v.id, R.levelOf(p.xp), { boosted: !!thing.boosted, sparkleOdds: odds });
     p.seen[this.v.id] = (p.seen[this.v.id] || 0) + 1;
     const last = settings.get('stone', 'rune');
     this.stoneId = p.items[last] > 0 ? last : R.STONES.find(id => p.items[id] > 0) || 'rune'; this.treat = null;
@@ -39,7 +43,7 @@ export class Encounter {
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d);
     // No motion sensors (stand-in or a computer): tilt the view down to Kiki.
     if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) + 0.08;
-    this.kiki = makeKiki(this.v.id, 0.42 * (this.rec.h / this.v.cm) ** 0.5); this.kiki.position.copy(this.home); this.group.add(this.kiki);
+    this.kiki = makeKiki(this.v.id, 0.42 * (this.rec.h / this.v.cm) ** 0.5, !!this.rec.sparkle); this.kiki.position.copy(this.home); this.group.add(this.kiki);
     this.kiki.rotation.y = Math.atan2(-this.home.x, -this.home.z);
     this.motion = new KikiMotion(this.kiki, reducedMotion);
     this.scale = this.kiki.scale.x;
@@ -51,6 +55,7 @@ export class Encounter {
     this.kiki.scale.setScalar(0.0001);
     this.anim(0.45, k => this.kiki.scale.setScalar(this.scale * easeOutBack(k, 2.2)));
     sfx('pickup', 0.4); hx.light();
+    if (this.rec.sparkle) setTimeout(() => { this.sparkles.burst(this.center, 26, 0xffe680, 0.05, 0.8, 1.0); this.sparkles.burst(this.center, 14, 0xffffff, 0.04, 0.6, 0.8); sfx('burst', 0.4); hx.success(); pop('✦ Sparkle! ✦', '#ffcf2e'); }, 500);
   }
 
   /** AR switched on or off: put Kiki where you're looking now. */
@@ -69,7 +74,8 @@ export class Encounter {
     $('hud').hidden = on; $('enc-hud').hidden = !on;
     if (!on) return;
     $('enc-name').textContent = this.v.name; $('enc-rarity').textContent = (this.rec.size ? this.rec.size + ' · ' : '') + C.RARITY[this.v.rarity].label; $('enc-rarity').style.color = C.RARITY[this.v.rarity].second;
-    $('enc-power').textContent = 'POWER ' + R.power(this.rec);
+    $('enc-power').innerHTML = `<i class="el-dot" style="background:${R.ELEMENT_COLOR[this.v.element]}"></i> POWER ${R.power(this.rec)}${this.rec.boosted ? ' · boosted' : ''}`;
+    $('enc-name').textContent = (this.rec.sparkle ? '✦ ' : '') + this.v.name;
     $('enc-ar').textContent = this.app.arOn ? 'AR on' : 'AR off';
     $('enc-tray').hidden = true; $('enc-treat').hidden = true;
     this.stones(); this.hint(this.starter ? 'Wait for the coloured ring to get small, then flick the stone at Kiki!' : 'Flick the stone at Kiki!');
@@ -103,7 +109,7 @@ export class Encounter {
   feed(id) {
     if (this.treat || this.state !== 'ready' && this.state !== 'out') return;
     if (!R.useItem(this.app.progress, id)) return;
-    this.app.save(); this.treat = id; this.stones(); this.state = 'feeding'; hx.light(); sfx('throw', 0.35);
+    this.app.save(); this.treat = id; this.stones(); this.state = 'feeding'; hx.light(); sfx('throw', 0.35); this.app.did && this.app.did({ type: 'feed' });
     const tr = makeTreat(id, 0.05); this.group.add(tr);
     const from = this.camera.localToWorld(HAND.clone()), to = this.center.add(new THREE.Vector3(0, 0.03, 0));
     this.anim(0.6, k => { tr.position.lerpVectors(from, to, k).y += Math.sin(k * Math.PI) * 0.15; tr.rotation.y = k * 8; }).then(() => {
@@ -233,7 +239,7 @@ export class Encounter {
   async resolve(hit) {
     this.state = 'resolving';
     const app = this.app, p = app.progress;
-    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.releaseRing, spin: this.spinThrow, stone: this.stoneId, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter }, C.sysRng);
+    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.releaseRing, spin: this.spinThrow, stone: this.stoneId, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter || this.reward }, C.sysRng);
     let steps = C.revealSteps(o.result === 'fled' ? { ...o, result: 'brokeout' } : o, this.v.rarity, reducedMotion());
     if (o.result === 'fled') steps = steps.map(s => s.kind === 'soClose' ? { kind: 'flee', dur: 1.3, haptic: 'warning', voice: 'awww', voiceChance: 0.6 } : s);
     this.o = o;
@@ -241,14 +247,17 @@ export class Encounter {
     if (o.quality === 'Excellent') p.stats.excellent++;
     const treatUsed = this.treat;
     if (o.result !== 'missed' && this.treat) { this.treat = null; $('enc-treat').hidden = true; } // a treat lasts one catch attempt
+    if (o.result !== 'missed' && this.app.did) { if (o.quality) this.app.did({ type: 'throw', q: o.quality }); if (o.spin) this.app.did({ type: 'spinThrow' }); }
     if (o.result === 'caught') {
       rw = R.catchRewards(p, this.v.id, { quality: o.quality, spin: o.spin, treat: treatUsed });
+      rw.sprouts = Math.round(rw.sprouts * (this.mods.sprouts || 1) * (this.rec.boosted ? R.BOOST_SPROUTS : 1));
+      if ((this.mods.xp || 1) > 1) { const extra = rw.xpTotal * (this.mods.xp - 1); rw.xp.push([`Event bonus ×${this.mods.xp}`, extra]); rw.xpTotal += extra; }
       const d = R.daily(p, 'catch', now); if (d) { rw.xp.push([d.bonus ? '7-day catch streak!' : `First catch today (day ${d.day})`, d.xp]); rw.xpTotal += d.xp; rw.sprouts += d.sprouts; }
       this.kikiRec = R.addKiki(p, this.rec, now, app.placeName ? app.placeName() : '');
       p.sprouts += rw.sprouts; p.fluff[rw.family] = (p.fluff[rw.family] || 0) + rw.fluff;
       this.ups = R.giveXp(p, rw.xpTotal);
-      if (!this.starter) R.markGone(p, this.thing.id, now);
-      app.save();
+      if (!this.starter && !this.reward) R.markGone(p, this.thing.id, now);
+      app.save(); if (app.did) app.did({ type: 'catch', el: this.v.element });
     } else if (o.result === 'fled') { p.stats.fled++; if (!this.starter) R.markGone(p, this.thing.id, now); app.save(); }
     const first = rw && rw.first;
     const at = this.pos.clone();
@@ -350,7 +359,7 @@ export class Encounter {
     let k, motion;
     const st = liveStage(el.querySelector('.kiki'), (scene, cam) => {
       cam.position.set(0, 0.33, 1.55); cam.lookAt(0, 0.26, 0);
-      k = makeKiki(this.v.id, 0.42); k.visible = false; scene.add(k);
+      k = makeKiki(this.v.id, 0.42, !!this.rec.sparkle); k.visible = false; scene.add(k);
       motion = new KikiMotion(k, reducedMotion); motion.idling = false;
       return { update: dt => motion.update(dt) };
     });
@@ -362,7 +371,7 @@ export class Encounter {
         hx.play(s.haptic); if (s.sfx) sfx(s.sfx, 0.55); if (s.voice) voice(s.voice, s.voiceChance);
         if (s.kind === 'stamp') {
           const stp = add(`<div class="stamp" style="color:${C.RARITY[this.v.rarity].main}">${s.text}</div>`); requestAnimationFrame(() => requestAnimationFrame(() => stp.classList.add('in')));
-          await sleep(280); add(`<div class="vname">${this.v.name}<div style="font-size:20px">POWER ${R.power(this.rec)}${this.rec.size ? ' · ' + this.rec.size : ''}</div></div>`); if (first) add('<div class="new sticker">NEW!</div>');
+          await sleep(280); add(`<div class="vname">${this.rec.sparkle ? '✦ ' : ''}${this.v.name}<div style="font-size:20px">POWER ${R.power(this.rec)}${this.rec.size ? ' · ' + this.rec.size : ''}${this.rec.sparkle ? ' · SPARKLE' : ''}</div></div>`); if (first) add('<div class="new sticker">NEW!</div>');
           await sleep(220);
         } else if (s.kind === 'dropIn') {
           k.visible = true; const t0 = performance.now();

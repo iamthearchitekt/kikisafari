@@ -200,7 +200,8 @@ export class WorldView {
     if (debug.surge && !C.surgeActive(now)) now = Math.floor(now / C.SURGE_EVERY) * C.SURGE_EVERY + 60;
     const home = debug.home ? JSON.parse(localStorage.getItem('kiki-home') || 'null') : null;
     const gone = goneSet(app.progress, now); for (const id of app.caught) gone.add(id);
-    this.things = C.nearby(me, now, { home, progress: app.progress, caught: gone, data: app.osm.data });
+    const m = app.mods ? app.mods() : {};
+    this.things = C.nearby(me, now, { home, progress: app.progress, caught: gone, data: app.osm.data, boost: m.boost, featured: m.featured });
     if (app.extraThings && app.extraThings.length) { // the tutorial's starters
       for (const t of app.extraThings) { t.distance = C.distance(me, t.where); t.bearing = C.bearing(me, t.where); }
       this.things = [...app.extraThings, ...this.things.filter(t => t.kind !== 'kiki')].sort((a, b) => a.distance - b.distance);

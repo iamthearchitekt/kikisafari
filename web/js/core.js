@@ -29,39 +29,23 @@ export const RARITY = {
   Legendary: { order: 3, label: 'LEGENDARY', main: '#ffd23f', second: '#ff8a00', wobbles: 3, chance: 0.15, reward: 1000, keeper: 85 },
 };
 
-// The species. The first six are the decisions doc's variants (section 3: only the crown, embroidery and glow change);
-// Phase 1 adds an evolved form for each of the three commons. `no` is the Safari Log number, `family` shares Fluff,
-// `base` sets Plush Power, `cm`/`kg` are average sizes. Names marked * in the roadmap are placeholders.
-export const VARIANTS = [
-  { id: 'meadow', no: 1, name: 'Meadow Kiki', rarity: 'Common', weight: 10, habitats: ['Meadow'], boost: 3, outside: 0.6, time: 'day', family: 'meadow', evolvesTo: 'grand-meadow', cost: 25, base: 60, cm: 42, kg: 0.6,
-    blurb: 'Naps in sunny grass and wakes up whenever someone laughs nearby. Its leaf crown turns to follow the sun.' },
-  { id: 'grand-meadow', no: 2, name: 'Grand Meadow Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Meadow'], boost: 3, outside: 0.3, time: 'day', family: 'meadow', base: 115, cm: 55, kg: 1.1,
-    blurb: 'A Meadow Kiki that has soaked up a whole summer. The spiral stitched on its tummy is said to grow one loop each year.' },
-  { id: 'pine', no: 3, name: 'Pine Kiki', rarity: 'Common', weight: 10, habitats: ['Woods'], boost: 3, outside: 0.4, family: 'pine', evolvesTo: 'elder-pine', cost: 25, base: 62, cm: 44, kg: 0.7,
-    blurb: 'Hides among tree roots and hums when the wind blows. Smells faintly of pine needles and campfire.' },
-  { id: 'elder-pine', no: 4, name: 'Elder Pine Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Woods'], boost: 3, outside: 0.2, family: 'pine', base: 120, cm: 60, kg: 1.3,
-    blurb: 'Its tall crown keeps a dusting of frost even in summer. Younger Pine Kikis follow it around the forest.' },
-  { id: 'sprout', no: 5, name: 'Sprout Kiki', rarity: 'Common', weight: 10, habitats: ['Town'], boost: 2, outside: 1, family: 'sprout', evolvesTo: 'bloom', cost: 25, base: 55, cm: 33, kg: 0.4,
-    blurb: 'Pops up in flower beds, window boxes and cracks in the pavement. Waters its own seedling when nobody is looking.' },
-  { id: 'bloom', no: 6, name: 'Bloom Kiki', rarity: 'Rare', weight: 0.5, habitats: ['Town'], boost: 2, outside: 0.6, family: 'sprout', base: 110, cm: 46, kg: 0.8,
-    blurb: 'Its seedling finally flowered. It shares the pollen with every bee in the neighbourhood.' },
-  { id: 'rainbow', no: 7, name: 'Rainbow Kiki', rarity: 'Rare', weight: 2.5, habitats: ['Water'], boost: 4, outside: 0.25, family: 'rainbow', base: 95, cm: 42, kg: 0.6,
-    blurb: 'Appears near water after a rain shower. Each leaf of its crown is a different colour, and no two are the same.' },
-  { id: 'moonbeam', no: 8, name: 'Moonbeam Kiki', rarity: 'Epic', weight: 1.2, time: 'night', family: 'moonbeam', base: 130, cm: 44, kg: 0.5,
-    blurb: 'Only comes out after sunset. Its embroidered stars glow a soft purple, so it never gets lost in the dark.' },
-  { id: 'golden-spiral', no: 9, name: 'Golden Spiral Kiki', rarity: 'Legendary', weight: 0.15, crewBoost: 6, family: 'golden-spiral', base: 200, cm: 48, kg: 0.9,
-    blurb: 'The keeper of the portals. Legends say the spiral on every Rune Stone was copied from its tummy.' },
-];
+// The species live in species.js (Phase 2 roster: 48 Kikis in six elements).
+import { SPECIES } from './species.js';
+export const VARIANTS = SPECIES;
 export const variant = id => VARIANTS.find(v => v.id === id) || VARIANTS[0];
 
 // ---------- spawning ----------
 export const WINDOW = 15 * 60, MIN_DUR = 15 * 60, MAX_DUR = 30 * 60;
 export function weight(v, ctx) {
+  if (!v.weight) return 0;
   if (v.time === 'night' && !ctx.night) return 0;
   if (v.time === 'day' && ctx.night) return 0;
   let w = v.weight;
   if (v.habitats && v.habitats.length) w *= v.habitats.includes(ctx.habitat) ? v.boost : v.outside;
+  if (ctx.night && v.nightBoost) w *= v.nightBoost;
   if (ctx.crew) w *= v.crewBoost || 1;
+  if (ctx.boost && ctx.boost.includes(v.element)) w *= 2.5; // weather and events (Phase 2)
+  if (ctx.featured && ctx.featured === v.id) w *= 25;
   return w;
 }
 export function pick(ctx, roll) {
@@ -252,20 +236,21 @@ export const KIKI_CELL = 70, SPAWN_CHANCE = 0.45, STOP_CELL = 250, NEARBY = 200,
 export const WORLD_SEED = 'KIKISAFARI-1';
 
 /** Everything near the player: Kikis, supply stops and Rune Circles (real landmarks when map data is loaded). */
-export function nearby(me, now, { home = null, progress = null, caught = new Set(), data = null, range = NEARBY } = {}) {
+export function nearby(me, now, { home = null, progress = null, caught = new Set(), data = null, range = NEARBY, boost = null, featured = null } = {}) {
+  const mods = { boost, featured };
   const list = [], date = new Date(now * 1000), mapped = !!(data && data.covers(me));
   for (const c of cellsAround(me, range, KIKI_CELL)) {
     const ctr = c.center;
-    const ctx = { habitat: (mapped && data.habitatAt(ctr)) || rotatingHabitat(ctr, now, WORLD_SEED), night: isNight(ctr, date) };
+    const ctx = { habitat: (mapped && data.habitatAt(ctr)) || rotatingHabitat(ctr, now, WORLD_SEED), night: isNight(ctr, date), ...mods };
     for (const s of activeSpawns(c.x, c.y, now, WORLD_SEED, KIKI_CELL, ctx, SPAWN_CHANCE)) {
       const at = c.at(s.e, s.n);
       if (data && !data.isSafe(at)) continue;
-      addKiki(list, `k:${c.x}:${c.y}:${s.start}`, s.id, at, caught);
+      addKiki(list, `k:${c.x}:${c.y}:${s.start}`, s.id, at, caught, boost);
     }
   }
   if (mapped) {
     for (const s of data.stops()) list.push({ kind: 'stop', id: s.id, name: s.name, where: s.where });
-    for (const c of data.circles()) addCircle(list, c.id, c.name, c.where, now, date, progress, caught, data);
+    for (const c of data.circles()) addCircle(list, c.id, c.name, c.where, now, date, progress, caught, data, mods);
   } else {
     for (const c of cellsAround(me, range, STOP_CELL)) {
       const r = rng(hash(WORLD_SEED, c.x, c.y, 5));
@@ -273,7 +258,7 @@ export function nearby(me, now, { home = null, progress = null, caught = new Set
     }
   }
   if (home) {
-    addCircle(list, 'circle:home', 'Home Rune Circle', home, now, date, progress, caught, data);
+    addCircle(list, 'circle:home', 'Home Rune Circle', home, now, date, progress, caught, data, mods);
     list.push({ kind: 'stop', id: 's:home', name: 'Circle Supply Stop', where: fromLocal(home, 9, -6) });
   }
   for (const t of list) { t.distance = distance(me, t.where); t.bearing = bearing(me, t.where); }
@@ -281,12 +266,12 @@ export function nearby(me, now, { home = null, progress = null, caught = new Set
   kept.sort((a, b) => a.distance - b.distance);
   return kept;
 }
-function addKiki(list, id, variantId, at, caught) {
+function addKiki(list, id, variantId, at, caught, boost) {
   if (caught.has(id)) return;
   const v = variant(variantId);
-  list.push({ kind: 'kiki', id, name: v.name, where: at, variant: v });
+  list.push({ kind: 'kiki', id, name: v.name, where: at, variant: v, boosted: !!(boost && boost.includes(v.element)) });
 }
-function addCircle(list, id, name, where, now, date, progress, caught, data) {
+function addCircle(list, id, name, where, now, date, progress, caught, data, mods = {}) {
   const safe = p => !data || data.isSafe(p), salt = hash(id), keeper = progress && progress.keepers[id];
   let kv, att;
   if (keeper) { kv = variant(keeper.variant); att = keeper.att; }
@@ -295,16 +280,16 @@ function addCircle(list, id, name, where, now, date, progress, caught, data) {
   list.push({ kind: 'circle', id, name, where, variant: kv, mine: !!keeper, keeperAtt: att, surge });
   { // the wanderer: one Kiki always near each circle
     const w = Math.floor(now / WINDOW), r = rng(hash(WORLD_SEED, w, 55, salt));
-    const v = pick({ habitat: rotatingHabitat(where, now, WORLD_SEED), night: isNight(where, date) }, r.next());
+    const v = pick({ habitat: rotatingHabitat(where, now, WORLD_SEED), night: isNight(where, date), ...mods }, r.next());
     const a = r.next() * Math.PI * 2, d = 10 + r.next() * 14;
-    for (let k = 0; k < 8 && v; k++) { const at = fromLocal(where, Math.cos(a + k * 0.8) * d, Math.sin(a + k * 0.8) * d); if (!safe(at)) continue; addKiki(list, `wander:${salt}:${w}`, v.id, at, caught); break; }
+    for (let k = 0; k < 8 && v; k++) { const at = fromLocal(where, Math.cos(a + k * 0.8) * d, Math.sin(a + k * 0.8) * d); if (!safe(at)) continue; addKiki(list, `wander:${salt}:${w}`, v.id, at, caught, mods.boost); break; }
   }
   if (surge) { // Portal Surge: rarer Kikis pour out
     const si = Math.floor(now / SURGE_EVERY), r = rng(hash(WORLD_SEED, si, 99, salt));
     for (let i = 0; i < 4; i++) {
-      const a = r.next() * Math.PI * 2, d = 8 + r.next() * 18, v = pick({ habitat: 'Meadow', night: isNight(where, date), crew: true }, r.next());
+      const a = r.next() * Math.PI * 2, d = 8 + r.next() * 18, v = pick({ habitat: 'Meadow', night: isNight(where, date), crew: true, ...mods }, r.next());
       const at = fromLocal(where, Math.cos(a) * d, Math.sin(a) * d);
-      if (v && safe(at)) addKiki(list, `surge:${salt}:${si}:${i}`, v.id, at, caught);
+      if (v && safe(at)) addKiki(list, `surge:${salt}:${si}:${i}`, v.id, at, caught, mods.boost);
     }
   }
 }

@@ -36,17 +36,20 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 
 ## Phase 2: a world worth exploring
 
-- [ ] 12. **A real roster.** Grow from 6 Kiki variants to 40 to 60 creatures in evolution families, all in
-      Kiki's plush style. The biggest art job.
-- [ ] 13. **Elements*** (e.g. Leaf, Water, Moon, Spark, Stone) with a strength chart. Habitat spawns already work.
-- [ ] 14. **Live weather boosts** from local weather (Open-Meteo: free, no key). Rain boosts Water Kikis, etc.
-- [ ] 15. **Eggs.** From stops; hatch by walking 2, 5 or 10 km. (Web limit: distance only counts while the
+**Done in the web version.** All 48 Kikis are Kikis (Kiki's body and spiral eyes) in new colours and crowns, since
+the owner hadn't picked between "Kiki variants only" and "Kiki plus friends".
+
+- [x] 12. **A real roster.** 48 Kikis in evolution families (some three stages), all in Kiki's plush style, including
+      six legendaries that only come through raids and story rewards. Listed in `web/js/species.js`.
+- [x] 13. **Elements***: Leaf, Water, Ember, Spark, Stone, Moon. Each is strong against two and weak to two.
+- [x] 14. **Live weather boosts** from local weather (Open-Meteo: free, no key). Rain boosts Water Kikis, etc.
+- [x] 15. **Eggs.** From stops; hatch by walking 2, 5 or 10 km. (Web limit: distance only counts while the
       app is open.)
-- [ ] 16. **Buddy Kiki** walks beside you on the map and earns Fluff as you walk.
-- [ ] 17. **Sparkle Kikis.** Rare alternate colours, about 1 in 450.
-- [ ] 18. **Research.** Three daily tasks from stops, a 7-day stamp card, and a story quest line with Kiki lore.
-- [ ] 19. **Medals** for milestones: km walked, catches, elements, stops.
-- [ ] 20. **Timed events.** Boosted spawns, special Kikis, bonus days. Portal Surges become event hooks.
+- [x] 16. **Buddy Kiki** walks beside you on the map and earns Fluff as you walk.
+- [x] 17. **Sparkle Kikis.** Rare alternate colours, about 1 in 450.
+- [x] 18. **Research.** Three daily tasks from stops, a 7-day stamp card, and a story quest line with Kiki lore.
+- [x] 19. **Medals** for milestones: km walked, catches, elements, stops.
+- [x] 20. **Timed events.** Boosted spawns, special Kikis, bonus days. Portal Surges become event hooks.
 
 ## Phase 3: battles
 
@@ -83,4 +86,4 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 - **Server for Phase 4:** Supabase recommended (free tier, works with Netlify).
 - **Names:** Plush Power, Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), Grand Meadow / Elder Pine /
   Bloom Kiki, the hidden stats Cuddle / Bounce / Zest, elements, factions. Approve or rename.
-- **New creatures:** Kiki variants only, or Kiki plus friends (other creatures in the same plush style)?
+- **New creatures:** Kiki variants only, or Kiki plus friends? Built as Kiki variants for now; say if you want friends too.

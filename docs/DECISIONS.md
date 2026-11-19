@@ -185,3 +185,26 @@ depth, with KIKI SAFARI's own creatures, names and look. Built in the web versio
 - **Spawns you catch or scare off stay gone** for you (they used to come back after reloading).
 - **Saves from before Phase 1 carry over:** each earlier catch becomes its own Kiki, stones and Sprouts are kept, and
   the player just makes an explorer (no starter).
+
+## 14. Phase 2: a world worth exploring (owner: "move onto phase 2")
+
+- **Roster:** 48 Kikis, all Kikis (same body, face and spiral eyes) with their own body colour, crown and tummy
+  embroidery. Families of two or three stages; evolving a stage 2 into stage 3 costs 50 Fluff. Data in
+  `web/js/species.js`; names are placeholders.
+- **Elements:** Leaf, Water, Ember, Spark, Stone, Moon. A balanced wheel: each is strong against two (×1.6 in battle)
+  and weak to two. Leaf beats Water and Stone, Water beats Ember and Spark, Ember beats Leaf and Moon, Spark beats Moon
+  and Leaf, Stone beats Spark and Ember, Moon beats Stone and Water.
+- **Weather** from Open-Meteo (free, no key). Only a rough position (rounded to about 10 km) is sent, every 10 minutes
+  while playing. Each weather boosts two elements: boosted Kikis spawn 2.5× as often, are 3 levels higher and give
+  25% more Sprouts. Rain and snow fall on the map.
+- **Eggs:** 30% of stop spins give an egg (bag of 9). 2 km eggs are common, 5 km sometimes, 10 km rarely. The Warm Nest
+  never wears out; a Cozy Nest (3 eggs) comes every 3 levels. Walking only counts while the game is open (web limit).
+- **Buddy:** walks behind your explorer on the map and finds a Fluff every 1 km (common), 3 km (rare) or 5 km.
+- **Sparkle Kikis:** 1 in 450, decided by the spawn so it's the same each time. Alternate colours and twinkles.
+- **Tasks:** a stop gives a task (up to 3 at a time, one per stop per day). Finishing a task on 7 different days fills
+  the stamp card for a rare Kiki. The story "The Spiral Mystery" has 5 chapters, ending with the Golden Spiral Kiki.
+- **Medals:** bronze, silver and gold for catches, walking, stops, the Safari Log, Excellent throws, evolving,
+  hatching, Sparkles, buddy walks, tasks, and each element.
+- **Events** follow a calendar every phone works out the same way: element weekends (2× Sprouts), a Kiki Parade on
+  Wednesdays 6 to 8 pm (2× XP), Kiki Day on the first Saturday of the month 2 to 5 pm (3× XP, Sparkles 25× as likely),
+  and Full Moon nights. Portal Surge Kikis follow the event.

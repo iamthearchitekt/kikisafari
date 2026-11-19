@@ -87,7 +87,8 @@ The `web/` folder is a complete web version that runs in Safari and installs to 
 The first time you play, Ranger Rue walks you through making your explorer and catching a starter Kiki. After that
 the map is home: walk around, tap Kikis to catch them, tap pink supply stops and swipe to spin them. The big stone at
 the bottom opens the menu (your Kikis, the Safari Log, your bag, your explorer, settings). **Settings ▸ Testing tools**
-has the tuning sliders plus shortcuts for testing: extra stones, XP, Fluff and Sprouts, and "Start over".
+has the tuning sliders plus shortcuts for testing: extra stones, XP, Fluff and Sprouts, pretend walking (to hatch
+eggs), extra eggs, a weather override, Sparkle Kikis 1 in 3, and "Start over".
 
 On a computer you can try it too: there's no camera or motion there, so catches use the meadow stand-in. WASD walks
 (up the map), drag turns the map, scroll zooms. Add `?lat=…&lon=…` to the address to start somewhere specific.

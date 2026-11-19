@@ -2,27 +2,27 @@
 // the Unity project's Core/Art: chubbier pear body, bigger grin, bolder mirrored spirals, a V-folded leaf fan, and the
 // six variants' crowns, embroidery and glow. Plus the Rune Stone, the portal, Rune Circles and sparkles.
 import * as THREE from '../vendor/three.module.min.js';
-import { rng, hash } from './core.js';
+import { rng, hash, variant } from './core.js';
 
 export const EGG_H = 1.15, GROUND = EGG_H + 0.12, BODY_H = GROUND + EGG_H;
 const C = h => new THREE.Color(h);
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-// ---------- looks (decisions doc, section 3) ----------
-export function lookFor(id) {
-  const base = { crown: 'canon', leaf: 0x38a626, tip: 0x92e25c, rainbow: false, gold: false, belly: false, stars: false, glow: false, scale: 1 };
-  switch (id) {
-    case 'pine': return { ...base, crown: 'pine', leaf: 0x1c6b2a, tip: 0x2e8b47 };
-    case 'sprout': return { ...base, crown: 'seedling', leaf: 0x3fae2a, tip: 0x9be36a, scale: 0.78 };
-    case 'rainbow': return { ...base, rainbow: true };
-    case 'moonbeam': return { ...base, glow: true, stars: true, tip: 0x9fe6c8 };
-    case 'golden-spiral': return { ...base, gold: true, belly: 'gold' };
-    // Phase 1 evolutions: bigger, fuller crowns and an embroidered tummy spiral.
-    case 'grand-meadow': return { ...base, crown: 'grand', leaf: 0x2f9e24, tip: 0xc4f27a, belly: 'leaf', scale: 1.1 };
-    case 'elder-pine': return { ...base, crown: 'elder', leaf: 0x17552c, tip: 0xe9f6ff, belly: 'frost', scale: 1.12 };
-    case 'bloom': return { ...base, crown: 'bloom', leaf: 0x3fae2a, tip: 0x9be36a, petal: 0xff6fae, petalTip: 0xffd6ea, scale: 0.92 };
-    default: return base;
-  }
+// ---------- looks (decisions doc section 3; Phase 2 roster in species.js) ----------
+const HEX = h => '#' + h.toString(16).padStart(6, '0');
+/** Sparkle Kikis: every colour turned around the colour wheel, a little brighter. */
+function shift(hex, dh = 0.42, dl = 0.04, sm = 1.05) { const c = C(hex), hsl = {}; c.getHSL(hsl); return c.setHSL((hsl.h + dh) % 1, Math.min(1, hsl.s * sm), Math.min(0.9, hsl.l + dl)).getHex(); }
+const shiftCss = (css, dh) => HEX(shift(parseInt(css.slice(1), 16), dh, 0));
+export function lookFor(id, sparkle = false) {
+  const v = variant(id);
+  const look = { crown: 'canon', leaf: 0x38a626, tip: 0x92e25c, body: 0xffc928, rainbow: false, gold: false, belly: null, stars: false, glow: false, scale: 1, ...((v && v.look) || {}) };
+  if (!sparkle) return look;
+  const out = { ...look, sparkle: true, body: shift(look.body, look.body === 0xffc928 ? 0.8 : 0.42, 0.1, 0.7) };
+  for (const k of ['leaf', 'tip', 'c1', 'c2']) if (typeof out[k] === 'number' && out[k] > 16) out[k] = shift(out[k]);
+  if (typeof look.c3 === 'number' && look.c3 > 16) out.c3 = shift(look.c3);
+  if (out.glow) out.glow = shift(out.glow); if (out.belly) out.belly = [out.belly[0], shiftCss(out.belly[1], 0.42), shiftCss(out.belly[2], 0.42)];
+  out.starColor = '#ffd23f';
+  return out;
 }
 
 // ---------- face texture and plush normal map (canvas, like the claw game) ----------
@@ -36,19 +36,34 @@ function mouthPath(g, sx = 1, sy = 1) {
   g.beginPath(); g.moveTo(...T(CX - MW, MY)); g.quadraticCurveTo(...T(CX, MY - 8), ...T(CX + MW, MY));
   g.bezierCurveTo(...T(CX + MW * 0.85, MY + MH * 1.3), ...T(CX - MW * 0.85, MY + MH * 1.3), ...T(CX - MW, MY)); g.closePath();
 }
-const texCache = new Map();
+/** Tummy embroidery shapes (Phase 2), centred at (x, y), about 2R across. */
+function bellyPath(g, shape, x = 512, y = 366, R = 52) {
+  g.beginPath();
+  const P = pts => pts.forEach(([px, py], i) => i ? g.lineTo(x + px * R, y + py * R) : g.moveTo(x + px * R, y + py * R));
+  switch (shape) {
+    case 'drop': g.moveTo(x, y - R); g.bezierCurveTo(x + R * 0.95, y - R * 0.05, x + R * 0.8, y + R * 0.95, x, y + R * 0.95); g.bezierCurveTo(x - R * 0.8, y + R * 0.95, x - R * 0.95, y - R * 0.05, x, y - R); break;
+    case 'flame': g.moveTo(x, y + R); g.bezierCurveTo(x - R, y + R, x - R * 0.85, y, x - R * 0.35, y - R * 0.45); g.lineTo(x - R * 0.18, y - R * 0.05); g.bezierCurveTo(x - R * 0.12, y - R * 0.6, x + R * 0.1, y - R * 0.85, x + R * 0.05, y - R * 1.1); g.bezierCurveTo(x + R * 0.65, y - R * 0.5, x + R * 1.0, y + R * 0.2, x + R * 0.72, y + R * 0.7); g.bezierCurveTo(x + R * 0.5, y + R, x + R * 0.2, y + R, x, y + R); break;
+    case 'bolt': P([[0.25, -1], [-0.3, -1], [-0.6, 0.1], [-0.1, 0.1], [-0.4, 1.05], [0.6, -0.15], [0.05, -0.15]]); break;
+    case 'star': { const pts = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.45 : 1.05; pts.push([Math.cos(a) * r, Math.sin(a) * r + 0.05]); } P(pts); break; }
+    case 'moon': g.arc(x, y, R, Math.PI * 0.35, Math.PI * 1.65, false); g.arc(x + R * 0.5, y - R * 0.05, R * 0.82, Math.PI * 1.55, Math.PI * 0.45, true); break;
+    case 'heart': g.moveTo(x, y + R * 0.95); g.bezierCurveTo(x - R * 1.3, y + R * 0.05, x - R * 0.8, y - R * 1.1, x, y - R * 0.45); g.bezierCurveTo(x + R * 0.8, y - R * 1.1, x + R * 1.3, y + R * 0.05, x, y + R * 0.95); break;
+    case 'leaf': g.moveTo(x - R * 0.2, y + R); g.bezierCurveTo(x - R * 1.1, y + R * 0.1, x - R * 0.4, y - R * 0.9, x + R * 0.6, y - R); g.bezierCurveTo(x + R * 0.8, y, x + R * 0.4, y + R * 0.8, x - R * 0.2, y + R); break;
+    default: spiralPath(g, x, y, R, 1); return 'stroke';
+  }
+  g.closePath(); return 'fill';
+}
+const texCache = new Map(), normCache = new Map();
 function faceTextures(look) {
-  const key = (look.belly || '') + (look.stars ? 's' : '');
-  const BELLY = { gold: ['#c97800', '#ffe48a'], leaf: ['#23701a', '#a6ec72'], frost: ['#3f73ad', '#eaf6ff'] }[look.belly];
+  const key = look.body + ':' + (look.belly ? look.belly.join() : '') + (look.stars ? 's' + (look.starColor || '') : '');
   if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
   const g = c.getContext('2d');
-  g.fillStyle = '#ffc928'; g.fillRect(0, 0, 1024, 512);
+  g.fillStyle = HEX(look.body); g.fillRect(0, 0, 1024, 512);
   const r = rng(1);
   for (let i = 0; i < 3000; i++) { g.fillStyle = r.next() < 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(120,60,0,.04)'; g.fillRect(r.next() * 1024, r.next() * 512, 2, 2); }
   g.lineCap = 'round'; g.lineJoin = 'round';
   if (look.stars) {
-    g.strokeStyle = '#c77dff';
+    g.strokeStyle = look.starColor || '#c77dff';
     for (const sx of [256, 768]) for (let y = 26; y < 492; y += 34) for (const side of [-1, 1]) {
       const x = sx + side * 16, s = 6.5;
       g.lineWidth = 2.6; g.beginPath(); g.moveTo(x - s, y); g.lineTo(x + s, y); g.moveTo(x, y - s); g.lineTo(x, y + s); g.stroke();
@@ -56,8 +71,9 @@ function faceTextures(look) {
     }
   }
   if (look.belly) {
-    spiralPath(g, 512, 366, 52, 1); g.strokeStyle = BELLY[0]; g.lineWidth = 10; g.stroke();
-    spiralPath(g, 512, 366, 52, 1); g.strokeStyle = BELLY[1]; g.lineWidth = 5.5; g.stroke();
+    const [shape, dark, light] = look.belly;
+    if (bellyPath(g, shape) === 'stroke') { g.strokeStyle = dark; g.lineWidth = 10; g.stroke(); bellyPath(g, shape); g.strokeStyle = light; g.lineWidth = 5.5; g.stroke(); }
+    else { g.fillStyle = light; g.fill(); g.strokeStyle = dark; g.lineWidth = 7; g.stroke(); g.setLineDash([7, 6]); g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 2; bellyPath(g, shape, 512, 366, 40); g.stroke(); g.setLineDash([]); }
   }
   for (const s of [-1, 1]) {
     g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(CX + s * EYE_DX, EYE_Y, 44, 0, 7); g.fill();
@@ -67,8 +83,13 @@ function faceTextures(look) {
   g.save(); g.clip(); g.fillStyle = '#ff4a2e'; g.beginPath(); g.ellipse(CX, MY + MH, MW * 0.68, MH * 0.58, 0, 0, 7); g.fill(); g.restore();
   mouthPath(g); g.strokeStyle = 'rgba(110,50,0,.35)'; g.lineWidth = 4; g.stroke();
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-
-  // Normal map: fabric grain, seams (groove + raised stitches), domed eye discs, raised spiral piping, carved mouth.
+  const res = { map, normal: normalMap(look.belly ? look.belly[0] : '') };
+  texCache.set(key, res);
+  return res;
+}
+/** Plush normal map: fabric grain, seams (groove + raised stitches), domed eye discs, raised piping, carved mouth. Only depends on the tummy shape. */
+function normalMap(belly) {
+  if (normCache.has(belly)) return normCache.get(belly);
   const n = document.createElement('canvas'); n.width = 1024; n.height = 512;
   const h = n.getContext('2d', { willReadFrequently: true });
   h.fillStyle = '#808080'; h.fillRect(0, 0, 1024, 512);
@@ -86,7 +107,7 @@ function faceTextures(look) {
     for (let k = 0; k < 8; k++) { h.fillStyle = 'rgba(255,255,255,.045)'; h.beginPath(); h.arc(ex, EYE_Y, 50 - k * 3, 0, 7); h.fill(); }
     for (const [w, a] of [[14, .22], [10, .3], [6, .35]]) { spiralPath(h, ex, EYE_Y, SPIRAL_R, s); h.strokeStyle = `rgba(255,255,255,${a})`; h.lineWidth = w; h.stroke(); }
   }
-  if (look.belly) for (const [w, a] of [[12, .2], [7, .3]]) { spiralPath(h, 512, 366, 52, 1); h.strokeStyle = `rgba(255,255,255,${a})`; h.lineWidth = w; h.stroke(); }
+  if (belly) for (const [w, a] of [[12, .2], [7, .3]]) { const kind = bellyPath(h, belly); if (kind === 'fill') { h.fillStyle = 'rgba(255,255,255,.08)'; h.fill(); } h.strokeStyle = `rgba(255,255,255,${a})`; h.lineWidth = w; h.stroke(); }
   for (let k = 0; k < 24; k++) { mouthPath(h, 1 - k * 0.026, 1 - k * 0.03); h.fillStyle = 'rgba(0,0,0,.05)'; h.fill(); }
   const src = h.getImageData(0, 0, 1024, 512).data, H = new Float32Array(1024 * 512);
   for (let i = 0; i < H.length; i++) H[i] = src[i * 4] / 255;
@@ -101,9 +122,7 @@ function faceTextures(look) {
   }
   h.putImageData(out, 0, 0);
   const normal = new THREE.CanvasTexture(n); normal.anisotropy = 4;
-  const res = { map, normal };
-  texCache.set(key, res);
-  return res;
+  normCache.set(belly, normal); return normal;
 }
 
 // ---------- geometry ----------
@@ -171,46 +190,301 @@ function leafGeometry(width, round, base, tip, strongTip) {
   g.computeVertexNormals();
   return g;
 }
-function crownGeometry(id, look) {
-  return cached('crown:' + id, () => {
-    const r = rng(hash(id)), R = (a, b) => a + r.next() * (b - a), baseY = EGG_H * 0.88, parts = [];
-    const tipFor = (i, n) => look.gold ? 0xffd23f : look.rainbow ? hsv((i * 0.61803) % 1, 0.75, 1).getHex() : look.tip;
-    if (look.crown === 'seedling') {
-      const stemPts = []; for (let i = 0; i <= 6; i++) { const t = i / 6; stemPts.push(new THREE.Vector2(0.075 * (1 - 0.35 * t), baseY - 0.08 + t * 0.36)); }
-      const stem = new THREE.LatheGeometry(stemPts, 10), sc = [];
-      for (let i = 0; i < stem.attributes.position.count; i++) { const c = C(look.leaf).lerp(C(0x7fcf5a), 0.4); sc.push(c.r, c.g, c.b); }
-      stem.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
-      parts.push([stem, new THREE.Matrix4()]);
-      for (let i = 0; i < 3; i++) {
-        const s = 0.7 * R(0.95, 1.05);
-        parts.push([leafGeometry(0.6, 0.7, look.leaf, tipFor(i, 3), true), M4(0, baseY + 0.27, 0, -(0.88 + R(-0.06, 0.06)), i / 3 * Math.PI * 2 + 0.3 + R(-0.08, 0.08), s, s, s)]);
-      }
-      return merge(parts);
+// ---------- crowns (Phase 2: one builder per crown style; all parts are vertex-coloured and merged) ----------
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+function paint(geo, fn) { const p = geo.attributes.position, cols = []; for (let i = 0; i < p.count; i++) { const c = fn(p.getX(i), p.getY(i), p.getZ(i)); cols.push(c.r, c.g, c.b); } geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); return geo; }
+const solid = (geo, hex) => paint(geo, () => C(hex));
+const vgrad = (geo, a, b, y0, y1) => paint(geo, (x, y) => C(a).lerp(C(b), smooth(y0, y1, y)));
+const noise3 = (x, y, z) => Math.sin(x * 12.9 + y * 7.3) * Math.cos(z * 9.1 - y * 4.7) * 0.5 + Math.sin(x * 31 + z * 23) * 0.25;
+const at = (geo, x, y, z, rx = 0, ry = 0, s = 1, sy = s, sz = s) => [geo, M4(x, y, z, rx, ry, s, sy, sz)];
+function taperTube(pts, r0, r1, colorAt, segs = 40, radial = 10) {
+  const curve = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(curve, segs, 1, radial, false), p = g.attributes.position, cols = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs, c = curve.getPointAt(t), r = r0 + (r1 - r0) * t, col = colorAt(t);
+    for (let j = 0; j <= radial; j++) { const k = i * (radial + 1) + j, v = V3(p.getX(k), p.getY(k), p.getZ(k)).sub(c).multiplyScalar(r).add(c); p.setXYZ(k, v.x, v.y, v.z); cols.push(col.r, col.g, col.b); }
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); g.computeVertexNormals(); return g;
+}
+/** A teardrop flame: round at the bottom, pointed at the top, leaning by `bend`; base at y=0. */
+function flameGeo(h, w, a, b, bend = 0) {
+  const pts = []; for (let i = 0; i <= 18; i++) { const t = i / 18; pts.push(new THREE.Vector2(Math.max(1e-4, w * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.6)), 1.1) * (1 - 0.25 * t)), t * h)); }
+  const g = new THREE.LatheGeometry(pts, 14), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const t = p.getY(i) / h; p.setX(i, p.getX(i) + bend * t * t * h); }
+  g.computeVertexNormals(); return vgrad(g, a, b, 0.05 * h, 0.85 * h);
+}
+function extrude(points, depth, a, b, h) {
+  const s = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: depth * 0.3, bevelSize: depth * 0.25, bevelSegments: 2, curveSegments: 4 });
+  g.translate(0, 0, -depth / 2); return vgrad(g, a, b, 0, h);
+}
+const boltGeo = (h, a, b) => { const g = extrude([[-0.25, 0], [0.25, 0], [0.05, 0.45], [0.3, 0.45], [-0.2, 1], [0, 0.55], [-0.25, 0.55]].map(([x, y]) => [x * h, y * h]), 0.12 * h, a, b, h); return paint(g, (x, y) => C(a).lerp(C(b), smooth(0.75 * h, h, y))); };
+function starGeo(r, a, b = a) { const pts = []; for (let i = 0; i < 10; i++) { const ang = Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; pts.push([Math.cos(ang) * rr, Math.sin(ang) * rr + r]); } return extrude(pts, r * 0.35, a, b, 2 * r); }
+/** A crescent moon standing up, thick in the middle and pointed at both ends. */
+function crescentGeo(R, tube, color) {
+  const arc = Math.PI * 1.3, g = new THREE.TorusGeometry(R, tube, 12, 48, arc), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), th = Math.atan2(y, x), u = Math.min(1, Math.max(0, (th < -0.01 ? th + Math.PI * 2 : th) / arc)), cx = Math.cos(th) * R, cy = Math.sin(th) * R, k = Math.max(0.08, Math.pow(Math.sin(Math.PI * u), 0.8)); p.setXYZ(i, cx + (x - cx) * k, cy + (y - cy) * k, z * k); }
+  g.rotateZ(-Math.PI * 0.15 - arc / 2 + Math.PI / 2); g.computeVertexNormals(); return solid(g, color);
+}
+function rock(r, detail, a, b, seed) {
+  const g = new THREE.IcosahedronGeometry(r, detail), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const v = V3(p.getX(i), p.getY(i), p.getZ(i)), n = 1 + 0.18 * noise3(v.x / r + seed, v.y / r, v.z / r - seed); v.multiplyScalar(n); p.setXYZ(i, v.x, v.y, v.z); }
+  g.computeVertexNormals(); return paint(g, (x, y, z) => C(a).lerp(C(b), 0.5 + 0.5 * noise3(x * 3 + seed, y * 3, z * 3)));
+}
+const sphere = (r, color, ws = 16, hs = 12) => solid(new THREE.SphereGeometry(r, ws, hs), color);
+const cyl = (r0, r1, h, color, seg = 12) => solid(new THREE.CylinderGeometry(r0, r1, h, seg), color);
+/** Leaf-fan crowns (the classic Kiki crown and its relatives). */
+const FANS = {
+  canon: { width: 0.46, layers: [[6, 0.84, 0.82, 0], [4, 0.78, 1.15, 0.4], [2, 0.6, 1.45, 1.1]] },
+  pine: { width: 0.13, layers: [[9, 1.0, 0.85, 0], [7, 0.92, 1.12, 0.35], [4, 0.72, 1.4, 0.9]] },
+  grand: { width: 0.5, layers: [[8, 0.98, 0.78, 0], [6, 0.92, 1.08, 0.3], [4, 0.78, 1.32, 0.85], [2, 0.62, 1.52, 1.4]] },
+  elder: { width: 0.13, layers: [[11, 1.12, 0.8, 0], [9, 1.04, 1.04, 0.3], [7, 0.92, 1.26, 0.7], [4, 0.74, 1.48, 1.1]] },
+};
+function fanParts(look, R, fan, baseY) {
+  const parts = [], total = fan.layers.reduce((a, l) => a + l[0], 0);
+  const tipFor = i => look.gold ? 0xffd23f : look.rainbow ? hsv((i * 0.61803) % 1, 0.75, 1).getHex() : look.tip;
+  let idx = 0;
+  for (const [n, len, pitch, spin] of fan.layers) for (let i = 0; i < n; i++, idx++) {
+    const yaw = i / n * Math.PI * 2 + spin + R(-0.12, 0.12), s = len * R(0.92, 1.08);
+    parts.push([leafGeometry(fan.width, 0.8, look.leaf, tipFor(idx), true), M4(0, baseY, 0, -(pitch + R(-0.08, 0.08)), yaw, s, s, s)]);
+  }
+  return parts;
+}
+function stem(baseY, top, color) {
+  const pts = []; for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(new THREE.Vector2(0.08 * (1 - 0.4 * t), baseY - 0.08 + t * (top - baseY + 0.08))); }
+  return solid(new THREE.LatheGeometry(pts, 10), C(color).lerp(C(0x7fcf5a), 0.4).getHex());
+}
+const CROWNS = {
+  seedling(look, R, Y) {
+    const parts = [[stem(Y, Y + 0.28, look.leaf), new THREE.Matrix4()]];
+    for (let i = 0; i < 3; i++) { const s = 0.7 * R(0.95, 1.05); parts.push([leafGeometry(0.6, 0.7, look.leaf, look.tip, true), M4(0, Y + 0.27, 0, -(0.88 + R(-0.06, 0.06)), i / 3 * Math.PI * 2 + 0.3 + R(-0.08, 0.08), s, s, s)]); }
+    return parts;
+  },
+  bloom(look, R, Y) {
+    const top = Y + 0.56, parts = [[stem(Y, top, look.leaf), new THREE.Matrix4()]];
+    for (let i = 0; i < 2; i++) parts.push([leafGeometry(0.6, 0.7, look.leaf, look.tip, true), M4(0, Y + 0.2 + i * 0.1, 0, -0.62, i * Math.PI + 0.5, 0.62, 0.62, 0.62)]);
+    for (let i = 0; i < 7; i++) parts.push([leafGeometry(0.7, 0.9, look.c1, look.c2, true), M4(0, top, 0, -0.62 + R(-0.05, 0.05), i / 7 * Math.PI * 2 + R(-0.05, 0.05), 0.68, 0.68, 0.68)]);
+    const ctr = new THREE.SphereGeometry(0.2, 16, 12); ctr.scale(1, 0.62, 1);
+    parts.push(at(paint(ctr, (x, y) => C(0xffc928).lerp(C(0xff8a00), Math.max(0, 0.5 - y * 4))), 0, top + 0.1, 0));
+    return parts;
+  },
+  orchard(look, R, Y) {
+    const parts = fanParts(look, R, FANS.grand, Y);
+    for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.5; parts.push(at(paint(new THREE.SphereGeometry(0.15, 16, 12), (x, y) => C(look.c1).lerp(C(0xffffff), y > 0.08 && x < 0 ? 0.25 : 0)), Math.cos(a) * 0.42, Y + 0.42, Math.sin(a) * 0.42)); parts.push(at(cyl(0.015, 0.015, 0.1, 0x5a3a1a, 5), Math.cos(a) * 0.42, Y + 0.6, Math.sin(a) * 0.42)); }
+    return parts;
+  },
+  acorn(look, R, Y) {
+    const cap = new THREE.SphereGeometry(0.72, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5); cap.scale(1, 0.62, 1);
+    paint(cap, (x, y, z) => { const a = Math.atan2(z, x), k = (Math.sin(a * 14) * Math.sin(y * 40)) > 0 ? 0.82 : 1; return C(look.c1).multiplyScalar(k); });
+    return [at(cap, 0, Y + 0.02, 0), at(cyl(0.05, 0.07, 0.22, look.c1, 8), 0.04, Y + 0.52, 0, 0, 0, 1), at(sphere(0.05, look.c2, 8, 6), 0.06, Y + 0.64, 0)];
+  },
+  oak(look, R, Y) {
+    const parts = [at(cyl(0.11, 0.15, 0.4, look.c1, 10), 0, Y + 0.12, 0)];
+    const blobs = [[0, 0.62, 0, 0.36], [0.3, 0.48, 0.1, 0.28], [-0.3, 0.5, 0.05, 0.28], [0.1, 0.5, 0.3, 0.27], [-0.08, 0.5, -0.3, 0.28], [0.2, 0.72, -0.12, 0.24], [-0.22, 0.74, 0.14, 0.24]];
+    for (const [x, y, z, r] of blobs) parts.push(at(vgrad(new THREE.SphereGeometry(r, 16, 12), look.leaf, look.tip, -r, r), x, Y + y, z));
+    for (const s of [-1, 1]) { const g = sphere(0.07, 0xc98a3c, 10, 8); parts.push(at(g, s * 0.36, Y + 0.3, 0.12, 0, 0, 1, 1.3, 1)); parts.push(at(sphere(0.06, look.c1, 10, 6), s * 0.36, Y + 0.38, 0.12, 0, 0, 1, 0.6, 1)); }
+    return parts;
+  },
+  evergreen(look, R, Y) {
+    const parts = [at(cyl(0.1, 0.14, 0.3, 0x6b4426, 10), 0, Y + 0.1, 0)];
+    [[0.62, 0.55, 0.32], [0.5, 0.5, 0.62], [0.38, 0.45, 0.9], [0.24, 0.4, 1.16]].forEach(([r, h, y]) => parts.push(at(vgrad(new THREE.ConeGeometry(r, h, 12), look.tip, look.leaf, -h / 2, -h / 2 + 0.12), 0, Y + y, 0)));
+    parts.push(at(starGeo(0.1, 0xffe14a), 0, Y + 1.36, 0));
+    return parts;
+  },
+  wave(look, R, Y) {
+    const n = look.c3 || 1, parts = [];
+    for (let k = 0; k < n; k++) {
+      const sc = n > 1 ? (k === 0 ? 1.05 : 0.8) : 0.95, yaw = n > 1 ? (k - (n - 1) / 2) * 1.1 : 0, pts = [];
+      for (let i = 0; i <= 24; i++) { const t = i / 24, th = -Math.PI * 0.5 + t * Math.PI * 1.7, r = 0.42 * (1 - 0.62 * t); pts.push(V3(0, 0.42 + Math.sin(th) * r + (1 - t) * 0.0, -Math.cos(th) * r + 0.05)); }
+      pts[0] = V3(0, -0.05, 0.05);
+      const g = taperTube(pts, 0.27, 0.05, t => C(look.c1).lerp(C(0x9fe0ff), t * 0.8).lerp(C(look.c2), smooth(0.8, 1, t)));
+      parts.push([g, M4(0, Y, 0, 0, yaw, sc, sc, sc)]);
     }
-    if (look.crown === 'bloom') {
-      // The seedling, grown up: a taller stem, two leaves, and a pink flower on top.
-      const top = baseY + 0.56, stemPts = []; for (let i = 0; i <= 8; i++) { const t = i / 8; stemPts.push(new THREE.Vector2(0.08 * (1 - 0.4 * t), baseY - 0.08 + t * (top - baseY + 0.08))); }
-      const stem = new THREE.LatheGeometry(stemPts, 10), sc = [];
-      for (let i = 0; i < stem.attributes.position.count; i++) { const c = C(look.leaf).lerp(C(0x7fcf5a), 0.4); sc.push(c.r, c.g, c.b); }
-      stem.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3)); parts.push([stem, new THREE.Matrix4()]);
-      for (let i = 0; i < 2; i++) parts.push([leafGeometry(0.6, 0.7, look.leaf, look.tip, true), M4(0, baseY + 0.2 + i * 0.1, 0, -0.62, i * Math.PI + 0.5, 0.62, 0.62, 0.62)]);
-      for (let i = 0; i < 7; i++) parts.push([leafGeometry(0.7, 0.9, look.petal, look.petalTip, true), M4(0, top, 0, -0.62 + R(-0.05, 0.05), i / 7 * Math.PI * 2 + R(-0.05, 0.05), 0.68, 0.68, 0.68)]);
-      const ctr = new THREE.SphereGeometry(0.2, 16, 12); ctr.scale(1, 0.62, 1); ctr.translate(0, top + 0.1, 0);
-      const cc = []; for (let i = 0; i < ctr.attributes.position.count; i++) { const y = ctr.attributes.position.getY(i) - top; const c = C(0xffc928).lerp(C(0xff8a00), Math.max(0, 0.6 - y * 6)); cc.push(c.r, c.g, c.b); }
-      ctr.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3)); parts.push([ctr, new THREE.Matrix4()]);
-      return merge(parts);
+    return parts;
+  },
+  tide(look, R, Y) {
+    const parts = CROWNS.wave({ ...look, c3: 3 }, R, Y).map(([g, m]) => [g, m.premultiply(new THREE.Matrix4().makeScale(1.25, 1.25, 1.25)).premultiply(new THREE.Matrix4().makeTranslation(0, -Y * 0.25, 0))]);
+    for (let i = 0; i < 9; i++) { const a = R(0, Math.PI * 2), r = R(0.35, 0.6); parts.push(at(sphere(R(0.04, 0.07), i % 2 ? look.c2 : 0x9fe0ff, 8, 6), Math.cos(a) * r, Y + R(0.6, 1.05), Math.sin(a) * r)); }
+    return parts;
+  },
+  lily(look, R, Y) {
+    const pad = new THREE.CylinderGeometry(0.66, 0.66, 0.05, 36, 1, false, 0.3, Math.PI * 2 - 0.6);
+    paint(pad, (x, y, z) => C(look.c1).lerp(C(0xa6ec72), Math.min(1, Math.hypot(x, z) / 0.66) * 0.5));
+    const parts = [at(pad, 0, Y + 0.08, 0.05, 0.3, 0.2)];
+    for (let i = 0; i < 7; i++) parts.push([leafGeometry(0.75, 0.9, look.c2, 0xffffff, true), M4(0.2, Y + 0.2, 0.22, -0.9, i / 7 * Math.PI * 2, 0.42, 0.42, 0.42)]);
+    parts.push(at(sphere(0.09, 0xffd23f), 0.2, Y + 0.27, 0.22));
+    return parts;
+  },
+  lotus(look, R, Y) {
+    const pad = new THREE.CylinderGeometry(0.72, 0.72, 0.05, 36, 1, false, 0.3, Math.PI * 2 - 0.6);
+    paint(pad, (x, y, z) => C(0x3fae2a).lerp(C(0xa6ec72), Math.min(1, Math.hypot(x, z) / 0.72) * 0.5));
+    const parts = [at(pad, 0, Y + 0.02, 0)];
+    for (let i = 0; i < 9; i++) parts.push([leafGeometry(0.75, 0.9, look.c1, look.c2, true), M4(0, Y + 0.06, 0, -0.75, i / 9 * Math.PI * 2, 0.62, 0.62, 0.62)]);
+    for (let i = 0; i < 6; i++) parts.push([leafGeometry(0.7, 0.9, look.c1, look.c2, true), M4(0, Y + 0.1, 0, -1.15, i / 6 * Math.PI * 2 + 0.3, 0.52, 0.52, 0.52)]);
+    parts.push(at(sphere(0.12, look.c3), 0, Y + 0.22, 0, 0, 0, 1, 0.6, 1));
+    return parts;
+  },
+  snow(look, R, Y) {
+    const parts = [], cy = Y + 0.5, ice = C(look.c1).lerp(C(look.c2), 0.25).getHex();
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2, arm = new THREE.Group();
+      const rot = (x, y) => [Math.cos(a) * x - Math.sin(a) * y, Math.sin(a) * x + Math.cos(a) * y];
+      const [x, y] = rot(0, 0.24); parts.push([solid(new THREE.BoxGeometry(0.07, 0.48, 0.06), ice), M4(x, cy + y, 0, 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(a))]);
+      for (const s of [-1, 1]) { const [bx, by] = rot(s * 0.08, 0.34); parts.push([solid(new THREE.BoxGeometry(0.05, 0.17, 0.05), look.c1), M4(bx, cy + by, 0, 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(a - s * 0.8))]); }
     }
-    const pine = look.crown === 'pine' || look.crown === 'elder';
-    const width = pine ? 0.13 : look.crown === 'grand' ? 0.5 : 0.46, round = 0.8;
-    const layers = look.crown === 'elder' ? [[11, 1.12, 0.8, 0], [9, 1.04, 1.04, 0.3], [7, 0.92, 1.26, 0.7], [4, 0.74, 1.48, 1.1]]
-      : look.crown === 'grand' ? [[8, 0.98, 0.78, 0], [6, 0.92, 1.08, 0.3], [4, 0.78, 1.32, 0.85], [2, 0.62, 1.52, 1.4]]
-      : pine ? [[9, 1.0, 0.85, 0], [7, 0.92, 1.12, 0.35], [4, 0.72, 1.4, 0.9]] : [[6, 0.84, 0.82, 0], [4, 0.78, 1.15, 0.4], [2, 0.6, 1.45, 1.1]];
-    const total = layers.reduce((a, l) => a + l[0], 0);
-    let idx = 0;
-    for (const [n, len, pitch, spin] of layers) for (let i = 0; i < n; i++, idx++) {
-      const yaw = i / n * Math.PI * 2 + spin + R(-0.12, 0.12), s = len * R(0.92, 1.08);
-      parts.push([leafGeometry(width, round, look.leaf, tipFor(idx, total), true), M4(0, baseY, 0, -(pitch + R(-0.08, 0.08)), yaw, s, s, s)]);
+    parts.push(at(sphere(0.09, look.c1), 0, cy, 0)); parts.push(at(cyl(0.05, 0.08, 0.25, ice, 8), 0, Y + 0.08, 0));
+    return parts;
+  },
+  icicle(look, R, Y) {
+    const cap = new THREE.SphereGeometry(0.6, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.42); cap.scale(1, 0.55, 1);
+    const parts = [at(solid(cap, look.c1), 0, Y - 0.08, 0)];
+    for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, h = i % 2 ? 0.34 : 0.55; parts.push([vgrad(new THREE.ConeGeometry(0.075, h, 6), look.c2, look.c1, -h / 2, h / 2), M4(Math.cos(a) * 0.38, Y + 0.12 + h / 2, Math.sin(a) * 0.38, 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationAxis(V3(Math.sin(a), 0, -Math.cos(a)), -0.35))]); }
+    parts.push(at(vgrad(new THREE.ConeGeometry(0.1, 0.75, 6), look.c2, look.c1, -0.37, 0.37), 0, Y + 0.48, 0));
+    return parts;
+  },
+  flame(look, R, Y) {
+    const n = look.c3 || 3, parts = [];
+    for (let i = 0; i < n; i++) {
+      const centre = i === 0, a = centre ? 0 : (i - 1) / (n - 1) * Math.PI * 2, h = centre ? 1.0 : R(0.55, 0.7), d = centre ? 0 : 0.3;
+      const g = flameGeo(h, 0.26, look.c1, look.c2, R(-0.15, 0.15)), inner = flameGeo(h * 0.6, 0.12, look.c2, 0xfff6c8, 0);
+      const m = M4(Math.cos(a) * d, Y - 0.06, Math.sin(a) * d, 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationAxis(V3(Math.sin(a), 0, -Math.cos(a)), centre ? 0 : -0.3));
+      parts.push([g, m], [inner, m.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.02, 0.08))]);
     }
+    return parts;
+  },
+  bonfire(look, R, Y) {
+    const parts = CROWNS.flame({ ...look, c3: 7 }, R, (Y + 0.1) / 1.2).map(([g, m]) => [g, m.premultiply(new THREE.Matrix4().makeScale(1.2, 1.2, 1.2))]);
+    for (let i = 0; i < 3; i++) parts.push([paint(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 8), (x, y) => C(look.c3).multiplyScalar(Math.abs(y) > 0.4 ? 1.4 : 1)), M4(0, Y + 0.08, 0, 0, i / 3 * Math.PI, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2))]);
+    return parts;
+  },
+  toast(look, R, Y) {
+    const cap = new THREE.SphereGeometry(0.72, 32, 14, 0, Math.PI * 2, 0, Math.PI * 0.36); cap.scale(1, 0.7, 1);
+    paint(cap, (x, y, z) => C(look.c1).lerp(C(0x7a4a1a), Math.max(0, noise3(x * 3, y * 3, z * 3)) * 0.7).lerp(C(0xffd9a0), smooth(0.5, 0.66, Math.hypot(x, z)) * 0.8));
+    return [at(cap, 0, Y - 0.1, 0), [cyl(0.03, 0.03, 0.9, look.c2, 6), M4(0.08, Y + 0.4, -0.05, 0.2, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(-0.35))]];
+  },
+  campfire(look, R, Y) {
+    const parts = CROWNS.flame({ ...look, c3: 3 }, R, Y + 0.1);
+    for (let i = 0; i < 2; i++) parts.push([paint(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8), (x, y) => C(look.c3).multiplyScalar(Math.abs(y) > 0.36 ? 1.45 : 1)), M4(0, Y + 0.06, 0, 0, Math.PI / 4 + i * Math.PI / 2, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2))]);
+    return parts;
+  },
+  sun(look, R, Y) {
+    const parts = [at(paint(new THREE.SphereGeometry(0.3, 20, 14), (x, y) => C(look.c1).lerp(C(0xfff6c8), smooth(0, 0.3, y) * 0.5)), 0, Y + 0.22, 0, 0, 0, 1, 0.55, 1)];
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, h = i % 2 ? 0.34 : 0.48; parts.push([vgrad(new THREE.ConeGeometry(0.09, h, 6), i % 2 ? look.c2 : look.c1, 0xfff27a, -h / 2, h / 2), M4(Math.cos(a) * (0.36 + h / 2 * 0.6), Y + 0.32 + h * 0.4, Math.sin(a) * (0.36 + h / 2 * 0.6), 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationAxis(V3(Math.sin(a), 0, -Math.cos(a)), -0.95))]); }
+    return parts;
+  },
+  bolt(look, R, Y) {
+    const n = look.c3 || 1, parts = [];
+    for (let i = 0; i < n; i++) { const side = n === 1 ? 0 : (i - (n - 1) / 2), h = side === 0 ? 1.0 : 0.7; parts.push([boltGeo(h, look.c1, look.c2), M4(side * 0.32, Y - 0.05, side * -0.05, 0, side * 0.5, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(-side * 0.45))]); }
+    return parts;
+  },
+  cloud(look, R, Y) {
+    const parts = [];
+    for (const [x, y, z, r] of [[0, 0.5, 0, 0.36], [0.34, 0.4, 0.05, 0.27], [-0.34, 0.42, 0, 0.28], [0.15, 0.38, 0.28, 0.24], [-0.12, 0.36, -0.26, 0.25], [0.12, 0.66, -0.08, 0.24]]) parts.push(at(vgrad(new THREE.SphereGeometry(r, 16, 12), look.c1, 0xffffff, -r, r), x, Y + y, z));
+    for (const s of [-1, 1]) parts.push([boltGeo(0.42, look.c2, 0xffffff), M4(s * 0.32, Y + 0.6, 0.2, 0, 0, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(s * -0.5 + Math.PI))]);
+    return parts;
+  },
+  antenna(look, R, Y) {
+    const parts = [];
+    for (const s of [-1, 1]) {
+      const tip = V3(s * 0.42, Y + 0.72, 0.1), g = taperTube([V3(s * 0.12, Y - 0.05, 0), V3(s * 0.2, Y + 0.35, 0.05), V3(s * 0.34, Y + 0.6, 0.08), tip], 0.045, 0.03, () => C(look.c1), 20, 8);
+      parts.push([g, new THREE.Matrix4()], at(paint(new THREE.SphereGeometry(0.1, 14, 10), (x, y) => C(look.c2).lerp(C(0xffffff), smooth(0, 0.1, y) * 0.5)), tip.x, tip.y + 0.04, tip.z));
+    }
+    return parts;
+  },
+  lantern(look, R, Y) {
+    const parts = CROWNS.antenna({ ...look, c2: 0xfff27a }, R, Y), hx = 0.42, hy = Y + 0.46, hz = 0.12;
+    parts.push(at(cyl(0.012, 0.012, 0.22, 0x3a2a1a, 4), hx, hy + 0.14, hz));
+    parts.push(at(paint(new THREE.SphereGeometry(0.2, 16, 12), (x, y) => C(look.c2).lerp(C(0xfff27a), smooth(-0.1, 0.15, -Math.abs(y) + 0.1))), hx, hy - 0.05, hz, 0, 0, 1, 1.15, 1));
+    parts.push(at(cyl(0.08, 0.1, 0.05, 0x3a2a1a, 10), hx, hy + 0.13, hz), at(cyl(0.1, 0.07, 0.05, 0x3a2a1a, 10), hx, hy - 0.23, hz));
+    return parts;
+  },
+  puff(look, R, Y) {
+    const big = (look.c3 || 1) > 1, n = big ? 26 : 15, parts = [];
+    for (let i = 0; i < n; i++) { const u = (i + 0.5) / n, phi = Math.acos(1 - u * 1.1), th = i * 2.39996, rr = big ? 0.62 : 0.48, r = R(0.15, 0.22) * (big ? 1.15 : 1); parts.push(at(vgrad(new THREE.SphereGeometry(r, 12, 10), look.c1, look.c2, -r, r), Math.sin(phi) * Math.cos(th) * rr, Y + 0.1 + Math.cos(phi) * rr * 0.8, Math.sin(phi) * Math.sin(th) * rr)); }
+    if (big) for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; parts.push([boltGeo(0.26, 0xffd000, 0xffffff), M4(Math.cos(a) * 0.62, Y + 0.55, Math.sin(a) * 0.62, 0, -a + Math.PI / 2, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationZ(0.5))]); }
+    return parts;
+  },
+  aurora(look, R, Y) {
+    const parts = [];
+    for (let k = 0; k < 5; k++) {
+      const g = new THREE.PlaneGeometry(1.1, 1.0, 20, 8), p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i) + 0.45; p.setXYZ(i, x * (0.6 + y * 0.5), y, Math.sin(x * 5 + k * 2 + y * 2) * 0.12); }
+      g.computeVertexNormals(); paint(g, (x, y) => C(look.c1).lerp(C(look.c2), smooth(0.1, 0.9, y)).lerp(C(0xffffff), smooth(0.85, 0.95, y) * 0.4));
+      parts.push([g, M4(0, Y - 0.02, 0, 0, k / 5 * Math.PI, 1, 1, 1)]);
+    }
+    return parts;
+  },
+  pebbles(look, R, Y) { return [at(rock(0.3, 2, look.c1, look.c2, 1), 0, Y + 0.08, 0, 0, 0.3, 1.3, 0.55, 1.1), at(rock(0.22, 2, look.c2, look.c1, 2), 0.04, Y + 0.3, 0.02, 0, 1.1, 1.25, 0.6, 1.05), at(rock(0.14, 2, look.c1, look.c2, 3), -0.02, Y + 0.46, 0, 0, 2, 1.2, 0.65, 1)]; },
+  boulder(look, R, Y) {
+    const g = rock(0.5, 2, look.c1, 0xb3ada2, 4), p = g.attributes.position, col = g.attributes.color, moss = C(look.c2);
+    for (let i = 0; i < p.count; i++) if (p.getY(i) > 0.22 + 0.08 * noise3(p.getX(i) * 4, 0, p.getZ(i) * 4)) col.setXYZ(i, moss.r, moss.g, moss.b);
+    return [at(g, 0, Y + 0.12, 0, 0, 0, 1.2, 0.8, 1.1), [leafGeometry(0.6, 0.7, 0x3fae2a, 0x9be36a, true), M4(0.1, Y + 0.45, 0, -0.9, 0.4, 0.35, 0.35, 0.35)], [leafGeometry(0.6, 0.7, 0x3fae2a, 0x9be36a, true), M4(0.1, Y + 0.45, 0, -0.9, 3.4, 0.3, 0.3, 0.3)]];
+  },
+  crystal(look, R, Y) {
+    const parts = [];
+    const prism = (r, h) => { const g = new THREE.CylinderGeometry(r * 0.85, r, h, 6, 1); const tip = new THREE.ConeGeometry(r * 0.85, r * 1.6, 6); tip.translate(0, h / 2 + r * 0.8, 0); return [g, tip]; };
+    [[0, 0, 0.7, 0.13], [0.6, 0.2, 0.45, 0.1], [-0.6, 0.9, 0.5, 0.1], [0.5, 2.6, 0.42, 0.09], [-0.5, 3.8, 0.4, 0.09], [0.7, 5.1, 0.32, 0.08]].forEach(([tilt, yaw, h, r]) => {
+      for (const g of prism(r, h)) { vgrad(g, look.c1, look.c2, -h / 2, h / 2 + r); parts.push([g.toNonIndexed(), M4(Math.sin(yaw) * Math.abs(tilt) * 0.3, Y + h / 2, Math.cos(yaw) * Math.abs(tilt) * 0.3, 0, yaw, 1, 1, 1).multiply(new THREE.Matrix4().makeRotationX(tilt * 0.6))]); }
+    });
+    for (const [g] of parts) g.computeVertexNormals();
+    return parts;
+  },
+  shell(look, R, Y) {
+    const g = new THREE.CircleGeometry(0.5, 40, 0, Math.PI), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), r = Math.hypot(x, y), a = Math.atan2(y, x); p.setZ(i, 0.07 * Math.abs(Math.sin(a * 9)) * (r / 0.5) + 0.22 * (r / 0.5) ** 2); }
+    g.computeVertexNormals(); paint(g, (x, y, z) => C(look.c1).lerp(C(look.c2), smooth(0.02, 0.07, z - 0.22 * (Math.hypot(x, y) / 0.5) ** 2)).lerp(C(0xffffff), smooth(0.4, 0.5, Math.hypot(x, y)) * 0.3));
+    const hinge = sphere(0.08, look.c2, 10, 8);
+    return [[g, M4(0, Y + 0.12, 0.18, -0.45, 0, 1, 1, 1)], at(hinge, 0, Y + 0.12, 0.18, 0, 0, 1.4, 0.7, 0.8)];
+  },
+  castle(look, R, Y) {
+    const sand = (geo) => paint(geo, (x, y, z) => C(look.c1).multiplyScalar(0.92 + 0.12 * noise3(x * 8, y * 8, z * 8)));
+    const parts = [at(sand(new THREE.CylinderGeometry(0.24, 0.3, 0.55, 14)), 0, Y + 0.25, 0)];
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; parts.push(at(sand(new THREE.BoxGeometry(0.1, 0.1, 0.1)), Math.cos(a) * 0.21, Y + 0.57, Math.sin(a) * 0.21, 0, -a)); }
+    for (const s of [-1, 1]) { parts.push(at(sand(new THREE.CylinderGeometry(0.13, 0.17, 0.36, 12)), s * 0.38, Y + 0.12, 0.05)); parts.push(at(sand(new THREE.ConeGeometry(0.15, 0.2, 12)), s * 0.38, Y + 0.4, 0.05)); }
+    parts.push(at(cyl(0.012, 0.012, 0.36, 0x6b4426, 5), 0, Y + 0.78, 0));
+    parts.push(at(extrude([[0, 0], [0.22, 0.07], [0, 0.14]], 0.02, look.c2, look.c2, 0.14), 0.01, Y + 0.8, 0));
+    return parts;
+  },
+  geode(look, R, Y) {
+    const shell = new THREE.SphereGeometry(0.5, 24, 16, 0, Math.PI); shell.rotateY(Math.PI / 2); shell.rotateX(-Math.PI / 2 * 0); 
+    paint(shell, (x, y, z) => C(look.c1).multiplyScalar(0.85 + 0.25 * noise3(x * 5, y * 5, z * 5)));
+    const face = new THREE.CircleGeometry(0.5, 32); paint(face, (x, y) => C(0x3a1f6b).lerp(C(look.c2), smooth(0.48, 0.2, Math.hypot(x, y))));
+    const parts = [at(shell, 0, Y + 0.32, -0.08, 0, Math.PI, 1, 1, 0.8), at(face, 0, Y + 0.32, -0.08)];
+    for (let i = 0; i < 16; i++) { const a = i * 2.4, r = 0.36 * Math.sqrt((i + 0.5) / 16), h = R(0.1, 0.18); parts.push([vgrad(new THREE.ConeGeometry(0.045, h, 5), look.c2, 0xf0e0ff, -h / 2, h / 2).toNonIndexed(), M4(Math.cos(a) * r, Y + 0.32 + Math.sin(a) * r, -0.08 + h / 2, Math.PI / 2, 0, 1, 1, 1)]); }
+    return parts;
+  },
+  mountain(look, R, Y) {
+    const parts = [];
+    [[0, 0.95, 0.42, 0], [0.32, 0.65, 0.3, 0.15], [-0.34, 0.7, 0.32, -0.1]].forEach(([x, h, r, z], i) => { const g = new THREE.ConeGeometry(r, h, 5); paint(g, (px, y, pz) => C(look.c1).multiplyScalar(0.85 + 0.2 * noise3(px * 6, y * 6, pz * 6)).lerp(C(look.c2), smooth(h * 0.12, h * 0.2, y))); parts.push([g.toNonIndexed(), M4(x, Y + h / 2 - 0.05, z, 0, i * 0.7, 1, 1, 1)]); });
+    for (const [g] of parts) g.computeVertexNormals();
+    return parts;
+  },
+  crescent(look, R, Y) { return [at(crescentGeo(0.4, 0.15, look.c1), 0.02, Y + 0.48, 0, 0, 0.2), at(starGeo(0.09, look.c1, 0xffffff), -0.32, Y + 0.18, 0.12, 0, 0.3)]; },
+  starry(look, R, Y) {
+    const parts = CROWNS.crescent(look, R, Y);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; parts.push(at(starGeo(0.07, look.c2, 0xffffff), Math.cos(a) * 0.62, Y + 0.2 + (i % 2) * 0.14, Math.sin(a) * 0.62, 0, -a + Math.PI / 2)); }
+    return parts;
+  },
+  mushroom(look, R, Y) {
+    const k = look.c3 || 1, cap = new THREE.SphereGeometry(0.58 * k, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5); cap.scale(1, 0.62, 1);
+    paint(cap, (x, y, z) => { const n = V3(x, y / 0.62, z).normalize(), spot = Math.sin(n.x * 9 + 1) * Math.sin(n.z * 9 + 2) * Math.sin(n.y * 7) > 0.32; return spot ? C(look.c2) : C(look.c1).lerp(C(0xffffff), smooth(0.2, 0.6, y) * 0.1); });
+    const under = new THREE.CircleGeometry(0.56 * k, 32); under.rotateX(Math.PI / 2); solid(under, 0xf2e6d0);
+    return [at(cyl(0.16, 0.2, 0.32, 0xf6efe0, 14), 0, Y + 0.1, 0), at(cap, 0, Y + 0.24, 0), at(under, 0, Y + 0.245, 0)];
+  },
+  ears(look, R, Y) {
+    const k = (look.c3 || 1) * 1.25, parts = [];
+    for (const s of [-1, 1]) for (let j = 0; j < 3; j++) parts.push([leafGeometry(0.45, 0.8, look.c1, look.c2, true), M4(s * (0.3 + j * 0.05), Y + 0.02, -0.05 + j * 0.06, -(1.15 - j * 0.15), s * (0.55 + j * 0.25) - 0.0, 0.62 * k * (1 - j * 0.18), 0.62 * k * (1 - j * 0.18), 0.62 * k * (1 - j * 0.18))]);
+    if (k > 1) for (let i = 0; i < 5; i++) parts.push([leafGeometry(0.4, 0.8, look.c1, look.c2, true), M4(0, Y, -0.1, -(0.75 + Math.abs(i - 2) * 0.05), Math.PI + (i - 2) * 0.35, 0.7, 0.7, 0.7)]);
+    return parts;
+  },
+};
+const CROWN_SCALE = { acorn: 1.25, toast: 1.2, icicle: 1.25, lotus: 1.3, lily: 1.45, evergreen: 1.2, oak: 1.3, tide: 1.2, sun: 1.3, mushroom: 1.4, geode: 1.3, castle: 1.35, mountain: 1.3 };
+function crownGeometry(id, look, key = id) {
+  return cached('crown:' + key, () => {
+    const r = rng(hash(id)), R = (a, b) => a + r.next() * (b - a), baseY = EGG_H * 0.88;
+    const fan = FANS[look.crown];
+    let parts = fan ? fanParts(look, R, fan, baseY) : (CROWNS[look.crown] || CROWNS.seedling)(look, R, baseY);
+    const k = fan || look.crown === 'seedling' || look.crown === 'bloom' ? 1 : (CROWN_SCALE[look.crown] || 1.35);
+    if (k !== 1) { const m = new THREE.Matrix4().makeTranslation(0, baseY, 0).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(0, -baseY, 0)); parts = parts.map(([g, mm]) => [g, m.clone().multiply(mm)]); }
     return merge(parts);
   });
 }
@@ -243,23 +517,24 @@ export function glowShell(geometry, intensity = 1.4, power = 2.2, color = 0x7a00
 
 // ---------- Kiki ----------
 const kikiMats = new Map();
-function matsFor(id, look) {
-  if (kikiMats.has(id)) return kikiMats.get(id);
+function matsFor(key, look) {
+  if (kikiMats.has(key)) return kikiMats.get(key);
   const { map, normal } = faceTextures(look);
   const m = {
     body: plush({ map, normalMap: normal, normalScale: new THREE.Vector2(0.9, 0.9), vertexColors: true }),
-    limb: plush({ color: 0xffc928 }),
-    leaf: plush({ color: 0xffffff, vertexColors: true, roughness: 0.28 }, 0.3),
+    limb: plush({ color: look.body }),
+    leaf: plush({ color: 0xffffff, vertexColors: true, roughness: 0.28, side: THREE.DoubleSide }, 0.3),
   };
-  kikiMats.set(id, m);
+  kikiMats.set(key, m);
   return m;
 }
 /**
  * A Kiki standing with feet at y=0, facing +z. Hierarchy for animation: root → motion → flip (pivot at the body's
- * centre) → squash (pivot at the feet) → parts. `height` is the real body height in metres (no leaves).
+ * centre) → squash (pivot at the feet) → parts. `height` is the real body height in metres (no leaves). Sparkle Kikis
+ * get their alternate colours and a few twinkling stars.
  */
-export function makeKiki(id, height = 0.42) {
-  const look = lookFor(id), m = matsFor(id, look);
+export function makeKiki(id, height = 0.42, sparkle = false) {
+  const look = lookFor(id, sparkle), key = id + (sparkle ? ':s' : ''), m = matsFor(key, look);
   const root = new THREE.Group(); root.scale.setScalar(height / BODY_H * look.scale);
   const motion = new THREE.Group(); root.add(motion);
   const flip = new THREE.Group(); flip.position.y = GROUND; motion.add(flip);
@@ -272,12 +547,17 @@ export function makeKiki(id, height = 0.42) {
     const pivot = new THREE.Object3D(); pivot.position.set(x, y, 0.05); pivot.rotation.z = rz; pivot.userData.rest = rz;
     pivot.add(new THREE.Mesh(armGeometry(), m.limb)); model.add(pivot); arms.push(pivot);
   }
-  model.add(new THREE.Mesh(crownGeometry(id, look), m.leaf));
-  if (look.glow) { const s = glowShell(eggGeometry()); s.scale.set(1.22, 1.14, 1.22); s.position.y = -0.05; model.add(s); root.userData.glow = s; }
+  model.add(new THREE.Mesh(crownGeometry(id, look, key), m.leaf));
+  if (look.glow) { const s = glowShell(eggGeometry(), 1.4, 2.2, look.glow === true ? 0x7a00ff : look.glow); s.scale.set(1.22, 1.14, 1.22); s.position.y = -0.05; model.add(s); root.userData.glow = s; }
+  let twinkle = null;
+  if (sparkle) {
+    twinkle = new THREE.Group(); model.add(twinkle);
+    for (let i = 0; i < 7; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTexture(), color: i % 2 ? 0xffe680 : 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); const a = i / 7 * Math.PI * 2; sp.position.set(Math.cos(a) * 1.35, 0.2 + (i % 3) * 0.55, Math.sin(a) * 1.35); sp.scale.setScalar(0.35); sp.userData.ph = i * 0.9; twinkle.add(sp); }
+  }
   // soft blob shadow on the ground
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 2.1), new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x0d0a26, transparent: true, opacity: 0.42, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.01; root.add(shadow);
-  root.userData = { ...root.userData, id, motion, flip, squash, arms, shadow, look };
+  root.userData = { ...root.userData, id, motion, flip, squash, arms, shadow, look, twinkle, sparkle };
   return root;
 }
 
@@ -315,6 +595,7 @@ export class KikiMotion {
   armsTo(r0, r1) { this.k.arms[0].rotation.z = (90 - r0) * Math.PI / 180; this.k.arms[1].rotation.z = (r1 - 90) * Math.PI / 180; }
   update(dt) {
     this.t += dt;
+    if (this.k.twinkle) { this.k.twinkle.rotation.y += dt * 0.6; for (const sp of this.k.twinkle.children) { const k = 0.5 + 0.5 * Math.sin(this.t * 3 + sp.userData.ph); sp.material.opacity = k; sp.scale.setScalar(0.2 + 0.25 * k); } }
     if (this.gen) { const r = this.gen.next(dt); if (r.done) { this.gen = null; this.reset(); } return; }
     if (!this.idling) return;
     this.squash(1 + Math.sin(this.t * 2.2) * 0.015 * this.amp);
@@ -670,6 +951,28 @@ export function makeRustle() {
   return g;
 }
 
+// ---------- eggs (Phase 2) ----------
+export const EGG_COLORS = { 2: ['#5fd34b', '#2f8f2a'], 5: ['#ff9a2e', '#c25a00'], 10: ['#a24dff', '#5a1fb0'] };
+const eggTex = new Map();
+/** A Kiki egg about `height` tall: cream, with a big spiral and spots in its tier colour (2, 5 or 10 km). */
+export function makeEgg(km, height = 1) {
+  if (!eggTex.has(km)) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'), [a, b] = EGG_COLORS[km], r = rng(km);
+    const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#fffaf0'); gr.addColorStop(1, '#f2e6cc'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 26; i++) { g.fillStyle = i % 3 ? a : b; g.globalAlpha = 0.85; g.beginPath(); g.ellipse(r.next() * 512, 30 + r.next() * 200, 7 + r.next() * 12, 9 + r.next() * 14, 0, 0, 7); g.fill(); }
+    g.globalAlpha = 1; g.lineCap = 'round';
+    for (const [w, col] of [[22, b], [12, a]]) { spiralPath(g, 256, 140, 62, 1, 2.2); g.strokeStyle = col; g.lineWidth = w; g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; eggTex.set(km, t);
+  }
+  const pts = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * Math.PI, y = -Math.cos(a); pts.push(new THREE.Vector2(Math.max(1e-4, Math.sin(a) * 0.72 * (1 - 0.2 * y)), y)); }
+  const geo = cached('egg-shape', () => { const g = new THREE.LatheGeometry(pts, 40); g.rotateY(Math.PI); return g; });
+  const root = new THREE.Group(), body = new THREE.Mesh(geo, plush({ map: eggTex.get(km) }, 0.3)); body.position.y = 1; root.add(body);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x0d0a26, transparent: true, opacity: 0.35, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.01; root.add(shadow);
+  root.scale.setScalar(height / 2); root.userData = { body, shadow, km };
+  return root;
+}
+
 // ---------- portraits for the menus (Kikis, items, your explorer), rendered once and cached ----------
 let pr = null; const portraits = new Map();
 function portraitRenderer() {
@@ -685,7 +988,13 @@ export function portrait(what, size = 256) {
   const key = what + '@' + size; if (portraits.has(key)) return portraits.get(key);
   const { r, scene, cam } = portraitRenderer(); r.setSize(size, size, false);
   const [kind, a, b] = what.split(':'); let obj;
-  if (kind === 'kiki') { obj = makeKiki(a, 1); obj.rotation.y = -0.35; cam.position.set(0, 0.62, 3.1); cam.lookAt(0, 0.6, 0); }
+  if (kind === 'kiki') {
+    obj = makeKiki(a, 1, b === 's'); obj.rotation.y = -0.35; obj.updateMatrixWorld(true);
+    const sh = obj.userData.shadow; obj.remove(sh); const box = new THREE.Box3().setFromObject(obj); obj.add(sh);
+    const h = Math.max(1.25, box.max.y - box.min.y, (box.max.x - box.min.x) * 0.95), cy = (box.max.y + box.min.y) / 2, d = h / 2 / Math.tan(14 * Math.PI / 180) * 1.12;
+    cam.position.set(0, cy + d * 0.04, d); cam.lookAt(0, cy, 0);
+  }
+  else if (kind === 'egg') { obj = makeEgg(+a, 1); obj.rotation.y = -0.25; cam.position.set(0, 0.55, 2.6); cam.lookAt(0, 0.5, 0); }
   else if (kind === 'explorer') { obj = makeExplorer(+a, +b); obj.userData.update(0, 0); obj.rotation.y = -0.3; cam.position.set(0, 0.78, 1.35); cam.lookAt(0, 0.74, 0); }
   else if (kind === 'explorer-full') { obj = makeExplorer(+a, +b); obj.userData.update(0, 0); obj.rotation.y = -0.4; cam.position.set(0, 0.62, 2.6); cam.lookAt(0, 0.5, 0); }
   else if (a === 'honey' || a === 'sunseed') { obj = makeTreat(a, 1); if (a === 'honey') obj.rotation.set(1.2, Math.PI - 0.7, 0); else obj.rotation.set(0.2, 0.5, -0.3); cam.position.set(0, 0, a === 'honey' ? 4.3 : 3.8); cam.lookAt(0, 0, 0); }

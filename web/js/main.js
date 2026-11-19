@@ -11,15 +11,19 @@ import { spiralRite } from './rite.js';
 import { portrait } from './art.js';
 import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
+import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
 import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug } from './services.js';
 
 const app = {
   progress: loadProgress(), progressApi: C.progressApi, caught: new Set(), mapMode: true, tasks: new Set(), encounter: null,
-  tracking: null, extraThings: [], arOn: true,
+  tracking: null, extraThings: [], arOn: true, hatchQueue: [], weather: null, weatherNow: null,
   save() { saveProgress(this.progress); },
   debugNight: () => debug.night,
 };
 app.loc = new Location();
+app.mods = () => mods(app);
+app.did = ev => did(app, ev);
+app.open = name => ({ eggs: openEggs, tasks: openTasks, medals: openMedals, events: openEvents })[name](app);
 app.osm = new OsmLoader();
 
 // ---------- rendering ----------
@@ -103,6 +107,8 @@ function startSensors() {
     if (ori !== 'granted') toast("No motion access: the map won't turn with you. Drag to turn it.", 4200);
     runTutorial(app);
   });
+  const wx = () => { if (app.loc.fix) loadWeather(app); };
+  setTimeout(wx, 3000); if (!app.wxTimer) app.wxTimer = setInterval(wx, 10 * 60e3);
   pLoc.then(ok => { if (!ok) toast(app.loc.problem || "Couldn't get your location.", 5000); });
 }
 
@@ -116,10 +122,11 @@ $('btn-north').onclick = () => { app.map.north(); sfx('button', 0.3); };
 $('btn-menu').onclick = () => { sfx('button', 0.4); hx.light(); openMenu(app); };
 $('btn-me').onclick = () => { sfx('button', 0.35); openExplorer(app); };
 $('btn-nearby').onclick = () => { sfx('button', 0.35); nearbyPanel(app); };
+$('on-chip').onclick = () => { sfx('button', 0.35); openEvents(app); };
 function applyMode() {
   const m = app.mapMode;
   $('btn-view').textContent = m ? 'AR' : 'Map'; $('btn-view').setAttribute('aria-label', m ? 'Switch to the camera view' : 'Switch to the map');
-  $('btn-north').hidden = !m; $('ar-bits').hidden = m; $('attribution').hidden = !m;
+  $('btn-north').hidden = !m; $('ar-bits').hidden = m; $('attribution').hidden = !m; $('hud').classList.toggle('ar', !m);
   app.world.setVisible(!m);
   resumeCam();
 }
@@ -152,6 +159,9 @@ app.setEncounterAR = async on => {
   if (!on) { camOff(); o.yaw = 0; }
   layers();
 };
+
+/** A Kiki from a task or the story, right where you are (it can't run away). */
+app.rewardEncounter = sp => { const v = C.variant(sp); startEncounter({ kind: 'kiki', id: 'reward:' + sp + ':' + Date.now(), name: v.name, variant: v, where: { ...app.loc.fix }, reward: true }); };
 
 async function startEncounter(t) {
   if (app.encounter) return;
@@ -195,11 +205,12 @@ function circlePanel(t) {
 // ---------- testing tools (Settings ▸ Testing tools) ----------
 app.tuningPanel = function tuningPanel() {
   const sliders = [['strength', 'Throw strength', 0.3, 3, 0.05], ['ringPeriod', 'Ring cycle (s)', 0.8, 6, 0.1], ['aimAssist', 'Aim assist', 0, 1, 0.05], ['odds', 'Catch odds ×', 0.1, 5, 0.05], ['gravity', 'Gravity (m/s²)', 2, 20, 0.1], ['hitRadius', 'Hit size (m)', 0.1, 1, 0.01]];
-  const toggles = [['night', 'Force night (Moonbeam)'], ['surge', 'Force Portal Surge'], ['home', 'Home test Rune Circle']];
+  const toggles = [['night', 'Force night (Moonbeam)'], ['surge', 'Force Portal Surge'], ['home', 'Home test Rune Circle'], ['sparkle', 'Sparkle Kikis 1 in 3']];
   const p = panel(`<h2>Testing tools</h2><div class="tune">${sliders.map(([k, l, a, b, s]) => `<label>${l}: <b id="tv-${k}">${tuning[k]}</b><input type="range" min="${a}" max="${b}" step="${s}" value="${tuning[k]}" data-k="${k}"></label>`).join('')}</div>
     <div class="stack">${toggles.map(([k, l]) => `<button class="pill small cream" data-t="${k}">${l}: ${debug[k] ? 'on' : 'off'}</button>`).join('')}
     <button class="pill small pink" id="t-pin">Move test Rune Circle here</button>
     <div class="row"><button class="pill small sky" id="t-stones">+30 stones</button><button class="pill small sky" id="t-xp">+5,000 XP</button><button class="pill small sky" id="t-res">+50 Fluff, +5k Sprouts</button></div>
+    <div class="row"><button class="pill small sky" id="t-km">Walk 1 km</button><button class="pill small sky" id="t-eggs">+3 eggs</button><button class="pill small sky" id="t-wx"></button></div>
     <div class="row"><button class="pill small cream" id="t-reset">Reset sliders</button><button class="pill small cream" id="t-wipe">Start over</button><button class="pill small" id="t-done">Done</button></div></div>`);
   p.root.querySelectorAll('input[type=range]').forEach(i => i.oninput = () => { tuning[i.dataset.k] = +i.value; p.root.querySelector('#tv-' + i.dataset.k).textContent = i.value; saveTuning(); });
   p.root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; debug[k] = !debug[k]; saveDebug(); b.textContent = `${toggles.find(x => x[0] === k)[1]}: ${debug[k] ? 'on' : 'off'}`; app.world.nextPlan = 0; });
@@ -207,6 +218,10 @@ app.tuningPanel = function tuningPanel() {
   p.root.querySelector('#t-stones').onclick = () => { R.addItems(app.progress, { rune: 30 }, true); app.save(); toast('+30 Rune Stones'); };
   p.root.querySelector('#t-xp').onclick = async () => { const ups = R.giveXp(app.progress, 5000); app.save(); refreshHud(true); p.close(); await levelUps(app, ups); };
   p.root.querySelector('#t-res').onclick = () => { for (const v of C.VARIANTS) app.progress.fluff[v.family] = (app.progress.fluff[v.family] || 0) + 50; app.progress.sprouts += 5000; app.save(); toast('+50 of every Fluff, +5,000 Sprouts'); };
+  p.root.querySelector('#t-km').onclick = () => { app.progress.stats.km += 1; walked(app, 1); toast('Walked 1 km (pretend)'); };
+  p.root.querySelector('#t-eggs').onclick = () => { for (let i = 0; i < 3; i++) R.newEgg(app.progress); app.save(); toast('+3 eggs'); };
+  const wxs = [null, ...Object.keys(R.WEATHER)], wxb = p.root.querySelector('#t-wx'), wxl = () => { wxb.textContent = 'Weather: ' + (debug.weather ? R.WEATHER[debug.weather].name : 'real'); };
+  wxl(); wxb.onclick = () => { debug.weather = wxs[(wxs.indexOf(debug.weather || null) + 1) % wxs.length]; saveDebug(); wxl(); app.world.nextPlan = 0; };
   p.root.querySelector('#t-reset').onclick = () => { Object.assign(tuning, { strength: 1, ringPeriod: 2.4, aimAssist: 0.35, odds: 1, gravity: 9.81, hitRadius: 0.26 }); saveTuning(); p.close(); app.tuningPanel(); };
   p.root.querySelector('#t-wipe').onclick = async () => { p.close(); if (await confirm('Start over? This deletes your explorer, Kikis and items on this phone.', 'Delete everything')) { localStorage.removeItem('kiki-safari-progress'); location.reload(); } };
   p.root.querySelector('#t-done').onclick = p.close;
@@ -282,6 +297,13 @@ function hud() {
   }
   // starters wander off if you walk away: bring them back around you
   if (app.extraThings.length && app.loc.fix && app.extraThings.every(t => C.distance(app.loc.fix, t.where) > 60)) spawnStarters(app);
+  // What's on: weather and events (refreshed once a second)
+  if ((hud.slow = (hud.slow || 0) - 0.1) <= 0) {
+    hud.slow = 1; const m = app.mods(); app.weatherNow = m.weather;
+    const w = m.weather && R.WEATHER[m.weather], ev = m.events[0];
+    const txt = (w ? w.icon + ' ' + w.boost.join(' · ') : '') + (ev ? (w ? ' | ' : '') + ev.name : '');
+    $('on-chip').hidden = !txt; $('on-chip').textContent = txt;
+  }
   // Portal Surge chip
   const now = Math.floor(Date.now() / 1000), circleNear = things.some(t => t.kind === 'circle');
   const surge = circleNear && (C.surgeActive(now) || debug.surge);
@@ -290,7 +312,7 @@ function hud() {
   const f = app.loc.fix;
   if (f && (app.loc.simulated || app.loc.accuracy <= 30) && !app.loc.locked) {
     if (!walkFix) walkFix = f; const d = C.distance(walkFix, f);
-    if (d > 10) { if (d < 150) { p.stats.km += d / 1000; if (Math.random() < 0.2) app.save(); } walkFix = f; }
+    if (d > 10) { if (d < 150) { p.stats.km += d / 1000; walked(app, d / 1000); } walkFix = f; }
   }
   let status = null;
   if (app.loc.locked) status = C.MOVING_FAST;

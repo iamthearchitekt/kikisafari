@@ -41,7 +41,7 @@
   <div class="sticker sheet">
     <h2>Let's find some Kikis!</h2>
     <p>Kiki Safari uses your <b>location</b> while you play to find Kikis, supply stops and Rune Circles near you, and your phone's <b>motion</b> to know which way you're facing. The <b>camera</b> is only used for AR catches, and you can turn AR off.</p>
-    <p class="small-print">Nothing is shared with other players. Location is only used while the game is open.</p>
+    <p class="small-print">Nothing is shared with other players. Location is only used while the game is open. For the weather, only your rough area (about 10 km) is sent to Open-Meteo.</p>
     <button type="button" class="pill play" id="perms-go">Allow and play</button>
     <p class="perm-status" id="perm-status"></p>
   </div>
@@ -55,7 +55,7 @@
   <div id="labels"></div>
   <div id="hud" class="safe">
     <div class="topbar">
-      <div class="sticker chip-status" id="surge-chip" hidden></div>
+      <div class="col chips"><button type="button" class="sticker chip-status on-chip" id="on-chip" hidden></button><div class="sticker chip-status" id="surge-chip" hidden></div></div>
       <div class="col right">
         <button type="button" class="round sticker" id="btn-view" aria-label="Switch to the camera view">AR</button>
         <button type="button" class="round sticker" id="btn-north" aria-label="Point the map north">N</button>
