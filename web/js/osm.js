@@ -52,13 +52,18 @@ function classify(t, closed) {
   if (t.historic) return { kind: 'landmark', cat: 'historic', name };
   return null;
 }
+/** Buildings on the map stay low (it's a board-game map, not a city model): taller buildings are a bit taller, up to
+ * about the explorer's height, so towers never hide the streets, Kikis or you. */
 function buildingHeight(h, levels) {
-  const a = parseFloat(String(h || '').replace('m', '')); if (isFinite(a)) return Math.max(3, Math.min(120, a));
-  const l = parseFloat(levels); if (isFinite(l)) return Math.max(3, Math.min(120, l * 3.2));
-  return 7;
+  let a = parseFloat(String(h || '').replace('m', ''));
+  if (!isFinite(a)) { const l = parseFloat(levels); a = isFinite(l) ? l * 3.2 : NaN; }
+  if (!isFinite(a)) return 7;
+  return Math.round(Math.max(4, Math.min(13, 4 + Math.sqrt(Math.max(0, a)) * 0.9)));
 }
 
 // ---------- 2D helpers (metres: e = east, n = north) ----------
+/** Inside a mapped shape, not in one of its holes (a courtyard, an island). */
+export const insideShape = (f, p) => contains(f.local, p) && !(f.holesLocal || []).some(h => contains(h, p));
 export function contains(ring, p) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -103,7 +108,8 @@ export class OsmArea {
         const a = pts[0], z = pts[pts.length - 1];
         const closed = pts.length >= 4 && a.lat === z.lat && a.lon === z.lon;
         const f = classify(tags, closed); if (!f) continue;
-        area.add(Object.assign(f, { id, pts, closed }));
+        const holes = closed && Array.isArray(el.holes) ? el.holes.map(h => (h || []).filter(ok).map(g => ({ lat: g.lat, lon: g.lon }))).filter(h => h.length >= 4) : [];
+        area.add(Object.assign(f, { id, pts, closed, holes }));
       } else if (el.type === 'relation') {
         let k = 0;
         for (const m of (el.members || [])) {
@@ -121,6 +127,7 @@ export class OsmArea {
 
   add(f) {
     f.local = f.pts.map(p => toLocal(this.origin, p));
+    f.holesLocal = (f.holes || []).map(h => h.map(p => toLocal(this.origin, p)));
     f.minE = Math.min(...f.local.map(p => p.e)); f.maxE = Math.max(...f.local.map(p => p.e));
     f.minN = Math.min(...f.local.map(p => p.n)); f.maxN = Math.max(...f.local.map(p => p.n));
     f.poly = f.closed && f.local.length >= 3;
@@ -153,8 +160,8 @@ export class OsmArea {
       else if (box(f, 15) && distToLine(p, f.local, false) < 15) return f.cat;
     }
     for (const f of near) {
-      if (f.kind === 'building' && !allowBuildings && f.poly && box(f, 1) && contains(f.local, p)) return 'building';
-      if (f.kind === 'water' && f.poly && box(f, 1) && contains(f.local, p)) return 'water';
+      if (f.kind === 'building' && !allowBuildings && f.poly && box(f, 1) && insideShape(f, p)) return 'building';
+      if (f.kind === 'water' && f.poly && box(f, 1) && insideShape(f, p)) return 'water';
       if (f.kind === 'waterline' && box(f, 10) && distToLine(p, f.local, false) < 8) return 'water';
       if (f.kind === 'road' && box(f, 12) && distToLine(p, f.local, false) < roadHalf(f.cat) + 3) return 'road';
       if (f.kind === 'rail' && box(f, 8) && distToLine(p, f.local, false) < 6) return 'railway';
@@ -169,8 +176,8 @@ export class OsmArea {
       if (f.kind === 'water' && f.poly && box(f, 40) && (contains(f.local, p) || distToLine(p, f.local, true) < 40)) return 'Water';
       if (f.kind === 'waterline' && box(f, 40) && distToLine(p, f.local, false) < 40) return 'Water';
     }
-    for (const f of near) if (f.kind === 'woods' && f.poly && box(f, 0) && contains(f.local, p)) return 'Woods';
-    for (const f of near) if ((f.kind === 'park' || f.kind === 'grass') && f.poly && box(f, 0) && contains(f.local, p)) return 'Meadow';
+    for (const f of near) if (f.kind === 'woods' && f.poly && box(f, 0) && insideShape(f, p)) return 'Woods';
+    for (const f of near) if ((f.kind === 'park' || f.kind === 'grass') && f.poly && box(f, 0) && insideShape(f, p)) return 'Meadow';
     return 'Town';
   }
 }
@@ -224,7 +231,7 @@ export function placeLandmarks(area, cell) {
     const r = rng(seed);
     for (let pass = 0; pass < 2; pass++) for (let t = 0; t < 24; t++) {
       const p = cell.at(e0 + r.next() * size, n0 + r.next() * size);
-      if (pass === 0) { const lp = area.local(p); if (!green.some(g => lp.e >= g.minE && lp.e <= g.maxE && lp.n >= g.minN && lp.n <= g.maxN && contains(g.local, lp))) continue; }
+      if (pass === 0) { const lp = area.local(p); if (!green.some(g => lp.e >= g.minE && lp.e <= g.maxE && lp.n >= g.minN && lp.n <= g.maxN && insideShape(g, lp))) continue; }
       if (!area.unsafe(p)) return p;
     }
     return null;

@@ -334,3 +334,20 @@ a full look the player picks in Change look (or when making their explorer), wit
 
 The whole look is saved with the explorer, shown on the map and in menus, and sent with the online profile so friends
 see it (the server stores the avatar as-is; older versions of the game still read its outfit and skin).
+
+## 22. Street map data from OpenFreeMap tiles
+
+The public Overpass servers stopped answering reliably (the main one refused connections; the mirrors timed out even on
+tiny requests), so the map was stuck on "Loading the map…" / "Map servers are busy". The map now comes from
+**OpenFreeMap** (tiles.openfreemap.org): free OpenStreetMap vector tiles on a CDN, no key or account, made for apps.
+
+- `web/js/tiles.js` reads zoom-14 tiles (about 2 km square) with a small built-in vector-tile decoder and turns the
+  OpenMapTiles layers into the same OpenStreetMap-style tags the game already understood (roads, paths, railways,
+  water, rivers, woods, grass, parks, buildings, no-go places such as schools and hospitals, and landmarks: artwork,
+  museums, galleries, theatres, libraries, fountains, monuments). Parks get their names from park labels.
+- Tiles are kept on the phone for 30 days. Overpass is still tried if the tiles can't be had.
+- Buildings arrive with real heights, but the map keeps them low (up to about the explorer's height) so towers never
+  hide the streets; merged building blocks keep their courtyards, lakes keep their islands.
+- The map credit reads "OpenFreeMap © OpenMapTiles © OpenStreetMap", as OpenFreeMap asks.
+- Landmark ids changed with the new source, so Rune Circles and stops sit in new spots (and anything kept at an old
+  circle is effectively retired).

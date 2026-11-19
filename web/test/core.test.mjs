@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as C from '../js/core.js';
 import * as R from '../js/rules.js';
 import { OsmArea, WorldData, placeLandmarks, DATA_CELL, CIRCLE_SPACING, STOP_SPACING } from '../js/osm.js';
+import { decodeTile, tileElements, tileOf } from '../js/tiles.js';
 
 let passed = 0, failed = 0;
 const test = (name, fn) => { try { fn(); passed++; } catch (e) { failed++; console.log('FAIL', name, '\n  ', e.message); } };
@@ -368,6 +369,18 @@ test('map reader skips broken bits instead of failing the whole map', () => {
   const a = OsmArea.fromOverpass(dirty, cell.center);
   assert.ok(a.features.length > area.features.length, 'the good part of the gappy street is kept');
   assert.ok(placeLandmarks(a, cell));
+});
+test('map tiles (OpenFreeMap): a real tile becomes roads, buildings, water and landmarks the game can use', () => {
+  const raw = readFileSync(new URL('./omt-tile-14-3624-5934.pbf', import.meta.url)), layers = decodeTile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.length));
+  assert.ok(layers.transportation.length > 50 && layers.building.length > 0, 'layers decoded');
+  const els = tileElements(layers, 3624, 5934), has = (k, v) => els.some(e => e.tags[k] === v);
+  assert.ok(has('highway', 'residential') && has('building', 'yes'), 'roads and buildings');
+  for (const e of els) if (e.type === 'way') { assert.ok(e.geometry.every(g => g.lat > 44.3 && g.lat < 44.45 && g.lon > -100.43 && g.lon < -100.28), 'coordinates land in Pierre, SD'); }
+  assert.deepEqual(tileOf(44.3683, -100.3510), { x: 3624, y: 5934 });
+  const c = C.cellOf({ lat: 44.3683, lon: -100.3510 }, DATA_CELL), s0 = c.sw.lat, w0 = c.sw.lon;
+  const inCell = els.filter(e => e.type === 'node' ? e.lat >= s0 && e.lat <= s0 + c.dLat && e.lon >= w0 && e.lon <= w0 + c.dLon : e.geometry.some(g => g.lat >= s0 && g.lat <= s0 + c.dLat && g.lon >= w0 && g.lon <= w0 + c.dLon));
+  const a = OsmArea.fromOverpass({ elements: inCell }, c.center), placed = placeLandmarks(a, c);
+  assert.ok(a.features.some(f => f.kind === 'road') && placed.stops.length > 0, 'a playable cell with supply stops');
 });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

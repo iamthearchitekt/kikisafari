@@ -30,7 +30,7 @@ export function openPrivacy() {
   const pn = panel(`<h2>Privacy</h2><div style="text-align:left;font-weight:500;font-size:15px">
     <p><b>On this phone:</b> your explorer, Kikis, items and settings. "Start over" in Testing tools deletes them.</p>
     <p><b>Location</b> is used only while the game is open, to place Kikis and landmarks around you. It is never stored online, except your last spot when you trade, raid or keep a Rune Circle (to stop cheating), and it's replaced each time.</p>
-    <p><b>Map data</b> comes from OpenStreetMap (Overpass): the game asks for the map around you. <b>Weather</b> comes from Open-Meteo, using your rough area (about 10 km).</p>
+    <p><b>Map data</b> is OpenStreetMap, as map tiles from OpenFreeMap (about 2 km squares around you, kept on your phone), with the public Overpass servers as a backup. <b>Weather</b> comes from Open-Meteo, using your rough area (about 10 km).</p>
     <p><b>Online</b> (Supabase): an anonymous account with no email or real name, a backup of your progress, your friends, and what you share in the game. Other players can see your explorer name, level, faction, look, and the Kikis you trade, battle with or leave at circles.</p>
     <p><b>Notifications</b> (only if you turn them on): your browser's push address is kept so the game can send gift and Portal Surge reminders.</p>
     <p>Settings ▸ Online account ▸ "Delete my online account" removes everything online.</p></div>

@@ -3,6 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './osm.js';
+import { tilesFor } from './tiles.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
 import { $, toast, hx, sfx, debug, reducedMotion, fmtDist } from './services.js';
 import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
@@ -163,16 +164,23 @@ export class OsmLoader {
       if (hit && Date.now() - +(hit.headers.get('x-saved') || 0) < 14 * 864e5) { const j = await hit.json(); if (goodMap(j)) json = j; }
     } catch (e) {}
     if (!json) {
-      const q = overpassQuery(cell.sw.lat, cell.sw.lon, cell.sw.lat + cell.dLat, cell.sw.lon + cell.dLon);
+      const q = overpassQuery(cell.sw.lat, cell.sw.lon, cell.sw.lat + cell.dLat, cell.sw.lon + cell.dLon); let tileError = null;
       try {
-        const got = await fetchOverpass(q, (i, host) => { this.loading = i ? 'The map server is slow. Trying another one…' : 'Loading the map…'; this.server = host; });
-        json = got.json; this.problem = null; this.lastError = null;
-        if (cache) cache.put(key, new Response(got.text, { headers: { 'x-saved': String(Date.now()), 'Content-Type': 'application/json' } })).catch(() => {});
+        // Map tiles from OpenFreeMap first (fast and dependable; the tiles are kept on the phone); the public Overpass
+        // servers only if the tiles can't be had.
+        try { this.server = 'tiles.openfreemap.org'; json = await tilesFor(cell.sw.lat, cell.sw.lon, cell.sw.lat + cell.dLat, cell.sw.lon + cell.dLon); }
+        catch (e) {
+          tileError = e.message; this.loading = 'Loading the map (backup servers)…';
+          const got = await fetchOverpass(q, (i, host) => { this.loading = i ? 'The map server is slow. Trying another one…' : 'Loading the map (backup servers)…'; this.server = host; });
+          json = got.json;
+          if (cache) cache.put(key, new Response(got.text, { headers: { 'x-saved': String(Date.now()), 'Content-Type': 'application/json' } })).catch(() => {});
+        }
+        this.problem = null; this.lastError = null;
       } catch (e) {
-        this.lastError = e.message; console.warn('map', e.message);
+        this.lastError = (tileError ? tileError + ' · then ' : '') + e.message; console.warn('map', this.lastError);
         if (cache) { try { const old = await cache.match(key); if (old) { const j = await old.json(); if (goodMap(j)) json = j; } } catch (e2) {} }
         if (!json) {
-          this.problem = navigator.onLine === false ? "You're offline. The map loads when you're back." : 'Map servers are busy. Trying again… (Kikis still spawn.)';
+          this.problem = navigator.onLine === false ? "You're offline. The map loads when you're back." : "Can't reach the map right now. Trying again… (Kikis still spawn.)";
           const k = cell.x + ':' + cell.y, n = (this.fails.get(k) || 0) + 1; this.fails.set(k, n);
           this.retry.set(k, performance.now() + Math.min(300000, 15000 * 2 ** (n - 1))); // back off: 15 s, 30 s, 60 s … up to 5 min
           return;

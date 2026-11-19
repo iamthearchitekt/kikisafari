@@ -22,11 +22,10 @@ class Layer {
   }
 }
 
-function flat(layer, pts, y, color) {
-  const ring = pts.slice(); if (ring.length > 1 && ring[0].x === ring[ring.length - 1].x && ring[0].z === ring[ring.length - 1].z) ring.pop();
-  if (ring.length < 3) return;
-  const v2 = ring.map(p => new THREE.Vector2(p.x, p.z));
-  for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(v2, [])) layer.tri([ring[a].x, y, ring[a].z], [ring[b].x, y, ring[b].z], [ring[c].x, y, ring[c].z], color);
+function flat(layer, pts, y, color, holes = []) {
+  const ring = openRing(pts); if (ring.length < 3) return;
+  const hs = holes.map(openRing).filter(h => h.length >= 3), all = [ring, ...hs].flat(), v2 = r => r.map(p => new THREE.Vector2(p.x, p.z));
+  for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(v2(ring), hs.map(v2))) layer.tri([all[a].x, y, all[a].z], [all[b].x, y, all[b].z], [all[c].x, y, all[c].z], color);
 }
 function ribbon(layer, pts, width, y, color) {
   const n = pts.length; if (n < 2) return; const hw = width / 2, L = [], R = [];
@@ -40,16 +39,16 @@ function ribbon(layer, pts, width, y, color) {
   }
   for (let i = 0; i < n - 1; i++) { layer.tri(L[i], R[i], L[i + 1], color); layer.tri(R[i], R[i + 1], L[i + 1], color); }
 }
-function building(layer, pts, h, pal) {
-  const ring = pts.slice(); if (ring.length > 1 && ring[0].x === ring[ring.length - 1].x && ring[0].z === ring[ring.length - 1].z) ring.pop();
-  if (ring.length < 3) return;
+const openRing = pts => { const r = pts.slice(); if (r.length > 1 && r[0].x === r[r.length - 1].x && r[0].z === r[r.length - 1].z) r.pop(); return r; };
+function building(layer, pts, h, pal, holes = []) {
+  const ring = openRing(pts); if (ring.length < 3) return;
   const wall = new THREE.Color(pal.wall);
-  for (let i = 0; i < ring.length; i++) {
-    const a = ring[i], b = ring[(i + 1) % ring.length], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); if (l < 1e-6) continue;
+  for (const r of [ring, ...holes.map(openRing)]) for (let i = 0; i < r.length; i++) { // outside walls, and the walls round courtyards
+    const a = r[i], b = r[(i + 1) % r.length], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); if (l < 1e-6) continue;
     const shade = 0.82 + 0.18 * Math.abs(dz / l); const c = wall.clone().multiplyScalar(shade);
     layer.tri([a.x, 0.06, a.z], [b.x, 0.06, b.z], [b.x, h, b.z], c); layer.tri([a.x, 0.06, a.z], [b.x, h, b.z], [a.x, h, a.z], c);
   }
-  flat(layer, ring, h, pal.roof);
+  flat(layer, ring, h, pal.roof, holes);
 }
 
 export class StreetMap {
@@ -79,18 +78,18 @@ export class StreetMap {
     if (!this.origin) { this.waiting.push([cell, area]); return; }
     this.built.add(key);
     const pal = this.pal(), L = [new Layer(), new Layer(), new Layer(), new Layer(), new Layer()], B = new Layer();
-    const o = C.toLocal(this.origin, area.origin), P = f => f.local.map(p => ({ x: p.e + o.e, z: -(p.n + o.n) }));
+    const o = C.toLocal(this.origin, area.origin), P = f => f.local.map(p => ({ x: p.e + o.e, z: -(p.n + o.n) })), Hs = f => (f.holesLocal || []).map(h => h.map(p => ({ x: p.e + o.e, z: -(p.n + o.n) })));
     for (const f of area.features) {
       switch (f.kind) {
-        case 'park': if (f.poly) flat(L[0], P(f), 0.02, pal.park); break;
-        case 'grass': if (f.poly) flat(L[0], P(f), 0.015, pal.grass); break;
-        case 'woods': if (f.poly) flat(L[0], P(f), 0.025, pal.woods); break;
-        case 'water': if (f.poly) flat(L[1], P(f), 0.03, pal.water); break;
+        case 'park': if (f.poly) flat(L[0], P(f), 0.02, pal.park, Hs(f)); break;
+        case 'grass': if (f.poly) flat(L[0], P(f), 0.015, pal.grass, Hs(f)); break;
+        case 'woods': if (f.poly) flat(L[0], P(f), 0.025, pal.woods, Hs(f)); break;
+        case 'water': if (f.poly) flat(L[1], P(f), 0.03, pal.water, Hs(f)); break;
         case 'waterline': ribbon(L[1], P(f), f.cat === 'river' ? 14 : 5, 0.032, pal.water); break;
         case 'road': { const w = roadHalf(f.cat) * 2; ribbon(L[2], P(f), w + 2.2, 0.04, pal.casing); ribbon(L[3], P(f), w, 0.05, MAJOR.has(f.cat) ? pal.main : pal.road); break; }
         case 'path': ribbon(L[4], P(f), f.cat === 'pedestrian' ? 6 : 2.4, 0.055, pal.path); break;
         case 'rail': ribbon(L[4], P(f), 2.2, 0.058, pal.rail); break;
-        case 'building': if (f.poly) building(B, P(f), Math.min(24, f.height * 0.8), pal); break;
+        case 'building': if (f.poly) building(B, P(f), Math.min(24, f.height * 0.8), pal, Hs(f)); break;
       }
     }
     const g = new THREE.Group();

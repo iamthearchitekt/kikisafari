@@ -172,5 +172,5 @@ Serve `tools/ArtPreview/web` (for example `python -m http.server`) and open `ind
 ## Next
 
 - **The server in the Unity app.** The web version is online (Supabase, above); the Unity project hasn't caught up.
-- **Self-hosted map data for launch.** Development uses the free public Overpass service, which is fine for testing but
-  not for a big launch. One endpoint constant in `OsmLoader.cs` switches it.
+- **Map data for the Unity app.** The web version reads OpenFreeMap vector tiles (`web/js/tiles.js`); the Unity project
+  still uses the public Overpass service (one endpoint constant in `OsmLoader.cs`).
