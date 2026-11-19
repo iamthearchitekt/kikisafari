@@ -391,7 +391,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
   s.root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { look[b.dataset.t] = look[b.dataset.t] ? 0 : 1; sfx('button', 0.25); hx.light(); render(); });
   s.root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { Object.assign(look, { ...lookOf({ outfit: +b.dataset.o }), skin: look.skin }); sfx('button', 0.3); hx.light(); render(); });
   s.q('[data-ok]').onclick = () => {
-    if (first) { const n = s.q('.name-input').value.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 15); if (!n) { hx.warning(); s.q('.name-input').focus(); return toast('Give your explorer a name!'); } e.name = n; }
+    if (first) { const n = cleanName(s.q('.name-input').value); if (!n) { hx.warning(); s.q('.name-input').focus(); return toast('Give your explorer a name!'); } e.name = n; }
     e.look = { ...look }; app.save(); app.map.setExplorer(); app.refreshHud(); if (app.syncProfile) app.syncProfile();
     sfx('pickup', 0.45); hx.success(); st.stop(); s.close(); onDone();
   };
@@ -457,10 +457,29 @@ export function nearbyPanel(app) {
   pn.root.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { app.tracking = app.tracking === b.dataset.tr ? null : b.dataset.tr; sfx('button', 0.3); hx.light(); pn.close(); nearbyPanel(app); app.refreshHud(); });
 }
 
+// ---------- your explorer's name ----------
+export const cleanName = s => String(s || '').replace(/[^\p{L}\p{N} '\-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 15);
+export function renameExplorer(app, onDone = () => {}) {
+  const e = app.progress.explorer;
+  const pn = panel(`<h2>Your name</h2><p>This is what friends, trades and leagues show.</p>
+    <input class="name-input" maxlength="15" value="${esc(e.name || '')}" placeholder="Your explorer name" autocomplete="off" enterkeyhint="done">
+    <div class="row"><button class="pill small cream" data-x>Cancel</button><button class="pill small" data-ok>Save</button></div>`);
+  const input = pn.root.querySelector('.name-input'); setTimeout(() => input.focus(), 50);
+  const save = () => {
+    const n = cleanName(input.value); if (!n) { hx.warning(); input.focus(); return toast('Give your explorer a name!'); }
+    e.name = n; app.save(); if (app.syncProfile) app.syncProfile(); app.refreshHud();
+    sfx('pickup', 0.4); hx.success(); toast(`You're ${n} now!`); pn.close(); onDone();
+  };
+  pn.root.querySelector('[data-ok]').onclick = save; input.onkeydown = ev => { if (ev.key === 'Enter') save(); };
+  pn.root.querySelector('[data-x]').onclick = () => { sfx('button', 0.3); pn.close(); };
+}
+
 // ---------- settings ----------
 export function openSettings(app) {
   const motionLabels = { auto: 'auto', reduced: 'reduced', full: 'full' };
-  const pn = panel(`<h2>Settings</h2><div class="grid2">
+  const pn = panel(`<h2>Settings</h2>
+    <button class="pill small sky name-btn" data-k="name"></button>
+    <div class="grid2">
     <button class="pill small cream" data-k="sound"></button>
     <button class="pill small cream" data-k="music"></button>
     <button class="pill small cream" data-k="motion"></button>
@@ -474,6 +493,7 @@ export function openSettings(app) {
     <button class="pill small" data-k="close">Done</button></div>`);
   const label = () => {
     const set = (k, t) => { pn.root.querySelector(`[data-k=${k}]`).textContent = t; };
+    set('name', 'Name: ' + (app.progress.explorer.name || 'Explorer') + '  ✎');
     set('sound', 'Sound: ' + (settings.get('sound', true) ? 'on' : 'off'));
     set('music', 'Music: ' + (settings.get('music', true) ? 'on' : 'off'));
     set('motion', 'Motion: ' + motionLabels[settings.get('motion', 'auto')]);
@@ -485,7 +505,8 @@ export function openSettings(app) {
   pn.root.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
     sfx('button', 0.35); const k = b.dataset.k;
     if (k === 'sound') app.setSound(!settings.get('sound', true));
-    else if (k === 'music') setMusic(!settings.get('music', true));
+    else if (k === 'music') { setMusic(!settings.get('music', true)); app.refreshTitle && app.refreshTitle(); }
+    else if (k === 'name') { renameExplorer(app, label); return; }
     else if (k === 'motion') { const o = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', o[(o.indexOf(m) + 1) % 3]); }
     else if (k === 'ar') settings.set('ar', !settings.get('ar', true));
     else if (k === 'battery') { settings.set('battery', !settings.get('battery', false)); app.applyBattery(); if (settings.get('battery')) toast('Battery saver: a calmer frame rate and a lighter picture.', 3000); }

@@ -15,7 +15,7 @@ import { circlePanel, healKiki } from './battle.js';
 import { startTitle } from './title.js';
 import { initOnline, connect, checkIn, syncProfile, openFriends, openLeagues, openAccount } from './social.js';
 import { cosmicCanvas } from './art.js';
-import { playMusic, musicName } from './music.js';
+import { playMusic, musicName, setMusic } from './music.js';
 import { $, toast, panel, hx, sfx, unlockAudio, audioRunning, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
 
 const app = {
@@ -54,12 +54,14 @@ let titleScene = null;
 function showTitleScene() { if (!titleScene && !$('title').hidden) titleScene = startTitle($('title-stage')); }
 function hideTitleScene() { if (titleScene) { titleScene.stop(); titleScene = null; } }
 setTimeout(() => { $('title-bg').querySelector('img').src = cosmicCanvas(768).toDataURL(); showTitleScene(); }, 0);
-const soundBtn = $('sound-toggle'), motionBtn = $('motion-toggle');
+const soundBtn = $('sound-toggle'), motionBtn = $('motion-toggle'), musicBtn = $('music-toggle');
 const motionLabels = { auto: 'Motion: auto', reduced: 'Motion: reduced', full: 'Motion: full' };
-const refreshTitle = () => { soundBtn.textContent = settings.get('sound', true) ? 'Sound: on' : 'Sound: off'; motionBtn.textContent = motionLabels[settings.get('motion', 'auto')]; };
+const refreshTitle = () => { soundBtn.textContent = settings.get('sound', true) ? 'Sound: on' : 'Sound: off'; musicBtn.textContent = settings.get('music', true) ? 'Music: on' : 'Music: off'; motionBtn.textContent = motionLabels[settings.get('motion', 'auto')]; };
+app.refreshTitle = () => refreshTitle();
 refreshTitle();
 app.setSound = on => { setSound(on); refreshTitle(); };
 soundBtn.onclick = () => { unlockAudio(); app.setSound(!settings.get('sound', true)); sfx('button', 0.35); };
+musicBtn.onclick = () => { unlockAudio(); setMusic(!settings.get('music', true)); refreshTitle(); sfx('button', 0.35); };
 motionBtn.onclick = () => { const order = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', order[(order.indexOf(m) + 1) % 3]); refreshTitle(); sfx('button', 0.35); };
 // Music. Browsers (iPhone Safari above all) won't play any sound until the player touches the screen, so the music
 // for the current screen is queued now and starts with the very first touch anywhere. iPhone also pauses the game's

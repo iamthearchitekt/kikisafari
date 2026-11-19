@@ -391,7 +391,7 @@ export class Encounter {
       <div class="rv-top"><div class="stamp" style="color:${C.RARITY[this.v.rarity].main}"></div>
         <div class="vname hide"><span class="nm">${this.rec.sparkle ? '✦ ' : ''}${this.v.name}</span>${first ? '<span class="new sticker">NEW!</span>' : ''}</div>
         <div class="vsub hide">${sub}</div></div>
-      <div class="kiki"></div>
+      <div class="rv-space"></div><div class="kiki"></div>
       <div class="rv-bottom"><div class="sticker reward hide">${rw.xp.map(([label, amount]) => `<div class="ln">${label} <span>+${amount}</span></div>`).join('')}<div class="tot">+0 XP</div>
         <div class="extra"><span>+${rw.sprouts} Sprouts</span><span>+${rw.fluff} ${R.fluffName(rw.family)}</span></div></div>
         <button type="button" class="pill play keep hide">Keep playing</button></div>`;
@@ -399,11 +399,21 @@ export class Encounter {
     const q = sel => el.querySelector(sel), show = n => n.classList.remove('hide');
     // Kiki on the cosmic spiral, on the shared screen stage.
     let k, motion;
+    const space = q('.rv-space');
     const st = liveStage(q('.kiki'), (scene, cam) => {
-      cam.position.set(0, 0.33, 1.55); cam.lookAt(0, 0.26, 0);
       k = makeKiki(this.v.id, 0.42, !!this.rec.sparkle); k.visible = false; scene.add(k);
       motion = new KikiMotion(k, reducedMotion); motion.idling = false;
-      return { update: dt => motion.update(dt) };
+      let fit = '';
+      return { update: dt => {
+        motion.update(dt);
+        // Frame Kiki in the clear space: the camera backs off so Kiki fills about 60% of it, and the picture is shifted
+        // so Kiki stands in its middle (the whole screen is still drawn, so jumps can go up over the title).
+        const W = innerWidth, H = innerHeight, r = space.getBoundingClientRect(), sig = [W, H, Math.round(r.top), Math.round(r.height)].join();
+        if (sig === fit || r.height < 10) return; fit = sig;
+        const viewH = 0.85 * H / r.height, d = Math.max(1.2, viewH / (2 * Math.tan(15 * Math.PI / 180)));
+        cam.fov = 30; cam.position.set(0, 0.3, d); cam.lookAt(0, 0.25, 0);
+        cam.setViewOffset(W, H, 0, -((r.top + r.height * 0.52) - H / 2), W, H); cam.updateProjectionMatrix();
+      } };
     });
     const sleep = ms => new Promise(res => setTimeout(res, ms));
     (async () => {
