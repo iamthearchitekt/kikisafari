@@ -272,3 +272,32 @@ Plush mascot is unchanged; this is about how the game presents them.
 - **Battery saver:** 1× pixels and 30 frames a second on the map; catches and battles stay smooth.
 - **Units:** km or miles for distances on screen. Egg names stay "2 km / 5 km / 10 km" (they're names).
 - **Privacy page** (Settings ▸ Privacy) lists what stays on the phone, what goes online and to which service.
+
+## 19. Rare Kikis use names from the Big Plush game (owner)
+
+"I have all the dumb names for the kikiwas from the big plush game ... just use some of those for the rare ones."
+Sixteen of the 19 rare Kikis take a name from Big Plush's roster, matched to how they look. Their ids don't change, so
+saves, trades and the server are unaffected. Lil Plush, Big Plush and Golden Ticket weren't used (the first two are
+plush names; Golden Spiral is already the golden one).
+
+| Kiki (id) | Name | Why |
+|---|---|---|
+| grand-meadow | High Meadow Mae | meadow |
+| elder-pine | Hemlock Holly | a frosty conifer |
+| oak | Hilltop Hank | big woodland Kiki |
+| bloom | Sanctuary Sadie | pink, like Sadie |
+| rainbow | Rainbow Bridget | rainbow |
+| brook | Swimmin' Hole Sid | water, blue like Sid |
+| campfire | Fire Circle Fred | campfire |
+| glowcap | Fungi Phil | mushroom cap |
+| boulder | Stone Circle Steve | stone |
+| geode | Fairy Cairn Fern | stones, purple like Fern |
+| starry | Portal Wookie | starry, like Wookie's galaxy pattern |
+| nightwing | Lucid Wizard | the wise night owl |
+| lantern | Disco Den Dottie | lights |
+| frizz | Clown Town Coco | the big hairdo |
+| volt | Ridge Road Rider | runs laps |
+| sandcastle | Labyrinth Lou | castle builder |
+
+Lotus, Frosty and Blaze Kiki keep their names (no name left that fit). Rainbow and Geode Fluff keep their short names.
+The Unity project still has the old names.

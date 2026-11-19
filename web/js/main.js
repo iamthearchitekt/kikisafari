@@ -194,7 +194,7 @@ async function startEncounter(t) {
     const enc = app.encounter; app.encounter = null; app.world.orient.locked = false; playMusic('map');
     if (why === 'caught' && !t.starter) app.caught.add(t.id);
     app.world.setVisible(!app.mapMode); app.world.nextPlan = 0; app.save(); resumeCam(); refreshHud(true);
-    if (why === 'fled') toast(`The ${t.name} ran away!`, 2800);
+    if (why === 'fled') toast(`${/ Kiki$/.test(t.name) ? 'The ' + t.name : t.name} ran away!`, 2800);
     if (why === 'caught' && enc.ups && enc.ups.length) await levelUps(app, enc.ups);
     if (why === 'caught' && t.starter && app.onStarterCaught) app.onStarterCaught();
   }, { starter: !!t.starter });

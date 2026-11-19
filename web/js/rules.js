@@ -44,7 +44,7 @@ export function useItem(p, id) { if (!(p.items[id] > 0)) return false; p.items[i
 
 // ---------- species helpers ----------
 export const SPECIES = [...VARIANTS].sort((a, b) => a.no - b.no);
-export const fluffName = family => variant(family).name.replace(' Kiki', '') + ' Fluff';
+export const fluffName = family => (variant(family).fluff || variant(family).name.replace(' Kiki', '')) + ' Fluff';
 export const familyOf = id => variant(id).family || id;
 export const STATS = ['Cuddle', 'Bounce', 'Zest'];
 

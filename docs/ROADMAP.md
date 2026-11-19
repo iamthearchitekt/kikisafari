@@ -25,8 +25,8 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 - [x] 6. **Every Kiki is its own.** Power, size (XS to XL), hidden stats, catch date and place. Nickname,
       favourite, sort and filter.
 - [x] 7. **Growth.** Sprouts (from everything) plus that family's Fluff* (from catching it) power a Kiki up.
-      Fluff evolves it. Send extras home for more Fluff. The three commons each evolve once for now: Meadow → Grand
-      Meadow*, Pine → Elder Pine*, Sprout → Bloom*. The full roster is Phase 2.
+      Fluff evolves it. Send extras home for more Fluff. The three commons each evolve once for now: Meadow → High
+      Meadow Mae, Pine → Hemlock Holly, Sprout → Sanctuary Sadie. The full roster is Phase 2.
 - [x] 8. **Limits.** A bag size and a collection size, so choices matter.
 - [x] 9. **Better supply stops.** A mix of items (stones and treats; eggs join in Phase 2); the stop changes colour once used.
       First catch and first stop of the day, with a 7-day streak bonus.
@@ -106,6 +106,5 @@ online is optional: offline, the game carries on and catches up when the signal 
 
 - ~~**Home screen:** map first, with the camera in encounters, or keep camera first.~~ Map first (owner: "lets tackle phase 1"). The camera view stays one tap away (the AR button).
 - ~~**Server for Phase 4:** Supabase recommended.~~ Supabase (owner: "supa base is fine i have an account").
-- **Names:** Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), Grand Meadow / Elder Pine /
-  Bloom Kiki, the hidden stats Cuddle / Bounce / Zest, elements, factions. Approve or rename.
+- **Names:** Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), the hidden stats Cuddle / Bounce / Zest, elements, factions. Approve or rename.
 - **New creatures:** Kiki variants only, or Kiki plus friends? Built as Kiki variants for now; say if you want friends too.
