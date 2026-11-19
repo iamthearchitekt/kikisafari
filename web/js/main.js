@@ -43,20 +43,49 @@ $('play').onclick = () => {
 };
 $('perms-go').onclick = () => { unlockAudio(); localStorage.setItem('kiki-perms', 'asked'); startSensors(); };
 
-let stream = null;
-/** Must run inside a tap: iPhone only shows the motion and camera prompts for a user gesture. */
+// ---------- camera ----------
+// The camera is a live viewfinder only: no microphone, nothing is recorded, saved or uploaded; frames go
+// straight from the camera to the <video> behind the 3D. It's switched off whenever it isn't on screen
+// (map view, title screen, app in the background) so the iPhone's green camera dot goes away too.
+const CAMERA = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+let stream = null, camWanted = false, camAllowed = false, camTapToResume = false;
+function camOn() {
+  camWanted = true;
+  if (stream && stream.getVideoTracks().some(t => t.readyState === 'live')) return Promise.resolve(stream);
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve(null);
+  return navigator.mediaDevices.getUserMedia(CAMERA).then(s => {
+    if (!camWanted) { for (const t of s.getTracks()) t.stop(); return null; } // switched off while it was starting
+    camOff(); camWanted = true;
+    stream = s; const v = $('cam'); v.srcObject = s; v.play().catch(() => {});
+    return s;
+  }).catch(() => null);
+}
+function camOff() {
+  camWanted = false;
+  if (stream) { for (const t of stream.getTracks()) t.stop(); stream = null; }
+  $('cam').srcObject = null;
+}
+const night = () => C.isNight(app.loc.fix || { lat: 40, lon: -74 }, new Date()) || debug.night;
+/** Back from the map or the background: turn the viewfinder on again, or ask for a tap if the phone wants one. */
+function resumeCam() {
+  if (!camAllowed || app.mapMode || $('game').hidden) return;
+  camOn().then(s => {
+    if (s || app.mapMode || $('game').hidden) return;
+    camTapToResume = true; toast('Tap the screen to turn the camera back on.', 3500);
+  });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) camOff(); else resumeCam(); });
+
+/** Must run inside a tap: iPhone only shows the motion prompt for a user gesture. */
 function startSensors() {
   $('perm-status').textContent = 'Asking your phone…';
   const pOri = (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')
     ? DeviceOrientationEvent.requestPermission().catch(() => 'denied') : Promise.resolve('granted');
-  const pCam = navigator.mediaDevices && navigator.mediaDevices.getUserMedia
-    ? navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).catch(() => null)
-    : Promise.resolve(null);
+  const pCam = camOn();
   const pLoc = app.loc.start();
   Promise.all([pOri, pCam]).then(([ori, cam]) => {
-    stream = cam;
-    if (cam) { const v = $('cam'); v.srcObject = cam; v.play().catch(() => {}); }
-    app.world.setStandIn(!cam, C.isNight(app.loc.fix || { lat: 40, lon: -74 }, new Date()) || debug.night);
+    camAllowed = !!cam;
+    app.world.setStandIn(!cam, night());
     $('title').hidden = true; $('perms').hidden = true; $('game').hidden = false;
     app.save();
     const missing = [!cam && 'camera', ori !== 'granted' && 'motion'].filter(Boolean);
@@ -67,7 +96,7 @@ function startSensors() {
 
 function goHome() {
   if (app.encounter) return;
-  if (stream) { for (const t of stream.getTracks()) t.stop(); stream = null; }
+  camOff(); camAllowed = false; camTapToResume = false;
   $('game').hidden = true; $('title').hidden = false; app.mapMode = false; applyMode();
 }
 $('btn-home').onclick = goHome;
@@ -76,8 +105,8 @@ function applyMode() {
   const m = app.mapMode;
   $('btn-map').textContent = m ? 'Camera' : 'Map';
   $('radar').hidden = m; $('attribution').hidden = !m;
-  $('cam').hidden = m || !stream; $('sky').hidden = m || !!stream;
-  if (m) $('cam').pause && $('cam').pause(); else if (stream) $('cam').play().catch(() => {});
+  $('cam').hidden = m || !camAllowed; $('sky').hidden = m || camAllowed;
+  if (m) camOff(); else resumeCam();
   app.world.setVisible(!m);
 }
 
@@ -169,7 +198,7 @@ function tuningPanel() {
 
 // ---------- input on the 3D view ----------
 const gl = $('gl'), pointers = new Map(); let press = null, pinch = 0;
-gl.addEventListener('pointerdown', e => { pointers.set(e.pointerId, [e.clientX, e.clientY]); press = { x: e.clientX, y: e.clientY, t: performance.now(), lx: e.clientX, ly: e.clientY, moved: false }; });
+gl.addEventListener('pointerdown', e => { if (camTapToResume) { camTapToResume = false; resumeCam(); } pointers.set(e.pointerId, [e.clientX, e.clientY]); press = { x: e.clientX, y: e.clientY, t: performance.now(), lx: e.clientX, ly: e.clientY, moved: false }; });
 addEventListener('pointermove', e => {
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
