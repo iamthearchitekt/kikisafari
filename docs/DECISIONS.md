@@ -305,3 +305,14 @@ plush names; Golden Spiral is already the golden one).
 
 Lotus, Frosty and Blaze Kiki keep their names (no name left that fit). Rainbow and Geode Fluff keep their short names.
 The Unity project still has the old names.
+
+## 20. No aiming circle; Kikis stand on the floor (owner)
+
+- "The big circle for aiming covers the Kiki ... I just want it gone." The shrinking timing circle over Kiki is gone.
+  Nice / Great / Excellent now come from accuracy: how close to Kiki's middle the flicked stone was heading (dead
+  centre is Excellent). "Tap to throw" always lands but earns no bonus. How hard the catch is shows as a coloured dot
+  on the name card.
+- "Make sure Kikis are on surfaces and not floating around in a room." iPhone's browser can't detect real floors or
+  tables (Safari has no WebXR), so the game assumes the floor is about phone-height below you. Kiki now appears closer
+  (1 to 2.2 m, so it fits in a room), with a darker shadow, and you can tap the floor or a table top to make Kiki hop
+  there: its feet land exactly where you tapped. Real surface detection would need the native (Unity, ARKit) app.

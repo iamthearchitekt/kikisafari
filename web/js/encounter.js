@@ -1,12 +1,14 @@
 // The catch (decisions doc, section 7, with the owner's Rune Stone and portal). Kiki stands on the ground in front of
 // you and stays put as you turn the phone. Flick the Rune Stone up from the bottom of the screen (circle it first for
 // spin), or tap "Tap to throw". On a hit the portal sucks Kiki in and seals into the stone; it wobbles, then bursts
-// (caught) or blasts open (SO CLOSE!). Phase 1: pick a Rune, Moon or Star Stone, feed a treat, the ring's colour shows how
-// hard the catch is, every Kiki has its own Power, a Kiki that breaks out can run away, and AR can be turned off.
+// (caught) or blasts open (SO CLOSE!). Phase 1: pick a Rune, Moon or Star Stone, feed a treat, the dot on the name card
+// shows how hard the catch is, every Kiki has its own Power, a Kiki that breaks out can run away, and AR can be turned
+// off. There's no aiming circle (owner): a flick that lands near Kiki's middle earns Nice, Great or Excellent.
+// Kiki stands on the floor where the phone points (close, so it fits in a room); tap the floor or a table to move it.
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, makeRuneStone, makePortal, makeTimingRing, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makePortal, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
 import { EYE } from './world.js';
 import { $, hx, sfx, voice, pop, shake, toast, tuning, reducedMotion, settings } from './services.js';
 import { liveStage } from './ui.js';
@@ -39,8 +41,8 @@ export class Encounter {
     // Where you're looking: the floor point straight ahead, kept 1.4–2.6 m away.
     const o = this.app.world.orient, h = o.rawHeading(this.camera.quaternion) * Math.PI / 180;
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    let d = f.y < -0.05 ? EYE / -f.y * Math.hypot(f.x, f.z) : 2.0;
-    d = Math.max(1.4, Math.min(2.6, d));
+    let d = f.y < -0.05 ? EYE / -f.y * Math.hypot(f.x, f.z) : 1.6;
+    d = Math.max(1.0, Math.min(2.2, d));
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d);
     // No motion sensors (stand-in or a computer): tilt the view down to Kiki.
     if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) + 0.08;
@@ -48,7 +50,7 @@ export class Encounter {
     this.kiki.rotation.y = Math.atan2(-this.home.x, -this.home.z);
     this.motion = new KikiMotion(this.kiki, reducedMotion);
     this.scale = this.kiki.scale.x;
-    this.ring = makeTimingRing(C.RARITY[this.v.rarity].main); this.ring.userData.max = 0.3 * (this.v.id === 'sprout' ? 0.78 : 1); this.ring.userData.min = 0.07; this.group.add(this.ring);
+    if (this.app.arOn) this.kiki.userData.shadow.material.opacity = 0.6; // a darker shadow so Kiki sits on the floor in the camera picture
     this.portal = makePortal(0.62); this.group.add(this.portal);
     this.stone = makeRuneStone(STONE_R, this.stoneId); this.group.add(this.stone);
     this.recolor();
@@ -59,15 +61,31 @@ export class Encounter {
     if (this.rec.sparkle) setTimeout(() => { this.sparkles.burst(this.center, 26, 0xffe680, 0.05, 0.8, 1.0); this.sparkles.burst(this.center, 14, 0xffffff, 0.04, 0.6, 0.8); sfx('burst', 0.4); hx.success(); pop('✦ Sparkle! ✦', '#ffcf2e'); }, 500);
   }
 
+  /** Tap the floor (or a table top) and Kiki hops there. Its feet land right where you tapped. */
+  placeAt(x, y) {
+    if (!this.app.arOn) return;
+    const ndc = new THREE.Vector3(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1, 0.5).unproject(this.camera), dir = ndc.sub(this.camera.position).normalize();
+    if (dir.y > -0.08) return toast('Tap the floor (or a table) where you want Kiki.', 2400);
+    const t = (-EYE - this.camera.position.y) / dir.y, to = this.camera.position.clone().addScaledVector(dir, t);
+    if (Math.hypot(to.x, to.z) > 4) return toast("That's too far away. Tap somewhere closer.", 2400);
+    if (Math.hypot(to.x, to.z) < 0.7) return toast('Too close! Tap a bit further away.', 2400);
+    const from = this.kiki.position.clone(); this.home = to.clone(); hx.light(); sfx('button', 0.3);
+    this.state = 'moving'; this.motion.stop(); this.motion.idling = false;
+    this.anim(0.4, k => { this.kiki.position.lerpVectors(from, to, k); this.motion.hop(Math.sin(k * Math.PI) * 0.7); })
+      .then(() => { this.motion.hop(0); this.motion.idling = true; if (this.state === 'moving') this.state = 'ready'; });
+  }
   /** AR switched on or off: put Kiki where you're looking now. */
   replace() {
     if (this.state !== 'ready' && this.state !== 'out') return;
-    const o = this.app.world.orient, h = o.rawHeading(this.camera.quaternion) * Math.PI / 180, d = 2.0;
+    const o = this.app.world.orient, h = o.rawHeading(this.camera.quaternion) * Math.PI / 180, d = 1.6;
     if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) + 0.08;
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d); this.kiki.position.copy(this.home);
   }
-  /** Ring colour from the odds: green is easy, red is hard. */
-  recolor() { this.odds = R.catchOdds(this.v.rarity, this.rec.lvl, { stone: this.raid ? 'moon' : this.stoneId, treat: this.treat, odds: tuning.odds }); this.ring.userData.setColor(R.ringColor(this.odds)); }
+  /** How hard the catch is, as the dot on the name card: green is easy, red is hard. */
+  recolor() {
+    this.odds = R.catchOdds(this.v.rarity, this.rec.lvl, { stone: this.raid ? 'moon' : this.stoneId, treat: this.treat, odds: tuning.odds });
+    const dot = $('enc-odds'); if (dot) { dot.style.background = R.ringColor(this.odds); dot.title = dot.ariaLabel = this.odds >= 0.6 ? 'Easy catch' : this.odds >= 0.35 ? 'Medium catch' : this.odds >= 0.18 ? 'Tricky catch' : 'Hard catch'; }
+  }
 
   get center() { return this.kiki.position.clone().add(new THREE.Vector3(0, GROUND * this.scale, 0)); }
 
@@ -79,7 +97,8 @@ export class Encounter {
     $('enc-name').textContent = (this.rec.sparkle ? '✦ ' : '') + this.v.name;
     $('enc-ar').textContent = this.app.arOn ? 'AR on' : 'AR off';
     $('enc-tray').hidden = true; $('enc-treat').hidden = true;
-    this.stones(); this.hint(this.starter ? 'Wait for the coloured ring to get small, then flick the stone at Kiki!' : 'Flick the stone at Kiki!');
+    this.stones(); this.hint(this.starter ? 'Flick the stone right at Kiki! Hit the middle for a bonus.' : 'Flick the stone at Kiki!');
+    if (this.app.arOn && (+localStorage.getItem('kiki-place-tip') || 0) < 3) { localStorage.setItem('kiki-place-tip', (+localStorage.getItem('kiki-place-tip') || 0) + 1); setTimeout(() => this.state === 'ready' && toast('Tip: tap the floor or a table to move Kiki there.', 3200), 1800); }
   }
   stones() {
     const p = this.app.progress, sb = $('enc-stone'), fb = $('enc-food');
@@ -130,7 +149,7 @@ export class Encounter {
       if (this.state !== 'ready') return;
       if (!$('enc-tray').hidden) { $('enc-tray').hidden = true; return; }
       const near = this.stoneScreen().distanceTo(new THREE.Vector2(e.clientX, e.clientY)) < innerHeight * 0.12;
-      if (!near && e.clientY < innerHeight * 0.65) return;
+      if (!near && e.clientY < innerHeight * 0.65) { this.placeTap = [e.clientX, e.clientY, performance.now()]; return; }
       this.state = 'drag'; this.samples = [[e.clientX, e.clientY, performance.now() / 1000]]; this.spin = 0; this.lastDir = null; this.spinning = false;
       hx.tick(); gl.setPointerCapture && gl.setPointerCapture(e.pointerId);
     };
@@ -144,7 +163,11 @@ export class Encounter {
       if (!this.spinning && Math.abs(this.spin) > Math.PI * 3) { this.spinning = true; hx.light(); this.sparkles.burst(this.stone.position.clone(), 8, 0x7a00ff, 0.02, 0.15, 0.4); }
       this.dragPos = [e.clientX, e.clientY];
     };
-    this.onUp = e => { if (this.state === 'drag') this.release(e.clientX, e.clientY); };
+    this.onUp = e => {
+      if (this.state === 'drag') return this.release(e.clientX, e.clientY);
+      const t = this.placeTap; this.placeTap = null;
+      if (t && this.state === 'ready' && performance.now() - t[2] < 450 && Math.hypot(e.clientX - t[0], e.clientY - t[1]) < 14) this.placeAt(e.clientX, e.clientY);
+    };
     gl.addEventListener('pointerdown', this.onDown); addEventListener('pointermove', this.onMove); addEventListener('pointerup', this.onUp);
     $('enc-tap').onclick = () => this.tapThrow();
     $('enc-back').onclick = () => { if (this.state === 'ready' || this.state === 'drag' || this.state === 'out') this.finish('left'); };
@@ -172,14 +195,14 @@ export class Encounter {
     const q = this.camera.quaternion, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
     const vel = fwd.multiplyScalar(speed).addScaledVector(up, speed * 0.28).addScaledVector(right, vx * 2.4 * tuning.strength);
     const o = this.stone.position.clone(), t = this.center, a = C.aimAssist(o, t, vel, tuning.gravity, tuning.aimAssist);
-    this.launch(o, new THREE.Vector3(a.x, a.y, a.z), this.spinning);
+    this.tapped = false; this.launch(o, new THREE.Vector3(a.x, a.y, a.z), this.spinning);
   }
 
   tapThrow() {
     if (this.state !== 'ready') return;
     const o = this.stone.position.clone(), t = this.center.add(new THREE.Vector3().randomDirection().multiplyScalar(0.05 * (1 - tuning.aimAssist)));
     const v = C.solveThrow(o, t, tuning.gravity, C.naturalTime(Math.hypot(t.x - o.x, t.z - o.z)));
-    this.launch(o, new THREE.Vector3(v.x, v.y, v.z), false);
+    this.launch(o, new THREE.Vector3(v.x, v.y, v.z), false); this.tapped = true; // tap throws always land, but earn no bonus
   }
 
   launch(o, v, spin) {
@@ -187,7 +210,7 @@ export class Encounter {
     if (this.raid) { if (this.raidStones <= 0) return this.outOfStones(); this.raidStones--; }
     else if (!R.useItem(app.progress, this.stoneId)) return this.outOfStones();
     app.progress.stats.throws++; app.save(); this.stones(); this.hint(null); this.taught = true; $('enc-tray').hidden = true;
-    this.releaseRing = C.ringScale(this.clock, tuning.ringPeriod); this.spinThrow = spin;
+    this.throwAim = 1; this.spinThrow = spin;
     this.pos = o; this.vel = v; this.flight = 0; this.state = 'fly';
     $('enc-tap').disabled = true; sfx('throw', 0.45); hx.light();
   }
@@ -212,12 +235,10 @@ export class Encounter {
       // If Kiki is off-screen, say where to look.
       const p = this.center.project(this.camera), off = p.z > 1 || Math.abs(p.x) > 0.95 || p.y < -0.75 || p.y > 0.95;
       const want = off ? (p.z > 1 ? 'Turn around: Kiki is behind you' : p.y < -0.75 ? 'Look down: Kiki is right in front of you' : p.x > 0 ? 'Kiki is to your right' : 'Kiki is to your left')
-        : this.state === 'out' ? 'Out of stones! Grab more at a supply stop.' : this.taught ? null : this.starter ? 'Wait for the coloured ring to get small, then flick the stone at Kiki!' : 'Flick the stone at Kiki!';
+        : this.state === 'out' ? 'Out of stones! Grab more at a supply stop.' : this.taught ? null : this.starter ? 'Flick the stone right at Kiki! Hit the middle for a bonus.' : 'Flick the stone at Kiki!';
       if (want !== this.lastHint) { this.lastHint = want; this.hint(want); }
     }
     if (this.state === 'ready' || this.state === 'drag' || this.state === 'fly') {
-      const c = this.center; this.ring.position.copy(c); this.ring.quaternion.copy(this.camera.quaternion);
-      this.ring.userData.set(C.ringScale(this.clock, tuning.ringPeriod));
       this.kiki.rotation.y = Math.atan2(-this.kiki.position.x, -this.kiki.position.z);
     }
     if (this.state === 'ready' || this.state === 'out') {
@@ -236,7 +257,12 @@ export class Encounter {
       this.vel.y -= tuning.gravity * dt; this.pos.addScaledVector(this.vel, dt);
       this.stone.position.copy(this.pos);
       this.stone.userData.body.rotation.set(this.flight * 12, this.flight * (this.spinThrow ? 24 : 3.5), 0);
-      if (this.pos.distanceTo(this.center) <= tuning.hitRadius * (this.v.id === 'sprout' ? 0.78 : 1) + STONE_R) return this.resolve(true);
+      const reach = tuning.hitRadius * (this.v.id === 'sprout' ? 0.78 : 1) + STONE_R;
+      if (this.pos.distanceTo(this.center) <= reach) {
+        // How close to Kiki's middle the stone was heading: 0 is dead centre, 1 is a graze. That's the throw bonus.
+        const v = this.vel.clone().normalize(), off = this.center.sub(this.pos).cross(v).length();
+        this.throwAim = this.tapped ? 1 : Math.min(1, off / reach); return this.resolve(true);
+      }
       if (this.pos.y <= -EYE + STONE_R * 0.5 || this.flight > 2.5 || this.pos.length() > 7) this.resolve(false);
     }
   }
@@ -244,7 +270,7 @@ export class Encounter {
   async resolve(hit) {
     this.state = 'resolving';
     const app = this.app, p = app.progress;
-    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.releaseRing, spin: this.spinThrow, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter || this.reward || !!this.raid, stone: this.raid ? 'moon' : this.stoneId }, C.sysRng);
+    const o = R.resolveCatch(this.v.rarity, this.rec.lvl, { hit, ring: this.throwAim, spin: this.spinThrow, treat: this.treat, odds: tuning.odds, guaranteed: this.starter, noFlee: this.starter || this.reward || !!this.raid, stone: this.raid ? 'moon' : this.stoneId }, C.sysRng);
     let steps = C.revealSteps(o.result === 'fled' ? { ...o, result: 'brokeout' } : o, this.v.rarity, reducedMotion());
     if (o.result === 'fled') steps = steps.map(s => s.kind === 'soClose' ? { kind: 'flee', dur: 1.3, haptic: 'warning', voice: 'awww', voiceChance: 0.6 } : s);
     this.o = o;
@@ -273,7 +299,7 @@ export class Encounter {
     }
     if (o.result === 'caught') { this.state = 'reveal'; this.reveal(o, rw, first, steps); return; }
     if (o.result === 'fled') { this.finish('fled'); return; }
-    this.ring.visible = true; this.kiki.visible = true; this.motion.idling = true;
+    this.kiki.visible = true; this.motion.idling = true;
     this.state = 'ready'; this.stone.scale.setScalar(1); this.stone.userData.body.rotation.set(0, 0, 0); this.recolor(); this.stones();
     if (this.raid ? this.raidStones <= 0 : !(app.progress.items[this.stoneId] > 0)) this.outOfStones();
   }
@@ -285,7 +311,7 @@ export class Encounter {
     switch (s.kind) {
       case 'hit':
         if (this.o && (this.o.quality || this.o.spin)) pop([this.o.quality && this.o.quality + '!', this.o.spin && 'Spin!'].filter(Boolean).join(' '), { Nice: '#36b6ff', Great: '#5fd34b', Excellent: '#ffcf2e' }[this.o.quality] || '#c77dff');
-        this.ring.visible = false; this.sparkles.burst(hitPoint, 14, 0xd9c0ff, 0.035, 0.5, 0.5); st.userData.flash(2);
+        this.sparkles.burst(hitPoint, 14, 0xd9c0ff, 0.035, 0.5, 0.5); st.userData.flash(2);
         return this.anim(d, k => st.position.lerpVectors(hitPoint, hover, 1 - Math.pow(1 - k, 3)));
       case 'portalOpen':
         this.motion.stop(); this.motion.idling = false; this.portal.position.copy(portalPos); this.portal.userData.target = 1;

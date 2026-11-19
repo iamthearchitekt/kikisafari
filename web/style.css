@@ -364,3 +364,5 @@ button { font: inherit; color: inherit; }
 .panel .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .panel .grid2 .pill { width: 100%; padding-left: 8px; padding-right: 8px; font-size: 16px; }
 .coin.big { width: 46px; height: 46px; border-width: 3px; vertical-align: middle; margin: 0; box-shadow: inset -4px -5px 0 rgba(160, 80, 0, .35); }
+#enc-hud .namecard .odds-row { display: flex; align-items: center; gap: 6px; }
+#enc-hud .odds-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--navy); background: #5fd34b; }

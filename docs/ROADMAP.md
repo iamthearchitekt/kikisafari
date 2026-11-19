@@ -18,8 +18,8 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 - [x] 2. **Your explorer on the map.** An animated avatar that walks when you walk, with a few starter outfits.
 - [x] 3. **Nearby panel.** Kikis around you, with silhouettes for ones you haven't caught. Rustling leaves on
       the map where something is hiding.
-- [x] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured catch ring
-      (green, yellow, red) shows how hard each one is. Every Kiki shows its Power.
+- [x] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured dot on the
+      name card (green, yellow, red) shows how hard each one is. (There was an aiming circle; the owner had it removed.) Every Kiki shows its Power.
 - [x] 5. **Stone tiers and treats.** Rune Stone, Moon Stone*, Star Stone* with better catch rates. Honey Leaf*
       makes a catch easier; Sun Seed* doubles the reward.
 - [x] 6. **Every Kiki is its own.** Power, size (XS to XL), hidden stats, catch date and place. Nickname,

@@ -202,7 +202,7 @@ async function startEncounter(t) {
 
 // ---------- testing tools (Settings ▸ Testing tools) ----------
 app.tuningPanel = function tuningPanel() {
-  const sliders = [['strength', 'Throw strength', 0.3, 3, 0.05], ['ringPeriod', 'Ring cycle (s)', 0.8, 6, 0.1], ['aimAssist', 'Aim assist', 0, 1, 0.05], ['odds', 'Catch odds ×', 0.1, 5, 0.05], ['gravity', 'Gravity (m/s²)', 2, 20, 0.1], ['hitRadius', 'Hit size (m)', 0.1, 1, 0.01]];
+  const sliders = [['strength', 'Throw strength', 0.3, 3, 0.05], ['aimAssist', 'Aim assist', 0, 1, 0.05], ['odds', 'Catch odds ×', 0.1, 5, 0.05], ['gravity', 'Gravity (m/s²)', 2, 20, 0.1], ['hitRadius', 'Hit size (m)', 0.1, 1, 0.01]];
   const toggles = [['night', 'Force night (Moonbeam)'], ['surge', 'Force Portal Surge'], ['home', 'Home test Rune Circle'], ['sparkle', 'Sparkle Kikis 1 in 3']];
   const p = panel(`<h2>Testing tools</h2><div class="tune">${sliders.map(([k, l, a, b, s]) => `<label>${l}: <b id="tv-${k}">${tuning[k]}</b><input type="range" min="${a}" max="${b}" step="${s}" value="${tuning[k]}" data-k="${k}"></label>`).join('')}</div>
     <div class="stack">${toggles.map(([k, l]) => `<button class="pill small cream" data-t="${k}">${l}: ${debug[k] ? 'on' : 'off'}</button>`).join('')}
