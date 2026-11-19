@@ -8,7 +8,7 @@ import { WorldView, Location, OsmLoader, drawRadar } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
 import { portrait, lookOf, encodeLook } from './art.js';
-import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm } from './ui.js';
+import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm, openSettings } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
 import { circlePanel, healKiki } from './battle.js';
@@ -54,15 +54,10 @@ let titleScene = null;
 function showTitleScene() { if (!titleScene && !$('title').hidden) titleScene = startTitle($('title-stage')); }
 function hideTitleScene() { if (titleScene) { titleScene.stop(); titleScene = null; } }
 setTimeout(() => { $('title-bg').querySelector('img').src = cosmicCanvas(768).toDataURL(); showTitleScene(); }, 0);
-const soundBtn = $('sound-toggle'), motionBtn = $('motion-toggle'), musicBtn = $('music-toggle');
-const motionLabels = { auto: 'Motion: auto', reduced: 'Motion: reduced', full: 'Motion: full' };
-const refreshTitle = () => { soundBtn.textContent = settings.get('sound', true) ? 'Sound: on' : 'Sound: off'; musicBtn.textContent = settings.get('music', true) ? 'Music: on' : 'Music: off'; motionBtn.textContent = motionLabels[settings.get('motion', 'auto')]; };
-app.refreshTitle = () => refreshTitle();
-refreshTitle();
-app.setSound = on => { setSound(on); refreshTitle(); };
-soundBtn.onclick = () => { unlockAudio(); app.setSound(!settings.get('sound', true)); sfx('button', 0.35); };
-musicBtn.onclick = () => { unlockAudio(); setMusic(!settings.get('music', true)); refreshTitle(); sfx('button', 0.35); };
-motionBtn.onclick = () => { const order = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', order[(order.indexOf(m) + 1) % 3]); refreshTitle(); sfx('button', 0.35); };
+// One Settings button on the title screen (sound, music, motion and the rest live in Settings).
+app.refreshTitle = () => {};
+app.setSound = on => setSound(on);
+$('title-settings').onclick = () => { unlockAudio(); sfx('button', 0.35); hx.light(); openSettings(app, { fromTitle: true }); };
 // Music. Browsers (iPhone Safari above all) won't play any sound until the player touches the screen, so the music
 // for the current screen is queued now and starts with the very first touch anywhere. iPhone also pauses the game's
 // sound when you leave the app; the first touch after coming back starts it again.

@@ -475,7 +475,7 @@ export function renameExplorer(app, onDone = () => {}) {
 }
 
 // ---------- settings ----------
-export function openSettings(app) {
+export function openSettings(app, { fromTitle = false } = {}) {
   const motionLabels = { auto: 'auto', reduced: 'reduced', full: 'full' };
   const pn = panel(`<h2>Settings</h2>
     <button class="pill small sky name-btn" data-k="name"></button>
@@ -491,6 +491,7 @@ export function openSettings(app) {
     <div class="row"><button class="pill small sky" data-k="privacy">Privacy</button><button class="pill small sky" data-k="title">Title screen</button></div>
     <button class="pill small cream" data-k="tools">Testing tools</button>
     <button class="pill small" data-k="close">Done</button></div>`);
+  if (fromTitle) for (const k of ['title', 'tools']) pn.root.querySelector(`[data-k=${k}]`).remove(); // already on the title screen
   const label = () => {
     const set = (k, t) => { pn.root.querySelector(`[data-k=${k}]`).textContent = t; };
     set('name', 'Name: ' + (app.progress.explorer.name || 'Explorer') + '  ✎');

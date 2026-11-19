@@ -30,9 +30,7 @@
       </div>
     </section>
     <div class="row">
-      <button type="button" class="pill small cream" id="sound-toggle">Sound: on</button>
-      <button type="button" class="pill small cream" id="music-toggle">Music: on</button>
-      <button type="button" class="pill small cream" id="motion-toggle">Motion: auto</button>
+      <button type="button" class="pill small cream" id="title-settings">⚙ Settings</button>
     </div>
     <p class="sticker note">Heads up! Watch your surroundings while you play.</p>
   </div>
@@ -84,10 +82,11 @@
     <button type="button" class="item-btn sticker" id="enc-food" aria-label="Give a treat"><img alt=""><b>0</b></button>
     <div class="tray sticker" id="enc-tray" hidden></div>
   </div>
-  <div id="pop" class="pop"></div>
-  <div id="toasts"></div>
-  <div id="overlay"></div>
 </section>
+<!-- Panels, pop-ups and messages sit above every screen (the title screen's Settings uses them too). -->
+<div id="overlay"></div>
+<div id="pop" class="pop"></div>
+<div id="toasts"></div>
 
 <script>
 // "Make it an app": on phone browsers, show how to add Kiki Safari to the Home Screen (like Big Plush).

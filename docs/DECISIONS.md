@@ -365,3 +365,14 @@ more random encounters."
   On a real Denver street that's about 40 within 200 m.
 - **Visitors:** every 5 minutes a new Kiki turns up within reach (on the street if there's one close enough, otherwise
   right by you, which at home is your own garden), so there's always something to catch without walking anywhere.
+
+## 24. Title screen: one Settings button, portal light, a fuller foreground (owner)
+
+- Sound, Music and Motion became one **⚙ Settings** button on the title screen; it opens the same Settings as in
+  the game (name, sound, music, motion, AR, battery saver, units, account, privacy). Panels, pop-ups and messages now
+  sit above every screen, so they work on the title screen too.
+- The portal lights the scene from behind: a purple rim light, a slowly turning glow with light rays (painted into one
+  image so it stays light on phones), a pool of light on the forest floor (purple near the portal, dark green towards
+  you), low drifting mist and rising magic dust.
+- The clearing is carpeted with grass (one instanced mesh of simple blades), with wildflowers and glowing mushrooms
+  down both sides and big leaves in the bottom corners; Kiki's spot stays clear.
