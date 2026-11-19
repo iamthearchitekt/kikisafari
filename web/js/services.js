@@ -50,9 +50,14 @@ export function unlockAudio() {
     ac = new AC(); master = ac.createGain(); master.connect(ac.destination);
     master.gain.value = settings.get('sound', true) ? 1 : 0;
     for (const v of ['yay', 'awww']) fetch(`assets/${v}.mp3`).then(r => r.arrayBuffer()).then(b => ac.decodeAudioData(b)).then(buf => { voices[v] = buf; }).catch(() => {});
+    // iPhone sometimes only lets sound out after something has actually played inside a touch: a silent blip.
+    try { const s = ac.createBufferSource(); s.buffer = ac.createBuffer(1, 1, 22050); s.connect(ac.destination); s.start(0); } catch (e) {}
   }
-  if (ac.state === 'suspended') ac.resume();
+  // "suspended" before the first touch; "interrupted" on iPhone after the app was in the background or a call came in
+  if (ac.state !== 'running') ac.resume().catch(() => {});
 }
+/** Is sound actually playing (not waiting for a touch)? */
+export const audioRunning = () => !!ac && ac.state === 'running';
 /** For the music player: the shared audio context and master volume (null until the first tap). */
 export const audioOut = () => (ac ? { ac, master } : null);
 export function setSound(on) { settings.set('sound', on); if (master) master.gain.value = on ? 1 : 0; }

@@ -87,28 +87,34 @@ export class OsmArea {
 
   static fromOverpass(json, origin) {
     const area = new OsmArea(origin);
+    // Real map data has odd bits (a street crossing the edge of the area can come back with gaps, a park with no
+    // outline). Each thing is read on its own and skipped if it's broken, so one odd item can't stop the whole map.
+    const ok = g => g && Number.isFinite(g.lat) && Number.isFinite(g.lon);
     for (const el of (json.elements || [])) {
-      const tags = el.tags; if (!tags) continue;
+      try {
+      const tags = el && el.tags; if (!tags) continue;
       const id = (el.type === 'node' ? 'n' : el.type === 'way' ? 'w' : 'r') + el.id;
       if (el.type === 'node') {
+        if (!ok(el)) continue;
         const f = classify(tags, false); if (!f) continue;
         area.add(Object.assign(f, { id, pts: [{ lat: el.lat, lon: el.lon }], closed: false }));
       } else if (el.type === 'way') {
-        if (!el.geometry || el.geometry.length < 2) continue;
-        const pts = el.geometry.map(g => ({ lat: g.lat, lon: g.lon })), a = pts[0], z = pts[pts.length - 1];
+        const pts = (el.geometry || []).filter(ok).map(g => ({ lat: g.lat, lon: g.lon })); if (pts.length < 2) continue;
+        const a = pts[0], z = pts[pts.length - 1];
         const closed = pts.length >= 4 && a.lat === z.lat && a.lon === z.lon;
         const f = classify(tags, closed); if (!f) continue;
         area.add(Object.assign(f, { id, pts, closed }));
       } else if (el.type === 'relation') {
         let k = 0;
         for (const m of (el.members || [])) {
-          if (m.role !== 'outer' || !m.geometry || m.geometry.length < 4) continue;
-          const pts = m.geometry.map(g => ({ lat: g.lat, lon: g.lon }));
+          if (!m || m.role !== 'outer') continue;
+          const pts = (m.geometry || []).filter(ok).map(g => ({ lat: g.lat, lon: g.lon })); if (pts.length < 4) continue;
           if (pts[0].lat !== pts[pts.length - 1].lat || pts[0].lon !== pts[pts.length - 1].lon) pts.push(pts[0]);
           const f = classify(tags, true); if (!f) continue;
           area.add(Object.assign(f, { id: id + ':' + k++, pts, closed: true }));
         }
       }
+      } catch (e) { area.skipped = (area.skipped || 0) + 1; }
     }
     return area;
   }

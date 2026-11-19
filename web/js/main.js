@@ -15,8 +15,8 @@ import { circlePanel, healKiki } from './battle.js';
 import { startTitle } from './title.js';
 import { initOnline, connect, checkIn, syncProfile, openFriends, openLeagues, openAccount } from './social.js';
 import { cosmicCanvas } from './art.js';
-import { playMusic } from './music.js';
-import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
+import { playMusic, musicName } from './music.js';
+import { $, toast, panel, hx, sfx, unlockAudio, audioRunning, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
 
 const app = {
   progress: loadProgress(), progressApi: C.progressApi, caught: new Set(), mapMode: true, tasks: new Set(), encounter: null,
@@ -61,8 +61,12 @@ refreshTitle();
 app.setSound = on => { setSound(on); refreshTitle(); };
 soundBtn.onclick = () => { unlockAudio(); app.setSound(!settings.get('sound', true)); sfx('button', 0.35); };
 motionBtn.onclick = () => { const order = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', order[(order.indexOf(m) + 1) % 3]); refreshTitle(); sfx('button', 0.35); };
-// Music starts with the first tap (browsers keep sound off until then).
-$('title').addEventListener('pointerdown', () => { unlockAudio(); if (!$('title').hidden) playMusic('title'); });
+// Music. Browsers (iPhone Safari above all) won't play any sound until the player touches the screen, so the music
+// for the current screen is queued now and starts with the very first touch anywhere. iPhone also pauses the game's
+// sound when you leave the app; the first touch after coming back starts it again.
+playMusic('title');
+const wakeAudio = () => { if (audioRunning() && musicName() === null) return; unlockAudio(); playMusic(musicName()); };
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) addEventListener(ev, wakeAudio, { capture: true, passive: true });
 $('play').onclick = () => {
   unlockAudio(); sfx('button', 0.4); hx.light();
   if (localStorage.getItem('kiki-perms') === 'asked') startSensors(); else { $('perms').hidden = false; }
@@ -210,7 +214,7 @@ app.tuningPanel = function tuningPanel() {
     <button class="pill small pink" id="t-pin">Move test Rune Circle here</button>
     <div class="row"><button class="pill small sky" id="t-stones">+30 stones</button><button class="pill small sky" id="t-xp">+5,000 XP</button><button class="pill small sky" id="t-res">+50 Fluff, +5k Sprouts</button></div>
     <div class="row"><button class="pill small sky" id="t-km">Walk 1 km</button><button class="pill small sky" id="t-eggs">+3 eggs</button><button class="pill small sky" id="t-wx"></button></div>
-    <p class="d" style="font-size:13px;margin:0;color:#4d5aa6;overflow-wrap:anywhere">Map: ${app.osm.data.covers(app.loc.fix || { lat: 0, lon: 0 }) ? 'loaded here' : 'not loaded here'}${app.osm.lastError ? ' · last problem: ' + app.osm.lastError.replace(/[<>&]/g, '') : ''}</p>
+    <p class="d" style="font-size:13px;margin:0;color:#4d5aa6;overflow-wrap:anywhere">Map: ${app.osm.data.covers(app.loc.fix || { lat: 0, lon: 0 }) ? 'loaded here' : 'not loaded here'} · ${app.osm.data.cells.size} areas${app.osm.server ? ' · server ' + app.osm.server : ''}${app.osm.lastError ? ' · last problem: ' + app.osm.lastError.replace(/[<>&]/g, '') : ''} · version ${window.KIKI_VERSION || '?'}</p>
     <button class="pill small sky" id="t-map">Try the map again now</button>
     <div class="row"><button class="pill small cream" id="t-reset">Reset sliders</button><button class="pill small cream" id="t-wipe">Start over</button><button class="pill small" id="t-done">Done</button></div></div>`);
   p.root.querySelectorAll('input[type=range]').forEach(i => i.oninput = () => { tuning[i.dataset.k] = +i.value; p.root.querySelector('#tv-' + i.dataset.k).textContent = i.value; saveTuning(); });
@@ -276,6 +280,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---------- updates ----------
+// Check for a new version whenever the game comes back to the front, and switch to it at a quiet moment (title screen,
+// or the map with nothing open), so fixes reach the Home Screen app without having to close it by hand.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
+setInterval(() => {
+  if (!window.kikiUpdateReady) return;
+  const quiet = !$('title').hidden || (!app.encounter && !app.inBattle && !$('overlay').children.length);
+  if (quiet) { window.kikiUpdateReady = false; app.save(); toast('Updating KIKI SAFARI…', 1500); setTimeout(() => location.reload(), 900); }
+}, 2000);
+if (window.caches) caches.keys().then(k => { const v = k.find(x => x.startsWith('kiki-safari-')); if (v) window.KIKI_VERSION = v.slice(12, 18); }).catch(() => {});
+
 // ---------- HUD ----------
 let hudSig = '';
 function refreshHud(force) {
@@ -322,7 +337,7 @@ function hud() {
   if (app.loc.locked) status = C.MOVING_FAST;
   else if (app.loc.problem && !app.loc.fix) status = app.loc.problem;
   else if (!app.loc.simulated && app.loc.accuracy > 50) status = 'Weak GPS. Things may wander a bit.';
-  else if (app.mapMode && !app.osm.data.covers(app.loc.fix)) status = app.osm.problem || 'Loading the map…';
+  else if (app.mapMode && !app.osm.data.covers(app.loc.fix)) status = app.osm.problem || app.osm.loading || 'Loading the map…';
   $('status').hidden = !status; if (status) $('status').textContent = status;
 }
 requestAnimationFrame(frame);

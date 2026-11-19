@@ -360,5 +360,14 @@ test('GPS smoothing: wobbles are eased, real steps and walking go straight throu
   let s = a; for (let i = 1; i <= 30; i++) s = C.smoothFix(s, C.fromLocal(a, i * 1.4, 0), 25); // walking, no speed from the phone
   assert.ok(C.distance(s, C.fromLocal(a, 42, 0)) < 6, 'keeps up while walking');
 });
+test('map reader skips broken bits instead of failing the whole map', () => {
+  const dirty = JSON.parse(JSON.stringify(json)), w = dirty.elements.find(e => e.type === 'way' && e.geometry && e.geometry.length > 3);
+  dirty.elements.push({ type: 'way', id: 991, tags: { highway: 'residential' }, geometry: [null, ...w.geometry.slice(0, 3), null] },
+    { type: 'relation', id: 992, tags: { leisure: 'park' }, members: [{ type: 'way', role: 'outer', geometry: null }, { type: 'way', role: 'outer' }, null] },
+    { type: 'node', id: 993, tags: { historic: 'monument' } }, null);
+  const a = OsmArea.fromOverpass(dirty, cell.center);
+  assert.ok(a.features.length > area.features.length, 'the good part of the gappy street is kept');
+  assert.ok(placeLandmarks(a, cell));
+});
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

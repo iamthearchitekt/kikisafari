@@ -112,10 +112,11 @@ if (typeof caches !== 'undefined') caches.delete('kiki-osm-v1').catch(() => {});
 /** Is this a real map reply (not an Overpass error dressed up as data)? */
 export const goodMap = j => !!j && Array.isArray(j.elements) && !(j.remark && /error|timed out|timeout|out of memory|too many/i.test(j.remark));
 let overpassAt = Math.max(0, OVERPASS.indexOf(localStorage.getItem('kiki-overpass')));
-async function fetchOverpass(q) {
+async function fetchOverpass(q, onTry = () => {}) {
   const errors = [];
   for (let i = 0; i < OVERPASS.length; i++) {
-    const url = OVERPASS[(overpassAt + i) % OVERPASS.length], host = new URL(url).host, ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 40000);
+    const url = OVERPASS[(overpassAt + i) % OVERPASS.length], host = new URL(url).host, ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
+    onTry(i, host);
     try {
       const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
       if (!r.ok) throw new Error(`HTTP ${r.status}${r.status === 429 ? ' (busy)' : r.status === 504 ? ' (timed out)' : ''}`);
@@ -123,7 +124,7 @@ async function fetchOverpass(q) {
       if (!goodMap(json)) throw new Error(json.remark ? json.remark.slice(0, 80) : 'not map data');
       if (overpassAt !== OVERPASS.indexOf(url)) { overpassAt = OVERPASS.indexOf(url); localStorage.setItem('kiki-overpass', url); }
       return { text, json };
-    } catch (e) { errors.push(`${host}: ${e.name === 'AbortError' ? 'no answer in 40 s' : e.message}`); }
+    } catch (e) { errors.push(`${host}: ${e.name === 'AbortError' ? 'no answer in 30 s' : e.message}`); }
     finally { clearTimeout(timer); }
   }
   throw new Error(errors.join(' · '));
@@ -140,21 +141,32 @@ export class OsmLoader {
   }
   async run() {
     this.busy = true;
-    while (this.queue.length) { const c = this.queue.shift(); try { await this.load(c); } catch (e) { console.warn('map', e); this.retry.set(c.x + ':' + c.y, performance.now() + 60000); } this.pending.delete(c.x + ':' + c.y); }
+    while (this.queue.length) {
+      const c = this.queue.shift();
+      try { await this.load(c); }
+      catch (e) { // never fail silently: say so on screen, and in Testing tools
+        console.warn('map', e); this.lastError = 'reading the map: ' + (e && e.message || e); this.problem = "Couldn't read the map here. Trying again soon.";
+        this.retry.set(c.x + ':' + c.y, performance.now() + 30000);
+      }
+      this.loading = null; this.pending.delete(c.x + ':' + c.y);
+    }
     this.busy = false;
   }
   async load(cell) {
     const key = `https://kiki-safari.local/osm/${cell.x}_${cell.y}.json`;
     let json = null, cache = null;
+    const within = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('timeout')), ms))]); // a stuck phone cache can't hold things up
+    this.loading = 'Loading the map…';
     try {
-      cache = await caches.open(OSM_CACHE);
-      const hit = await cache.match(key);
+      cache = await within(caches.open(OSM_CACHE), 3000);
+      const hit = await within(cache.match(key), 3000);
       if (hit && Date.now() - +(hit.headers.get('x-saved') || 0) < 14 * 864e5) { const j = await hit.json(); if (goodMap(j)) json = j; }
     } catch (e) {}
     if (!json) {
       const q = overpassQuery(cell.sw.lat, cell.sw.lon, cell.sw.lat + cell.dLat, cell.sw.lon + cell.dLon);
       try {
-        const got = await fetchOverpass(q); json = got.json; this.problem = null; this.lastError = null;
+        const got = await fetchOverpass(q, (i, host) => { this.loading = i ? 'The map server is slow. Trying another one…' : 'Loading the map…'; this.server = host; });
+        json = got.json; this.problem = null; this.lastError = null;
         if (cache) cache.put(key, new Response(got.text, { headers: { 'x-saved': String(Date.now()), 'Content-Type': 'application/json' } })).catch(() => {});
       } catch (e) {
         this.lastError = e.message; console.warn('map', e.message);
@@ -171,7 +183,7 @@ export class OsmLoader {
     const area = OsmArea.fromOverpass(json, cell.center);
     await new Promise(r => setTimeout(r, 0));
     this.data.add(cell, area, placeLandmarks(area, cell));
-    for (const l of this.listeners) l(cell, area);
+    for (const l of this.listeners) { try { l(cell, area); } catch (e) { console.warn('map', e); this.lastError = 'drawing the map: ' + (e && e.message || e); } }
   }
 }
 

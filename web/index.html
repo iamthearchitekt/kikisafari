@@ -108,7 +108,12 @@
   document.getElementById('app-tip-ok').onclick = () => { try { localStorage.setItem('kiki-app-tip', 'done'); } catch (e) {} tip.hidden = true; };
   document.getElementById('app-tip-later').onclick = () => { tip.hidden = true; };
   if (window.navigator.standalone) { const fit = () => { document.documentElement.style.height = (innerWidth < innerHeight ? screen.height : screen.width) + 'px'; }; fit(); addEventListener('resize', fit); }
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    // A new version of the game takes over in the background; the game then reloads itself at a quiet moment.
+    const hadOne = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadOne) window.kikiUpdateReady = true; });
+  }
 })();
 </script>
 <script type="module" src="js/main.js"></script>
