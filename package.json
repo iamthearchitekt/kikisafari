@@ -1,0 +1,7 @@
+{
+  "name": "kiki-safari",
+  "private": true,
+  "description": "KIKI SAFARI: the web game is in web/; Netlify Functions for push notifications are in netlify/functions/.",
+  "scripts": { "test": "node web/test/core.test.mjs && node web/test/push.test.mjs" },
+  "dependencies": { "@netlify/blobs": "^11.1.9", "web-push": "^4.0.0" }
+}

@@ -1,4 +1,9 @@
-# Netlify: publishes the web version (web/). Import this repo in Netlify and it deploys with no settings to change.
+# Netlify: publishes the web version (web/) and runs the push-notification functions (netlify/functions/).
+# Import this repo in Netlify and it deploys with no settings to change.
 [build]
   publish = "web"
   command = "echo 'Static site: nothing to build'"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

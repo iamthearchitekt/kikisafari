@@ -1,7 +1,7 @@
 // Writes sw.js with every file of the web build and a fresh cache name: node build-sw.mjs
 import { readdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-const skip = new Set(['sw.js', 'build-sw.mjs', 'test', 'netlify.toml', '_headers']);
+const skip = new Set(['sw.js', 'build-sw.mjs', 'test', 'netlify.toml', '_headers', 'package.json']);
 const files = [];
 const walk = d => { for (const n of readdirSync(d || '.')) { if (skip.has(n) || n.startsWith('.')) continue; const p = d ? d + '/' + n : n; statSync(p).isDirectory() ? walk(p) : files.push(p); } };
 process.chdir(new URL('.', import.meta.url).pathname); walk('');

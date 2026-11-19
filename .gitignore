@@ -47,3 +47,5 @@ tools/**/obj/
 tools/ArtPreview/web/art
 # web deploy bundle
 web-deploy.zip
+
+node_modules/
