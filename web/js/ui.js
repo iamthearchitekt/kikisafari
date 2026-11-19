@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles } from './art.js';
+import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, HAIR_STYLES, HATS, GLASSES, BAGS, PATTERNS, LEGS, EXTRAS, HAIR_COLORS, EYE_COLORS, CLOTHES } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -89,7 +89,7 @@ export function openMenu(app) {
     <button class="sticker" data-m="tasks"><span class="ic">📋</span>Tasks${p.tasks.some(t => t.got >= t.n) || R.chapterReady(p) ? ' <span class="badge-n">!</span>' : ''}</button>
     <button class="sticker" data-m="friends"><span class="ic">🤝</span>Friends</button>
     <button class="sticker" data-m="leagues"><span class="ic">🏆</span>Leagues</button>
-    <button class="sticker" data-m="me">${img(`explorer:${p.explorer.outfit}:${p.explorer.skin}`, '', 160)}Explorer</button>
+    <button class="sticker" data-m="me">${img(`explorer:${encodeLook(lookOf(p.explorer))}`, '', 160)}Explorer</button>
     <button class="sticker" data-m="shop"><span class="ic"><i class="coin big"></i></span>Shop</button>
   </div>
   <div class="row"><button class="pill small cream" data-m="settings">Settings</button></div>
@@ -321,7 +321,7 @@ export function openExplorer(app) {
   const dots = kind => { const n = R.streakNow(p, kind, t); return `<div class="streak">${[1, 2, 3, 4, 5, 6, 7].map(i => `<i class="${i <= n ? 'on' : ''}${i === 7 ? ' seven' : ''}"></i>`).join('')}</div>`; };
   const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>${esc(p.explorer.name || 'Explorer')}</h2></div>
     <div class="sheet-body" style="text-align:center">
-      ${img(`explorer-full:${p.explorer.outfit}:${p.explorer.skin}`, 'big-explorer', 512)}
+      ${img(`explorer-full:${encodeLook(lookOf(p.explorer))}`, 'big-explorer', 512)}
       <div class="row"><button class="pill small sky" data-look>Change look</button><button class="pill small" data-medals>Medals</button></div>
       ${p.buddy && p.kikis.find(k => k.uid === p.buddy.uid) ? (() => { const b = p.kikis.find(k => k.uid === p.buddy.uid); return `<div class="list-row sticker" style="margin-top:12px">${img(kp(b), '', 128)}<div class="grow"><div class="t">Buddy: ${esc(kikiName(b))}</div><div class="d">${fmtKm(p.buddy.km)} of ${fmtKm(R.BUDDY_KM[C.variant(b.sp).rarity], 0)} to the next ${R.fluffName(R.familyOf(b.sp))}</div></div></div>`; })() : ''}
       ${p.faction ? `<div class="sticker" style="padding:6px 12px;margin-top:12px;border-color:${R.FACTIONS[p.faction].color}"><b style="color:${R.FACTIONS[p.faction].color};font-family:Lilita One;font-size:20px">${R.FACTIONS[p.faction].name}</b></div>` : ''}
@@ -337,25 +337,63 @@ export function openExplorer(app) {
   s.q('[data-look]').onclick = () => { s.close(); outfitPicker(app, { onDone: () => openExplorer(app) }); };
   s.q('[data-medals]').onclick = () => { sfx('button', 0.3); app.open('medals'); };
 }
-/** Pick your look (and name, the first time). */
+/** Pick your look (and name, the first time): skin, hair, eyes, hat and clothes, each in any colour. */
 export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
-  const e = app.progress.explorer; let outfit = e.outfit, skin = e.skin;
+  const e = app.progress.explorer, look = lookOf(e);
+  const hex = c => '#' + c.toString(16).padStart(6, '0');
+  const sw = (key, colors, label) => `<div class="look-row"><div class="look-label">${label}</div><div class="look-swatches">${colors.map(c => `<button data-c="${key}" data-v="${c}" style="background:${hex(c)}" aria-label="${label} ${hex(c)}"></button>`).join('')}</div></div>`;
+  const chips = (key, names, label) => `<div class="look-row"><div class="look-label">${label}</div><div class="look-chips">${names.map((n, i) => `<button data-s="${key}" data-v="${i}">${n}</button>`).join('')}</div></div>`;
   const s = screen(`<div class="sheet-head"><h2>${first ? 'Make your explorer' : 'Change look'}</h2></div>
-    <div class="sheet-body" style="text-align:center"><img class="big-explorer" alt="">
-      <div class="outfits"></div><div class="swatches">${SKINS.map((c, i) => `<button data-skin="${i}" style="background:#${c.toString(16).padStart(6, '0')}" aria-label="Skin tone ${i + 1}"></button>`).join('')}</div>
+    <div class="look-stage"></div>
+    <div class="sheet-body look-body">
       ${first ? `<input class="name-input" maxlength="15" placeholder="Your explorer name" value="${esc(e.name)}">` : ''}
+      <div class="look-row"><div class="look-label">Festival looks</div><div class="outfits">${OUTFITS.slice(0, 4).map((o, i) => `<button data-o="${i}">${img(`explorer:${encodeLook({ ...lookOf({ outfit: i }), skin: look.skin })}`, '', 160)}${o[0]}</button>`).join('')}</div></div>
+      ${sw('skin', SKINS, 'Skin')}
+      ${chips('hair', HAIR_STYLES, 'Hair')}
+      ${sw('hairC', HAIR_COLORS, 'Hair colour')}
+      ${sw('eyes', EYE_COLORS, 'Eyes')}
+      ${chips('hat', HATS, 'Hat')}
+      <div class="look-if" data-if="hat">${sw('hatC', CLOTHES, 'Hat colour')}</div>
+      ${chips('glasses', GLASSES, 'Shades')}
+      <div class="look-if" data-if="glasses">${sw('glassC', CLOTHES, 'Shades colour')}</div>
+      ${chips('topPat', PATTERNS, 'Top')}
+      ${sw('top', CLOTHES, 'Top colour')}
+      ${chips('pants', LEGS, 'Bottoms')}
+      ${chips('botPat', PATTERNS, 'Bottoms pattern')}
+      ${sw('bottom', CLOTHES, 'Bottoms colour')}
+      ${sw('shoes', CLOTHES, 'Shoes')}
+      ${chips('bag', BAGS, 'Bag')}
+      <div class="look-if" data-if="bag">${sw('pack', CLOTHES, 'Bag colour')}</div>
+      <div class="look-row"><div class="look-label">Extras</div><div class="look-chips">${EXTRAS.map(([k, n]) => `<button data-t="${k}">${n}</button>`).join('')}</div></div>
     </div><div class="sheet-foot"><button class="pill" data-ok>${first ? "That's me!" : 'Done'}</button></div>`);
+  // A live 3D preview: drag to turn your explorer around.
+  let holder, avatar, spin = -0.4, drag = null;
+  const st = liveStage(s.q('.look-stage'), (scene, cam) => {
+    cam.position.set(0, 0.62, 2.35); cam.lookAt(0, 0.52, 0);
+    holder = new THREE.Group(); scene.add(holder);
+    return { update: dt => { if (avatar) avatar.userData.update(dt, 0); if (!drag) spin += dt * 0.25; holder.rotation.y = spin; } };
+  });
+  const stage = s.q('.look-stage');
+  stage.addEventListener('pointerdown', ev => { drag = ev.clientX; stage.setPointerCapture && stage.setPointerCapture(ev.pointerId); });
+  stage.addEventListener('pointermove', ev => { if (drag == null) return; spin += (ev.clientX - drag) * 0.012; drag = ev.clientX; });
+  const endDrag = () => { drag = null; }; stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+  const skinValue = i => SKINS[i];
   const render = () => {
-    s.q('.big-explorer').src = portrait(`explorer-full:${outfit}:${skin}`, 512);
-    s.q('.outfits').innerHTML = OUTFITS.slice(0, 4).map((o, i) => `<button data-o="${i}" class="${i === outfit ? 'on' : ''}">${img(`explorer:${i}:${skin}`, '', 160)}${o[0]}</button>`).join('');
-    s.root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { outfit = +b.dataset.o; sfx('button', 0.3); hx.light(); render(); });
-    s.root.querySelectorAll('[data-skin]').forEach(b => b.classList.toggle('on', +b.dataset.skin === skin));
+    if (avatar) holder.remove(avatar);
+    avatar = makeExplorer(look); holder.add(avatar);
+    s.root.querySelectorAll('[data-c]').forEach(b => b.classList.toggle('on', b.dataset.c === 'skin' ? skinValue(look.skin) === +b.dataset.v : look[b.dataset.c] === +b.dataset.v));
+    s.root.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', look[b.dataset.s] === +b.dataset.v));
+    s.root.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('on', !!look[b.dataset.t]));
+    s.root.querySelectorAll('.look-if').forEach(d => { d.hidden = d.dataset.if === 'bag' ? look.bag === 3 : !look[d.dataset.if]; });
   };
-  s.root.querySelectorAll('[data-skin]').forEach(b => b.onclick = () => { skin = +b.dataset.skin; sfx('button', 0.3); render(); });
+  s.root.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c, v = +b.dataset.v; look[k] = k === 'skin' ? SKINS.indexOf(v) : v; sfx('button', 0.25); hx.light(); render(); });
+  s.root.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { look[b.dataset.s] = +b.dataset.v; sfx('button', 0.25); hx.light(); render(); });
+  s.root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { look[b.dataset.t] = look[b.dataset.t] ? 0 : 1; sfx('button', 0.25); hx.light(); render(); });
+  s.root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { Object.assign(look, { ...lookOf({ outfit: +b.dataset.o }), skin: look.skin }); sfx('button', 0.3); hx.light(); render(); });
   s.q('[data-ok]').onclick = () => {
     if (first) { const n = s.q('.name-input').value.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 15); if (!n) { hx.warning(); s.q('.name-input').focus(); return toast('Give your explorer a name!'); } e.name = n; }
-    e.outfit = outfit; e.skin = skin; app.save(); app.map.setExplorer(undefined, outfit, skin); app.refreshHud();
-    sfx('pickup', 0.45); hx.success(); s.close(); onDone();
+    e.look = { ...look }; app.save(); app.map.setExplorer(); app.refreshHud(); if (app.syncProfile) app.syncProfile();
+    sfx('pickup', 0.45); hx.success(); st.stop(); s.close(); onDone();
   };
   render();
 }

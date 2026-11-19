@@ -35,7 +35,7 @@ export class Online {
   }
   /** Sign in (creating an explorer the first time). */
   async hello(name, avatar) { this.player = await this.rpc('kiki_hello', { p_name: name || null, p_avatar: avatar || {} }); this.problem = null; return this.player; }
-  profile(p) { return this.rpc('kiki_profile', { p_name: p.explorer.name, p_faction: p.faction, p_level: p.level, p_avatar: { outfit: p.explorer.outfit, skin: p.explorer.skin }, p_buddy: p.buddySp || null }); }
+  profile(p) { return this.rpc('kiki_profile', { p_name: p.explorer.name, p_faction: p.faction, p_level: p.level, p_avatar: p.avatar || { outfit: p.explorer.outfit, skin: p.explorer.skin }, p_buddy: p.buddySp || null }); }
   inbox() { return this.rpc('kiki_inbox'); }
   savePut(data, savedAt) { return this.rpc('kiki_save_put', { p_data: data, p_saved_at: savedAt }); }
   saveGet() { return this.rpc('kiki_save_get'); }

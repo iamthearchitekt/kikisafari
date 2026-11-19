@@ -7,13 +7,13 @@ import * as R from './rules.js';
 import { WorldView, Location, OsmLoader, drawRadar } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
-import { portrait } from './art.js';
+import { portrait, lookOf, encodeLook } from './art.js';
 import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
 import { circlePanel, healKiki } from './battle.js';
 import { startTitle } from './title.js';
-import { initOnline, connect, checkIn, openFriends, openLeagues, openAccount } from './social.js';
+import { initOnline, connect, checkIn, syncProfile, openFriends, openLeagues, openAccount } from './social.js';
 import { cosmicCanvas } from './art.js';
 import { playMusic } from './music.js';
 import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
@@ -31,6 +31,7 @@ app.did = ev => did(app, ev);
 app.open = name => ({ eggs: openEggs, tasks: openTasks, medals: openMedals, events: openEvents, friends: openFriends, leagues: openLeagues, account: openAccount })[name](app);
 initOnline(app);
 app.checkIn = () => checkIn(app);
+app.syncProfile = () => app.online && app.online.signedIn ? syncProfile(app) : null;
 app.osm = new OsmLoader();
 
 // ---------- rendering ----------
@@ -279,7 +280,7 @@ function frame(now) {
 let hudSig = '';
 function refreshHud(force) {
   const p = app.progress, L = R.levelOf(p.xp), lo = R.xpFor(L), hi = R.xpFor(L + 1);
-  const sig = `${p.explorer.outfit}:${p.explorer.skin}`;
+  const sig = encodeLook(lookOf(p.explorer));
   if (force || $('me-face').dataset.sig !== sig) { $('me-face').src = portrait(`explorer:${sig}`, 160); $('me-face').dataset.sig = sig; }
   $('me-lvl').textContent = L; $('me-xp').style.width = (L >= R.MAX_LEVEL ? 100 : (p.xp - lo) / (hi - lo) * 100) + '%';
   if (force) hudSig = '';

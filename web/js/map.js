@@ -4,7 +4,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import { roadHalf } from './osm.js';
-import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle, lookOf } from './art.js';
 import { STOP_COOLDOWN } from './rules.js';
 import { reducedMotion } from './services.js';
 
@@ -103,13 +103,13 @@ export class StreetMap {
     const g = new THREE.Group();
     const ring = (r0, r1, color, y, op = 1) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: op < 1, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = -2; g.add(m); return m; };
     ring(C.ACTION - 0.9, C.ACTION, 0xffffff, 0.4, 0.9);
-    const e = this.app.progress.explorer; this.setExplorer(g, e.outfit, e.skin);
+    this.setExplorer(g);
     return g;
   }
   /** Your explorer, about 12 m tall on the map so you can see them at any zoom (things on the map are drawn big, like a board game). */
-  setExplorer(g = this.player, outfit = 0, skin = 1) {
+  setExplorer(g = this.player) {
     if (this.avatar) g.remove(this.avatar);
-    this.avatar = makeExplorer(outfit, skin); this.avatar.scale.setScalar(12); g.add(this.avatar);
+    this.avatar = makeExplorer(lookOf(this.app.progress.explorer)); this.avatar.scale.setScalar(12); g.add(this.avatar);
   }
 
   makeThing(t) {

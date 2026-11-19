@@ -316,3 +316,21 @@ The Unity project still has the old names.
   tables (Safari has no WebXR), so the game assumes the floor is about phone-height below you. Kiki now appears closer
   (1 to 2.2 m, so it fits in a room), with a darker shadow, and you can tap the floor or a table top to make Kiki hop
   there: its feet land exactly where you tapped. Real surface detection would need the native (Unity, ARKit) app.
+
+## 21. Explorers are festival-goers (owner)
+
+"The avatars look stupid ... allow them to customize their colors", then "they have to look like wooks and festival
+goers, for EDM festivals." The explorer is rebuilt as a chibi festival-goer: big head and shiny eyes, brows, ears, and
+a full look the player picks in Change look (or when making their explorer), with a live 3D preview to spin:
+
+- Skin (8 tones), eyes (6 colours).
+- Hair: Short, Bob, Long, Ponytail, Space buns, Curly, Spiky, Buzz, Dreads, Mohawk, Braids, in 12 colours.
+- Hat: none, bucket hat, trucker cap, beanie, cowboy hat, flower crown, bandana, ranger hat, in any colour.
+- Shades: none, round, hearts, shutter shades, LED shades (colour-cycling).
+- Top and bottoms: plain, tie-dye, rainbow, galaxy, checker, stripes, spots or daisies, in any colour; shorts or flowy
+  pants. Shoes in any colour.
+- Bag: backpack, hydration pack, fanny pack or none. Extras: kandi bracelets, LED gloves, a totem with a Kiki on top.
+- Festival looks to start from: Wook, Raver, Bass Head, Flower Child. Old saves' outfits become these four.
+
+The whole look is saved with the explorer, shown on the map and in menus, and sent with the online profile so friends
+see it (the server stores the avatar as-is; older versions of the game still read its outfit and skin).

@@ -381,3 +381,16 @@ button { font: inherit; color: inherit; }
 .coin.big { width: 46px; height: 46px; border-width: 3px; vertical-align: middle; margin: 0; box-shadow: inset -4px -5px 0 rgba(160, 80, 0, .35); }
 #enc-hud .namecard .odds-row { display: flex; align-items: center; gap: 6px; }
 #enc-hud .odds-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--navy); background: #5fd34b; }
+/* Explorer look picker: a live 3D preview on top, choices below */
+.look-stage { flex: none; height: min(36vh, 300px); touch-action: none; cursor: grab; }
+.look-stage canvas { width: 100%; height: 100%; display: block; }
+.look-body { padding-top: 0; }
+.look-row { margin: 10px 0 2px; }
+.look-label { font-family: 'Lilita One'; font-size: 17px; color: var(--navy); margin: 0 2px 6px; }
+.look-swatches { display: flex; gap: 8px; overflow-x: auto; padding: 4px 4px 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.look-swatches::-webkit-scrollbar { display: none; }
+.look-swatches button { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--navy); cursor: pointer; }
+.look-swatches button.on { outline: 4px solid var(--pink); outline-offset: 2px; }
+.look-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.look-chips button { border: 3px solid var(--navy); border-radius: 999px; background: #fff; color: var(--navy); font: inherit; font-weight: 700; font-size: 14px; padding: 4px 12px; cursor: pointer; }
+.look-chips button.on { background: #fff27a; }

@@ -15,7 +15,8 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 - [x] 1. **Map is the home screen.** Walk around a stylised map, Kikis pop up on it, tap one to start an
       encounter. The camera moves into encounters, with an AR on/off switch. (Reverses the earlier
       camera-first call; owner decision.)
-- [x] 2. **Your explorer on the map.** An animated avatar that walks when you walk, with a few starter outfits.
+- [x] 2. **Your explorer on the map.** An animated festival-goer that walks when you walk, with hair, hats, shades,
+      patterned clothes, bags and extras (kandi, LED gloves, a totem) in any colour.
 - [x] 3. **Nearby panel.** Kikis around you, with silhouettes for ones you haven't caught. Rustling leaves on
       the map where something is hiding.
 - [x] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured dot on the

@@ -4,13 +4,13 @@
 import * as C from './core.js';
 import * as R from './rules.js';
 import { Online, snapshot, friendTier } from './online.js';
-import { portrait } from './art.js';
+import { portrait, lookOf, encodeLook } from './art.js';
 import { $, toast, panel, hx, sfx, settings, wait } from './services.js';
 import { confirm, levelUps } from './ui.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const kp = k => 'kiki:' + k.sp + (k.sparkle ? ':s' : '');
-const face = a => portrait(`explorer:${(a && a.outfit) || 0}:${a && a.skin != null ? a.skin : 1}`, 128);
+const face = a => portrait(`explorer:${encodeLook(lookOf(a || {}))}`, 128);
 const fcolor = f => (R.FACTIONS[f] || {}).color || '#4d5aa6';
 function screen(html) { const el = document.createElement('div'); el.className = 'screen-sheet'; el.innerHTML = html; $('overlay').appendChild(el); return { root: el, q: s => el.querySelector(s), close: () => el.remove() }; }
 const offline = msg => toast(msg || "Can't reach the KIKI SAFARI server right now. Check your signal and try again.", 3200);
@@ -37,12 +37,14 @@ export async function refreshCircles(app) {
 /** Sign in (silently) and catch up: profile, coins and messages, keepers. */
 export async function connect(app) {
   const p = app.progress;
-  try { await app.online.hello(p.explorer.name, { outfit: p.explorer.outfit, skin: p.explorer.skin }); await syncProfile(app); await checkIn(app); pushSave(app); setTimeout(() => refreshCircles(app), 5000); return true; }
+  try { await app.online.hello(p.explorer.name, avatarOf(p)); await syncProfile(app); await checkIn(app); pushSave(app); setTimeout(() => refreshCircles(app), 5000); return true; }
   catch (e) { app.online.problem = e.message; return false; }
 }
+/** What other players see of your explorer: the old outfit/skin (for older versions of the game) and the full look. */
+const avatarOf = p => ({ outfit: p.explorer.outfit || 0, skin: p.explorer.skin ?? 1, look: lookOf(p.explorer) });
 export function syncProfile(app) {
   const p = app.progress, b = p.buddy && p.kikis.find(k => k.uid === p.buddy.uid);
-  return app.online.profile({ explorer: p.explorer, faction: p.faction, level: R.levelOf(p.xp), buddySp: b ? b.sp : null }).catch(() => {});
+  return app.online.profile({ explorer: p.explorer, avatar: avatarOf(p), faction: p.faction, level: R.levelOf(p.xp), buddySp: b ? b.sp : null }).catch(() => {});
 }
 /** Coins from keepers who came home, and news like "your keeper was beaten". */
 export async function checkIn(app) {
