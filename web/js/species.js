@@ -1,7 +1,7 @@
-// Every Kiki in the Safari Log (Phase 2 roster). They're all Kikis: Kiki's plush body and spiral eyes, with a body
-// colour, crown and tummy embroidery for each one. Six elements: Leaf, Water, Ember, Spark, Stone and Moon.
+// Every Kiki in the Safari Log (Phase 2 roster). Kikis are little creatures (not stuffed toys: owner): each has Kiki's
+// round body and spiral eyes, with its own body colour, crown and tummy markings. Six elements: Leaf, Water, Ember, Spark, Stone and Moon.
 //   no        Safari Log number          family / evolvesTo / cost   evolution line (cost in that family's Fluff)
-//   rarity    catch difficulty           base       sets Plush Power; shape tilts battle stats (atk, def, hp, bal)
+//   rarity    catch difficulty           base       sets Power; shape tilts battle stats (atk, def, hp, bal)
 //   weight, habitats, boost, outside, time, nightBoost, crewBoost   how often it spawns, and where (0 = never wild)
 //   egg       which egg it can hatch from (2, 5 or 10 km)          look       its art (see art.js lookFor)
 // Names here are placeholders the owner can rename.
@@ -11,7 +11,7 @@ export const SPECIES = [
   { id: 'meadow', no: 1, name: 'Meadow Kiki', element: 'Leaf', rarity: 'Common', weight: 10, habitats: ['Meadow'], boost: 3, outside: 0.6, time: 'day', family: 'meadow', evolvesTo: 'grand-meadow', cost: 25, base: 60, shape: 'bal', cm: 42, kg: 0.6, egg: 2,
     blurb: 'Naps in sunny grass and wakes up whenever someone laughs nearby. Its leaf crown turns to follow the sun.', look: L({}) },
   { id: 'grand-meadow', no: 2, name: 'Grand Meadow Kiki', element: 'Leaf', rarity: 'Rare', weight: 0.5, habitats: ['Meadow'], boost: 3, outside: 0.3, time: 'day', family: 'meadow', base: 115, shape: 'bal', cm: 55, kg: 1.1,
-    blurb: 'A Meadow Kiki that has soaked up a whole summer. The spiral stitched on its tummy is said to grow one loop each year.', look: L({ crown: 'grand', leaf: 0x2f9e24, tip: 0xc4f27a, belly: ['spiral', '#23701a', '#a6ec72'], scale: 1.1 }) },
+    blurb: 'A Meadow Kiki that has soaked up a whole summer. The spiral marking on its tummy grows one more loop every year.', look: L({ crown: 'grand', leaf: 0x2f9e24, tip: 0xc4f27a, belly: ['spiral', '#23701a', '#a6ec72'], scale: 1.1 }) },
   { id: 'pine', no: 3, name: 'Pine Kiki', element: 'Leaf', rarity: 'Common', weight: 10, habitats: ['Woods'], boost: 3, outside: 0.4, family: 'pine', evolvesTo: 'elder-pine', cost: 25, base: 62, shape: 'def', cm: 44, kg: 0.7, egg: 2,
     blurb: 'Hides among tree roots and hums when the wind blows. Smells faintly of pine needles and campfire.', look: L({ crown: 'pine', leaf: 0x1c6b2a, tip: 0x2e8b47 }) },
   { id: 'elder-pine', no: 4, name: 'Elder Pine Kiki', element: 'Leaf', rarity: 'Rare', weight: 0.5, habitats: ['Woods'], boost: 3, outside: 0.2, family: 'pine', base: 120, shape: 'def', cm: 60, kg: 1.3,
@@ -94,7 +94,7 @@ export const SPECIES = [
     blurb: 'Sits on the tallest mountain and watches the clouds go by. Climbers leave it snacks at the top.', look: L({ body: 0xb4bccb, crown: 'mountain', c1: 0x8a93a6, c2: 0xffffff, glow: 0xbfe4ff, belly: ['spiral', '#5a6378', '#ffffff'], scale: 1.2 }) },
   // ---------- Moon ----------
   { id: 'moonbeam', no: 8, name: 'Moonbeam Kiki', element: 'Moon', rarity: 'Epic', weight: 1.2, time: 'night', family: 'moonbeam', base: 130, shape: 'bal', cm: 44, kg: 0.5, egg: 10,
-    blurb: 'Only comes out after sunset. Its embroidered stars glow a soft purple, so it never gets lost in the dark.', look: L({ glow: 0x7a00ff, stars: true, tip: 0x9fe6c8 }) },
+    blurb: 'Only comes out after sunset. The star markings on its skin glow a soft purple, so it never gets lost in the dark.', look: L({ glow: 0x7a00ff, stars: true, tip: 0x9fe6c8 }) },
   { id: 'dusk', no: 38, name: 'Dusk Kiki', element: 'Moon', rarity: 'Common', weight: 3, habitats: ['Meadow', 'Town'], boost: 1.5, outside: 0.8, nightBoost: 4, family: 'dusk', evolvesTo: 'starry', cost: 25, base: 58, shape: 'bal', cm: 34, kg: 0.4, egg: 2,
     blurb: 'Wakes up just as the sun goes down. Wears the first sliver of the moon like a hat.', look: L({ body: 0xc8bcff, crown: 'crescent', c1: 0xffe48a, scale: 0.86 }) },
   { id: 'starry', no: 39, name: 'Starry Kiki', element: 'Moon', rarity: 'Rare', weight: 0.4, habitats: ['Meadow'], boost: 1.5, outside: 0.8, nightBoost: 4, family: 'dusk', base: 114, shape: 'bal', cm: 48, kg: 0.6,

@@ -4,7 +4,9 @@ import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
 import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles } from './art.js';
-import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait } from './services.js';
+import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
+import { openShop, openPrivacy } from './shop.js';
+import { setMusic } from './music.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -85,7 +87,10 @@ export function openMenu(app) {
     <button class="sticker" data-m="bag">${img('item:rune', '', 160)}Bag</button>
     <button class="sticker" data-m="eggs">${img('egg:5', '', 160)}Eggs${p.eggs.length ? ` <span class="badge-n">${p.eggs.length}</span>` : ''}</button>
     <button class="sticker" data-m="tasks"><span class="ic">📋</span>Tasks${p.tasks.some(t => t.got >= t.n) || R.chapterReady(p) ? ' <span class="badge-n">!</span>' : ''}</button>
+    <button class="sticker" data-m="friends"><span class="ic">🤝</span>Friends</button>
+    <button class="sticker" data-m="leagues"><span class="ic">🏆</span>Leagues</button>
     <button class="sticker" data-m="me">${img(`explorer:${p.explorer.outfit}:${p.explorer.skin}`, '', 160)}Explorer</button>
+    <button class="sticker" data-m="shop"><span class="ic"><i class="coin big"></i></span>Shop</button>
   </div>
   <div class="row"><button class="pill small cream" data-m="settings">Settings</button></div>
   <button class="round sticker" data-m="close" aria-label="Close" style="width:64px;height:64px;font-size:28px">✕</button>`;
@@ -94,7 +99,7 @@ export function openMenu(app) {
   dim.onclick = e => { if (e.target === dim) close(); };
   dim.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
     sfx('button', 0.35); hx.light(); close();
-    ({ kikis: () => openKikis(app), log: () => openLog(app), bag: () => openBag(app), eggs: () => app.open('eggs'), tasks: () => app.open('tasks'), me: () => openExplorer(app), settings: () => openSettings(app), close: () => {} })[b.dataset.m]();
+    ({ kikis: () => openKikis(app), log: () => openLog(app), bag: () => openBag(app), eggs: () => app.open('eggs'), tasks: () => app.open('tasks'), friends: () => app.open('friends'), leagues: () => app.open('leagues'), me: () => openExplorer(app), shop: () => openShop(app), settings: () => openSettings(app), close: () => {} })[b.dataset.m]();
   });
 }
 
@@ -102,7 +107,7 @@ export function openMenu(app) {
 const SORTS = [['recent', 'Recent'], ['power', 'Power'], ['number', 'Number'], ['name', 'Name'], ['fav', '★']];
 export function openKikis(app, onPick = null, title = 'Kikis', only = null) {
   const p = app.progress;
-  const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>${title}</h2><span class="count sticker" style="padding:2px 10px">${p.kikis.length} / ${R.KIKI_MAX}</span></div>
+  const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>${title}</h2><span class="count sticker" style="padding:2px 10px">${p.kikis.length} / ${R.kikiMax(p)}</span></div>
     <div class="tabs">${SORTS.map(([k, l]) => `<button data-s="${k}">${l}</button>`).join('')}</div>
     <input class="search" type="search" placeholder="Search by name, element or sparkle" maxlength="20">
     <div class="sheet-body"><div class="cards"></div></div>`);
@@ -157,7 +162,7 @@ export function openKiki(app, uid, onChange = () => {}) {
       <div class="actions">
         <div class="action sticker"><div class="what">Power up<span class="cost">${up.ok || k.lvl < maxL ? `${fmt(cost.sprouts)} Sprouts · ${cost.fluff} ${R.fluffName(fam)}` : 'Level up to power it further'}</span></div><button class="pill small" data-up ${up.ok ? '' : 'style="opacity:.55"'}>Power up</button></div>
         ${v.evolvesTo ? `<div class="action sticker"><div class="what">Evolve<span class="cost">${v.cost} ${R.fluffName(fam)} → ${C.variant(v.evolvesTo).name}</span></div><button class="pill small sky" data-ev ${ev.ok ? '' : 'style="opacity:.55"'}>Evolve</button></div>` : ''}
-        <div class="action sticker"><div class="what">${p.buddy && p.buddy.uid === k.uid ? 'Your buddy' : 'Buddy'}<span class="cost">${p.buddy && p.buddy.uid === k.uid ? `${p.buddy.km.toFixed(1)} / ${R.BUDDY_KM[v.rarity]} km to the next Fluff` : `Walks with you and finds a Fluff every ${R.BUDDY_KM[v.rarity]} km`}</span></div><button class="pill small cream" data-buddy>${p.buddy && p.buddy.uid === k.uid ? 'Swap' : 'Make buddy'}</button></div>
+        <div class="action sticker"><div class="what">${p.buddy && p.buddy.uid === k.uid ? 'Your buddy' : 'Buddy'}<span class="cost">${p.buddy && p.buddy.uid === k.uid ? `${fmtKm(p.buddy.km)} of ${fmtKm(R.BUDDY_KM[v.rarity], 0)} to the next Fluff` : `Walks with you and finds a Fluff every ${fmtKm(R.BUDDY_KM[v.rarity], 0)}`}</span></div><button class="pill small cream" data-buddy>${p.buddy && p.buddy.uid === k.uid ? 'Swap' : 'Make buddy'}</button></div>
         <div class="action sticker"><div class="what">Appraise<span class="cost">Ask Ranger Rue about its hidden stats</span></div><button class="pill small cream" data-ap>Appraise</button></div>
       </div>
       <div class="blurb sticker">Caught ${day(k.at)}${k.place ? ' near ' + esc(k.place) : ''}.<br>${esc(v.blurb)}</div>
@@ -285,16 +290,16 @@ export function openBag(app) {
   const p = app.progress, L = R.levelOf(p.xp);
   const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>Bag</h2><span class="count sticker" style="padding:2px 10px"></span></div><div class="sheet-body"></div>`);
   const render = () => {
-    s.q('.count').textContent = `${R.bagCount(p)} / ${R.BAG_MAX}`;
+    s.q('.count').textContent = `${R.bagCount(p)} / ${R.bagMax(p)}`;
     s.q('.sheet-body').innerHTML = Object.entries(R.ITEMS).map(([id, it]) => {
       const n = p.items[id] || 0, locked = L < it.unlock;
       if (locked && !n) return `<div class="list-row sticker" style="opacity:.55"><div style="width:56px;height:56px;display:grid;place-items:center;font-size:26px">🔒</div><div class="grow"><div class="t">???</div><div class="d">Unlocks at explorer level ${it.unlock}</div></div></div>`;
       return `<div class="list-row sticker">${img('item:' + id, '', 128)}<div class="grow"><div class="t">${it.name}</div><div class="d">${esc(it.blurb)}</div></div><div style="text-align:center"><div class="n">${n}</div>${n && (it.kind === 'heal' || it.kind === 'revive') ? `<button class="mini" data-use="${id}">Use</button> ` : ''}${n ? `<button class="mini" data-drop="${id}">Discard</button>` : ''}</div></div>`;
-    }).join('') + `<p class="d" style="text-align:center;color:#4d5aa6">Your bag holds ${R.BAG_MAX} items. Supply stops can't give you more when it's full.</p>`;
+    }).join('') + `<p class="d" style="text-align:center;color:#4d5aa6">Your bag holds ${R.bagMax(p)} items. Supply stops can't give you more when it's full. A bigger bag is in the Shop.</p>`;
     s.root.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => discard(app, b.dataset.drop, render));
     s.root.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
       const id = b.dataset.use, revive = R.ITEMS[id].kind === 'revive', hurt = p.kikis.filter(k => revive ? R.hpOf(k) === 0 : R.hpOf(k) > 0 && R.hpOf(k) < R.battleStats(k).maxHp);
-      if (!hurt.length) return toast(revive ? 'No fainted Kikis. Great!' : 'All your Kikis are full of stuffing!');
+      if (!hurt.length) return toast(revive ? 'No fainted Kikis. Great!' : 'All your Kikis are full of energy!');
       openKikis(app, k => { const got = R.heal(p, k, id); app.save(); if (got) { sfx('pickup', 0.45); toast(`${kikiName(k)}: +${got} HP`); } render(); }, revive ? 'Revive which Kiki?' : 'Heal which Kiki?', k => hurt.includes(k));
     });
   };
@@ -318,14 +323,14 @@ export function openExplorer(app) {
     <div class="sheet-body" style="text-align:center">
       ${img(`explorer-full:${p.explorer.outfit}:${p.explorer.skin}`, 'big-explorer', 512)}
       <div class="row"><button class="pill small sky" data-look>Change look</button><button class="pill small" data-medals>Medals</button></div>
-      ${p.buddy && p.kikis.find(k => k.uid === p.buddy.uid) ? (() => { const b = p.kikis.find(k => k.uid === p.buddy.uid); return `<div class="list-row sticker" style="margin-top:12px">${img(kp(b), '', 128)}<div class="grow"><div class="t">Buddy: ${esc(kikiName(b))}</div><div class="d">${p.buddy.km.toFixed(1)} / ${R.BUDDY_KM[C.variant(b.sp).rarity]} km to the next ${R.fluffName(R.familyOf(b.sp))}</div></div></div>`; })() : ''}
+      ${p.buddy && p.kikis.find(k => k.uid === p.buddy.uid) ? (() => { const b = p.kikis.find(k => k.uid === p.buddy.uid); return `<div class="list-row sticker" style="margin-top:12px">${img(kp(b), '', 128)}<div class="grow"><div class="t">Buddy: ${esc(kikiName(b))}</div><div class="d">${fmtKm(p.buddy.km)} of ${fmtKm(R.BUDDY_KM[C.variant(b.sp).rarity], 0)} to the next ${R.fluffName(R.familyOf(b.sp))}</div></div></div>`; })() : ''}
       ${p.faction ? `<div class="sticker" style="padding:6px 12px;margin-top:12px;border-color:${R.FACTIONS[p.faction].color}"><b style="color:${R.FACTIONS[p.faction].color};font-family:Lilita One;font-size:20px">${R.FACTIONS[p.faction].name}</b></div>` : ''}
       <div class="sticker" style="padding:8px 14px;margin:14px 0 6px"><div style="font-family:Lilita One;font-size:26px">Level ${L}</div>
         <div class="lvlbar"><i style="width:${L >= R.MAX_LEVEL ? 100 : (p.xp - lo) / (hi - lo) * 100}%"></i></div>
         <div style="font-size:14px">${L >= R.MAX_LEVEL ? fmt(p.xp) + ' XP' : `${fmt(p.xp - lo)} / ${fmt(hi - lo)} XP to level ${L + 1}`}</div></div>
       <div class="stats3"><div class="sticker"><b>${p.stats.catches}</b><span>Kikis caught</span></div><div class="sticker"><b>${R.SPECIES.filter(v => p.caught[v.id]).length}/${R.SPECIES.length}</b><span>Safari Log</span></div><div class="sticker"><b>${p.stats.stops}</b><span>Stops spun</span></div></div>
       <div class="stats3"><div class="sticker"><b>${p.stats.wins || 0}</b><span>Battles won</span></div><div class="sticker"><b>${p.stats.raids || 0}</b><span>Raids won</span></div><div class="sticker"><b>${Object.keys(p.keepers).length}</b><span>Circles kept</span></div></div>
-      <div class="stats3"><div class="sticker"><b>${p.stats.km.toFixed(1)}</b><span>km walked</span></div><div class="sticker"><b>${p.stats.excellent}</b><span>Excellent throws</span></div><div class="sticker"><b>${p.stats.evolved}</b><span>Evolved</span></div></div>
+      <div class="stats3"><div class="sticker"><b>${fmtKm(p.stats.km).split(' ')[0]}</b><span>${fmtKm(0).split(' ')[1]} walked</span></div><div class="sticker"><b>${p.stats.excellent}</b><span>Excellent throws</span></div><div class="sticker"><b>${p.stats.evolved}</b><span>Evolved</span></div></div>
       <div class="sticker" style="padding:8px">First catch of the day${dots('catch')}First stop of the day${dots('stop')}<span style="font-size:13px;color:#4d5aa6">Day 7 in a row gives a big bonus.</span></div>
     </div>`);
   s.q('[data-x]').onclick = () => { sfx('button', 0.3); s.close(); };
@@ -382,6 +387,7 @@ export function stopPanel(app, t) {
     if (d) { xp += d.xp; if (d.items) { const extra = R.addItems(p, d.items); for (const [id, n] of Object.entries(extra)) got[id] = (got[id] || 0) + n; } lines.push(d.bonus ? `7-day streak bonus! +${d.xp} XP` : `First stop today (day ${d.day} of 7) +${d.xp} XP`); }
     p.stops[t.id] = now2; p.visited[t.id] = 1; p.stats.stops++;
     const egg = Math.random() < 0.3 ? R.newEgg(p) : null, task = R.giveTask(p, t.id, now2);
+    if (Math.random() < 0.25) { const g = R.addItems(p, { gift: 1 }); if (g.gift) got.gift = (got.gift || 0) + 1; }
     if (egg) lines.push(`A ${egg.km} km egg! Put it in a nest from the menu.`);
     if (task) lines.push(`New task from Ranger Rue: ${task.text}`);
     const ups = R.giveXp(p, xp); app.save(); app.refreshHud();
@@ -405,7 +411,7 @@ export function nearbyPanel(app) {
   const p = app.progress, things = app.world.things.filter(t => t.kind === 'kiki').slice(0, 9), facing = app.world.orient.facing;
   const pn = panel(`<h2>Nearby</h2>${things.length ? things.map(t => {
       const c = p.caught[t.variant.id], tr = app.tracking === t.id;
-      return `<div class="list-row sticker" style="${tr ? 'background:#fff27a' : ''}">${img('kiki:' + t.variant.id, c ? '' : 'sil', 128)}<div class="grow"><div class="t">${c ? t.name : '???'}</div><div class="d"><i class="el-dot" style="background:${R.ELEMENT_COLOR[t.variant.element]}"></i> ${Math.round(t.distance)} m${t.boosted ? ' · boosted' : ''} <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px;transform:rotate(${t.bearing - facing}deg)"><path d="M12 2 21 21 12 16 3 21z" fill="#ff5d8f" stroke="#18237a" stroke-width="2" stroke-linejoin="round"/></svg>${t.distance > C.VISIBLE ? ' · rustling' : ''}</div></div><button class="mini${tr ? ' on' : ''}" data-tr="${esc(t.id)}">${tr ? 'Tracking' : 'Track'}</button></div>`;
+      return `<div class="list-row sticker" style="${tr ? 'background:#fff27a' : ''}">${img('kiki:' + t.variant.id, c ? '' : 'sil', 128)}<div class="grow"><div class="t">${c ? t.name : '???'}</div><div class="d"><i class="el-dot" style="background:${R.ELEMENT_COLOR[t.variant.element]}"></i> ${fmtDist(t.distance)}${t.boosted ? ' · boosted' : ''} <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px;transform:rotate(${t.bearing - facing}deg)"><path d="M12 2 21 21 12 16 3 21z" fill="#ff5d8f" stroke="#18237a" stroke-width="2" stroke-linejoin="round"/></svg>${t.distance > C.VISIBLE ? ' · rustling' : ''}</div></div><button class="mini${tr ? ' on' : ''}" data-tr="${esc(t.id)}">${tr ? 'Tracking' : 'Track'}</button></div>`;
     }).join('') : '<p>No Kikis nearby right now. Take a walk, they move around every 15 minutes!</p>'}
     <p style="font-size:14px;color:#4d5aa6">Rustling leaves on the map are Kikis that are a bit further away. Walk closer and they pop out.</p>
     <div class="stack"><button class="pill small" data-x>Close</button></div>`);
@@ -416,26 +422,40 @@ export function nearbyPanel(app) {
 // ---------- settings ----------
 export function openSettings(app) {
   const motionLabels = { auto: 'auto', reduced: 'reduced', full: 'full' };
-  const pn = panel(`<h2>Settings</h2><div class="stack">
+  const pn = panel(`<h2>Settings</h2><div class="grid2">
     <button class="pill small cream" data-k="sound"></button>
+    <button class="pill small cream" data-k="music"></button>
     <button class="pill small cream" data-k="motion"></button>
     <button class="pill small cream" data-k="ar"></button>
-    <button class="pill small sky" data-k="title">Title screen</button>
+    <button class="pill small cream" data-k="battery"></button>
+    <button class="pill small cream" data-k="units"></button></div>
+    <div class="stack">
+    <button class="pill small sky" data-k="account">Online account</button>
+    <div class="row"><button class="pill small sky" data-k="privacy">Privacy</button><button class="pill small sky" data-k="title">Title screen</button></div>
     <button class="pill small cream" data-k="tools">Testing tools</button>
     <button class="pill small" data-k="close">Done</button></div>`);
   const label = () => {
-    pn.root.querySelector('[data-k=sound]').textContent = 'Sound: ' + (settings.get('sound', true) ? 'on' : 'off');
-    pn.root.querySelector('[data-k=motion]').textContent = 'Motion: ' + motionLabels[settings.get('motion', 'auto')];
-    pn.root.querySelector('[data-k=ar]').textContent = 'AR in catches: ' + (settings.get('ar', true) ? 'on' : 'off');
+    const set = (k, t) => { pn.root.querySelector(`[data-k=${k}]`).textContent = t; };
+    set('sound', 'Sound: ' + (settings.get('sound', true) ? 'on' : 'off'));
+    set('music', 'Music: ' + (settings.get('music', true) ? 'on' : 'off'));
+    set('motion', 'Motion: ' + motionLabels[settings.get('motion', 'auto')]);
+    set('ar', 'AR catches: ' + (settings.get('ar', true) ? 'on' : 'off'));
+    set('battery', 'Battery saver: ' + (settings.get('battery', false) ? 'on' : 'off'));
+    set('units', 'Units: ' + (settings.get('units', 'km') === 'mi' ? 'miles' : 'km'));
   };
   label();
   pn.root.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
     sfx('button', 0.35); const k = b.dataset.k;
     if (k === 'sound') app.setSound(!settings.get('sound', true));
+    else if (k === 'music') setMusic(!settings.get('music', true));
     else if (k === 'motion') { const o = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', o[(o.indexOf(m) + 1) % 3]); }
     else if (k === 'ar') settings.set('ar', !settings.get('ar', true));
+    else if (k === 'battery') { settings.set('battery', !settings.get('battery', false)); app.applyBattery(); if (settings.get('battery')) toast('Battery saver: a calmer frame rate and a lighter picture.', 3000); }
+    else if (k === 'units') { settings.set('units', settings.get('units', 'km') === 'mi' ? 'km' : 'mi'); app.refreshHud(); }
+    else if (k === 'privacy') { openPrivacy(); return; }
     else if (k === 'title') { pn.close(); app.goHome(); return; }
     else if (k === 'tools') { pn.close(); app.tuningPanel(); return; }
+    else if (k === 'account') { pn.close(); app.open('account'); return; }
     else if (k === 'close') { pn.close(); return; }
     label();
   });

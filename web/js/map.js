@@ -68,6 +68,8 @@ export class StreetMap {
     if (this.origin) return;
     this.origin = { ...me }; this.night = C.isNight(me, new Date()) || this.app.debugNight();
     this.scene.background = new THREE.Color(this.pal().land);
+    this.scene.fog = new THREE.Fog(this.pal().land, 400, 900); // the map fades softly into the distance
+    this.makeSky();
     // Areas that loaded before the map was first opened.
     for (const [cell, area] of this.waiting.splice(0)) this.addArea(cell, area);
   }
@@ -140,7 +142,8 @@ export class StreetMap {
     const want = this.walkSpeed > 0.4 && step.lengthSq() > 1e-6 ? Math.atan2(step.x, step.z) : Math.PI - heading * Math.PI / 180;
     let d = want - this.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); this.facing += d * Math.min(1, dt * 6);
     this.avatar.rotation.y = this.facing; this.avatar.userData.update(dt, this.walkSpeed > 0.25 ? this.walkSpeed : 0);
-    this.updateBuddy(dt); this.updateWeather(dt);
+    this.updateBuddy(dt); this.updateWeather(dt); this.updateSky(dt, time);
+    if (this.scene.fog) { this.scene.fog.near = this.dist * 1.7; this.scene.fog.far = this.dist * 3.6; }
     const h = this.yaw * Math.PI / 180, tilt = 54 * Math.PI / 180, f = new THREE.Vector3(Math.sin(h), 0, -Math.cos(h));
     this.camera.position.copy(this.player.position).addScaledVector(f, -this.dist * Math.cos(tilt)).add(new THREE.Vector3(0, this.dist * Math.sin(tilt), 0));
     this.camera.lookAt(this.player.position);
@@ -197,6 +200,39 @@ export class StreetMap {
     const m = this.buddy.userData.motionCtl; if (gap > 2 && !m.busy) m.play(m.tinyHops()); m.update(dt);
   }
   /** Rain or snow falling on the map when that's the real weather. */
+  /** Phase 5 map look: cloud shadows drifting over the streets by day, fireflies by night. */
+  makeSky() {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const tex = new THREE.CanvasTexture(c);
+    this.sky = new THREE.Group(); this.scene.add(this.sky);
+    if (!this.night) {
+      const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0x3a2a8a, transparent: true, opacity: 0.2, depthWrite: false });
+      for (let i = 0; i < 12; i++) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); m.rotation.x = -Math.PI / 2; m.position.set((Math.random() - 0.5) * 700, 0.6, (Math.random() - 0.5) * 700);
+        m.scale.set(160 + Math.random() * 160, 90 + Math.random() * 80, 1); m.renderOrder = 1; this.sky.add(m);
+      }
+    } else {
+      const n = 70, pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 500; pos[i * 3 + 1] = 3 + Math.random() * 12; pos[i * 3 + 2] = (Math.random() - 0.5) * 500; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      this.flies = new THREE.Points(g, new THREE.PointsMaterial({ map: tex, color: 0xfff27a, size: 7, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+      this.flies.userData.base = pos.slice(); this.sky.add(this.flies);
+    }
+  }
+  updateSky(dt, time) {
+    if (!this.sky) return;
+    const me = this.player.position, still = reducedMotion();
+    if (!this.night) for (const m of this.sky.children) {
+      if (!still) { m.position.x += dt * 4; m.position.z -= dt * 1.5; } // a gentle breeze
+      for (const k of ['x', 'z']) { const d = m.position[k] - me[k]; if (Math.abs(d) > 350) m.position[k] -= Math.sign(d) * 700; }
+    }
+    else if (this.flies && !still) {
+      const a = this.flies.geometry.attributes.position, b = this.flies.userData.base;
+      for (let i = 0; i < a.count; i++) { a.setX(i, b[i * 3] + Math.sin(time * 0.7 + i) * 4); a.setY(i, b[i * 3 + 1] + Math.sin(time * 1.3 + i * 2.1) * 2); a.setZ(i, b[i * 3 + 2] + Math.cos(time * 0.6 + i * 1.7) * 4); }
+      a.needsUpdate = true; this.flies.position.set(me.x, 0, me.z); this.flies.material.opacity = 0.6 + Math.sin(time * 2.4) * 0.3;
+    }
+  }
   updateWeather(dt) {
     const w = this.app.weatherNow, kind = w === 'rain' || w === 'storm' ? 'rain' : w === 'snow' ? 'snow' : null;
     if (kind !== this.fxKind) {

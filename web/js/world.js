@@ -4,7 +4,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './osm.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
-import { $, toast, hx, sfx, debug, reducedMotion } from './services.js';
+import { $, toast, hx, sfx, debug, reducedMotion, fmtDist } from './services.js';
 import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
 
 export const EYE = 1.4; // the camera is about 1.4 m above the ground
@@ -33,7 +33,7 @@ export class Location {
           this.locked = C.speedLocked(this.locked, this.speedKmh);
         }
         this.last = { fix, t: now };
-        this.fix = fix; this.count++; this.problem = null;
+        this.fix = this.fix ? C.smoothFix(this.fix, fix, p.coords.accuracy, p.coords.speed) : fix; this.count++; this.problem = null;
         if (first) { first = false; resolve(true); }
       }, e => {
         this.problem = e.code === 1 ? 'Location is off for this site. Turn it on in Settings ▸ Safari ▸ Location (or your browser) to find Kikis near you.' : "Couldn't get your location yet. Step outside or wait a moment.";
@@ -214,7 +214,8 @@ export class WorldView {
       t.mine = !!mine; t.keepers = mine ? [] : keeperTeam(t.id, now, L);
       if (mine) t.variant = C.variant(mine.variant); else t.variant = C.variant(t.keepers[0].sp);
       t.raid = surge ? raidAt(t.id, Math.floor(now / C.SURGE_EVERY)) : null; if (t.raid && app.progress.raidsDone[t.raid.id]) t.raid = null;
-      t.color = mine && app.progress.faction ? FACTIONS[app.progress.faction].color : null;
+      const sh = app.sharedCircles && app.sharedCircles[t.id];
+      t.color = mine && app.progress.faction ? FACTIONS[app.progress.faction].color : sh && FACTIONS[sh.faction] ? FACTIONS[sh.faction].color : null;
     }
     if (app.mapMode) return;
     const keep = new Set();
@@ -293,7 +294,7 @@ export class WorldView {
       if (!lab) { lab = document.createElement('div'); lab.className = 'label sticker'; el.appendChild(lab); this.labels.set(id, lab); }
       const near = t.distance <= C.ACTION && t.kind !== 'circle';
       const name = t.kind === 'stop' ? 'Supply Stop' : t.name;
-      lab.textContent = near ? `${name} · tap!` : `${name} · ${Math.round(t.distance)} m`;
+      lab.textContent = near ? `${name} · tap!` : `${name} · ${fmtDist(t.distance)}`;
       lab.classList.toggle('tap', near);
       lab.style.left = ((v3.x + 1) / 2 * w) + 'px'; lab.style.top = ((1 - v3.y) / 2 * h) + 'px';
       lab.style.display = '';
@@ -339,7 +340,7 @@ export function renderNearby(el, things, heading) {
   el.innerHTML = list.map(t => {
     const col = t.kind === 'kiki' ? C.RARITY[t.variant.rarity].main : '#7a00ff', near = t.distance <= C.ACTION;
     const name = t.kind === 'circle' ? 'Rune Circle' : t.name.replace(' Kiki', '');
-    return `<div class="chip sticker${near ? ' near' : ''}"><span class="dot" style="background:${col}"></span><span class="nm">${name}</span><span class="ds">${near ? 'Tap it!' : Math.round(t.distance) + ' m'}</span>` +
+    return `<div class="chip sticker${near ? ' near' : ''}"><span class="dot" style="background:${col}"></span><span class="nm">${name}</span><span class="ds">${near ? 'Tap it!' : fmtDist(t.distance)}</span>` +
       `<svg class="ar" viewBox="0 0 24 24" style="transform:rotate(${t.bearing - heading}deg)"><path d="M12 2 21 21 12 16 3 21z" fill="#ff5d8f" stroke="#18237a" stroke-width="2" stroke-linejoin="round"/></svg></div>`;
   }).join('');
 }

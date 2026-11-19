@@ -336,5 +336,29 @@ test('circle keepers and raids are the same on every phone; one free raid a day'
   const ups = R.giveXp(p, R.xpFor(5)); assert.ok(ups.find(u => u.level === 5).items.stitch === 10 && p.items.key >= 1);
 });
 
+// ---------- Phase 5 ----------
+test('coins and the shop', () => {
+  const p = R.newSave(), t0 = Math.floor(new Date(2026, 10, 5, 9).getTime() / 1000);
+  assert.equal(R.keeperCoins(p, t0, t0 + 3600), 6); assert.equal(R.keeperCoins(p, t0, t0 + 86400 / 2), 44); assert.equal(R.keeperCoins(p, t0, t0 + 3600), 0); // 50 a day
+  p.coins = 1000; p.xp = R.xpFor(10);
+  assert.ok(R.buy(p, 'bag')); assert.equal(R.bagMax(p), R.BAG_MAX + 50); assert.ok(R.buy(p, 'box')); assert.equal(R.kikiMax(p), R.KIKI_MAX + 50);
+  assert.ok(R.buy(p, 'star10')); assert.equal(p.items.star, 10); assert.equal(p.coins, 1000 - 200 - 200 - 180);
+  const n = p.nests.length; assert.ok(R.buy(p, 'nest')); assert.equal(p.nests.length, n + 1);
+  assert.equal(R.buy(p, 'bag') && R.buy(p, 'bag') && R.buy(p, 'bag') && R.buy(p, 'bag') && R.buy(p, 'bag'), false); // capped at 500 (or out of coins)
+  const q = R.newSave(); q.coins = 50; assert.equal(R.canBuy(q, R.SHOP.find(x => x.id === 'key')).ok, false);
+});
+
+test('medals pay coins, once per tier', () => {
+  const p = R.newSave(); p.coins = 0; p.stats.catches = 1000; R.newMedals(p);
+  const want = R.MEDALS.filter(m => R.medalTier(p, m)).reduce((a, m) => a + R.MEDAL_COINS.slice(1, R.medalTier(p, m) + 1).reduce((x, y) => x + y, 0), 0);
+  assert.ok(want >= 85); assert.equal(p.coins, want); R.newMedals(p); assert.equal(p.coins, want);
+});
+test('GPS smoothing: wobbles are eased, real steps and walking go straight through', () => {
+  const a = { lat: 51.5, lon: -0.12 }, near = C.fromLocal(a, 4, 0), far = C.fromLocal(a, 40, 0);
+  assert.ok(C.distance(a, C.smoothFix(a, near, 20)) < 2); // a 4 m wobble at 20 m accuracy moves you about 1 m
+  assert.deepEqual(C.smoothFix(a, far, 20), far); assert.deepEqual(C.smoothFix(a, near, 20, 1.4), near);
+  let s = a; for (let i = 1; i <= 30; i++) s = C.smoothFix(s, C.fromLocal(a, i * 1.4, 0), 25); // walking, no speed from the phone
+  assert.ok(C.distance(s, C.fromLocal(a, 42, 0)) < 6, 'keeps up while walking');
+});
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

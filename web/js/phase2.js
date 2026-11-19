@@ -56,13 +56,13 @@ export function did(app, ev) {
   const p = app.progress, done = R.track(p, ev);
   for (const t of done) { toast(t.story ? `Story step done: ${t.text}!` : `Task done: ${t.text}! Claim it in Tasks.`, 3000); hx.success(); }
   if (R.chapterReady(p) && done.some(t => t.story)) toast('Story chapter complete! Open Tasks to hear from Ranger Rue.', 3200);
-  for (const { m, tier } of R.newMedals(p)) medalPop(m, tier);
+  for (const { m, tier, coins } of R.newMedals(p)) medalPop(m, tier, coins);
   app.save();
   if (app.refreshBadges) app.refreshBadges();
 }
-function medalPop(m, tier) {
+function medalPop(m, tier, coins) {
   const el = document.createElement('div'); el.className = 'medal-pop sticker';
-  el.innerHTML = `<span class="medal t${tier}">★</span><div><b>${R.TIER_NAMES[tier]} medal!</b><br>${esc(m.name)}: ${m.tiers[tier - 1].toLocaleString()} ${esc(m.what)}</div>`;
+  el.innerHTML = `<span class="medal t${tier}">★</span><div><b>${R.TIER_NAMES[tier]} medal!</b><br>${esc(m.name)}: ${m.tiers[tier - 1].toLocaleString()} ${esc(m.what)}${coins ? ` · +${coins} coins` : ''}</div>`;
   $('toasts').appendChild(el); sfx('pickup', 0.45); setTimeout(() => el.remove(), 3600);
 }
 

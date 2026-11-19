@@ -1,5 +1,6 @@
 // Phase 3 (docs/ROADMAP.md): battles, healing, Rune Circle battles, factions and Portal Surge raids.
 // The battle rules live in rules.js (Battle); this file is the arena on screen and the flows around it.
+import { playMusic } from './music.js';
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
@@ -7,6 +8,7 @@ import { makeKiki, KikiMotion, Sparkles, portrait } from './art.js';
 import { $, toast, panel, hx, sfx, voice, pop, shake, reducedMotion, wait, debug } from './services.js';
 import { liveStage, levelUps, guide, confirm } from './ui.js';
 import { spiralRite } from './rite.js';
+import { snapshot } from './online.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const now = () => Math.floor(Date.now() / 1000);
@@ -16,21 +18,24 @@ const hpBar = k => { const max = R.battleStats(k).maxHp, hp = R.hpOf(k); return 
 
 // ---------- choosing a team ----------
 /** Pick up to n healthy Kikis (the strongest are picked for you). Resolves with the Kikis, or null. */
-export function chooseTeam(app, n, title) {
+/** Pick up to n Kikis. `only` limits which (e.g. a league's power cap); `anyHp` lets hurt Kikis in (leagues heal everyone). */
+export function chooseTeam(app, n, title, only = null, anyHp = false) {
   return new Promise(res => {
-    const p = app.progress; let pick = R.bestTeam(p, n).map(k => k.uid);
+    const p = app.progress, ok = k => !k.keeping && (anyHp || R.hpOf(k) > 0) && (!only || only(k));
+    let pick = [...p.kikis].filter(ok).sort((a, b) => R.power(b) - R.power(a)).slice(0, n).map(k => k.uid);
     const el = document.createElement('div'); el.className = 'screen-sheet'; $('overlay').appendChild(el);
     const render = () => {
-      const list = [...p.kikis].sort((a, b) => R.power(b) - R.power(a));
+      const list = [...p.kikis].filter(k => !only || only(k)).sort((a, b) => R.power(b) - R.power(a));
       el.innerHTML = `<div class="sheet-head"><button class="pill small cream" data-x>Back</button><h2>${esc(title)}</h2><span class="count sticker" style="padding:2px 10px">${pick.length} / ${n}</span></div>
-        <p class="d" style="margin:0 0 8px;text-align:center">Tap Kikis to add or remove them. Fainted Kikis need a Revive Pillow from your bag.</p>
+        <p class="d" style="margin:0 0 8px;text-align:center">Tap Kikis to add or remove them. Fainted Kikis need Revival Dew from your bag.</p>
         <div class="sheet-body"><div class="cards">${list.map(k => { const hp = R.hpOf(k), on = pick.includes(k.uid), busy = !!k.keeping;
-          return `<div class="card sticker${on ? ' picked' : ''}${hp === 0 || busy ? ' unknown' : ''}" data-uid="${k.uid}">${on ? `<span class="pick-n">${pick.indexOf(k.uid) + 1}</span>` : ''}<img src="${portrait(kp(k), 160)}" alt=""><div class="pw">POWER ${R.power(k)}</div><div class="nm">${esc(k.nick || C.variant(k.sp).name)}</div>${hpBar(k)}${busy ? '<div class="no">keeping a circle</div>' : hp === 0 ? '<div class="no">fainted</div>' : ''}</div>`; }).join('')}</div></div>
+          const hp0 = hp === 0 && !anyHp;
+          return `<div class="card sticker${on ? ' picked' : ''}${hp0 || busy ? ' unknown' : ''}" data-uid="${k.uid}">${on ? `<span class="pick-n">${pick.indexOf(k.uid) + 1}</span>` : ''}<img src="${portrait(kp(k), 160)}" alt=""><div class="pw">POWER ${R.power(k)}</div><div class="nm">${esc(k.nick || C.variant(k.sp).name)}</div>${hpBar(k)}${busy ? '<div class="no">keeping a circle</div>' : hp === 0 ? '<div class="no">fainted</div>' : ''}</div>`; }).join('')}</div></div>
         <div class="sheet-foot"><button class="pill" data-go ${pick.length ? '' : 'disabled'}>Let's go!</button></div>`;
       el.querySelector('[data-x]').onclick = () => { sfx('button', 0.3); el.remove(); res(null); };
       el.querySelector('[data-go]').onclick = () => { sfx('button', 0.4); el.remove(); res(pick.map(uid => p.kikis.find(k => k.uid === uid))); };
       el.querySelectorAll('[data-uid]').forEach(c => c.onclick = () => {
-        const k = p.kikis.find(x => x.uid === +c.dataset.uid); if (k.keeping) return toast('That Kiki is keeping a Rune Circle.'); if (R.hpOf(k) === 0) return toast('Fainted. Use a Revive Pillow from your bag.');
+        const k = p.kikis.find(x => x.uid === +c.dataset.uid); if (k.keeping) return toast('That Kiki is keeping a Rune Circle.'); if (R.hpOf(k) === 0 && !anyHp) return toast('Fainted. Use Revival Dew from your bag.');
         if (pick.includes(k.uid)) pick = pick.filter(u => u !== k.uid); else if (n === 1) pick = [k.uid]; else if (pick.length < n) pick.push(k.uid); else { hx.light(); return toast(`Your team is full (${n}). Remove one first.`); }
         sfx('button', 0.25); render();
       });
@@ -49,7 +54,8 @@ function writeBack(app, team, fighters) {
  * Fight on screen. Tap anywhere to attack, swipe sideways to dodge, tap the charge button when it's full.
  * Resolves with 'win', 'lose', 'timeout' or 'run' and the Battle.
  */
-export function runBattle(app, { mine, theirs, title, raid = false, time = 120, aiQuick = 1.7, aiCharged = 9 }) {
+export function runBattle(app, { mine, theirs, title, raid = false, time = 120, aiQuick = 1.7, aiCharged = 9, sync = null }) {
+  playMusic(raid ? 'raid' : 'battle');
   return new Promise(res => {
     const b = new R.Battle(mine, theirs, { time, aiQuick, aiCharged, raid });
     const el = document.createElement('div'); el.className = 'battle' + (raid ? ' raid' : '');
@@ -137,6 +143,11 @@ export function runBattle(app, { mine, theirs, title, raid = false, time = 120, 
     q('.brun').onclick = async () => { if (b.done) return; if (await confirm('Run away from this battle?', 'Run', 'Keep fighting')) { b.done = 'run'; end('run'); } };
     let last = performance.now(), alive = true;
     const loop = t => { if (!alive) return; const dt = Math.min(0.05, (t - last) / 1000); last = t; handle(b.update(dt)); requestAnimationFrame(loop); };
+    // Co-op raids: every 2 s, share your damage and take the boss's HP from everyone's.
+    if (sync) { let busy = false; const tick = setInterval(async () => {
+      if (!alive || b.done) { clearInterval(tick); return; } if (busy) return; busy = true;
+      try { const r = await sync(b); if (r && alive) { if (r.hp < b.them.hp) handle(b.setHp(1, r.hp)); const others = r.players.filter(x => !x.me && x.active); q('.btitle').textContent = title + (others.length ? ` · with ${others.map(x => x.name).join(', ')}` : ''); } } catch (e) {}
+      busy = false; }, 2000); }
     requestAnimationFrame(loop); hud();
     function end(result) {
       if (!alive) return; alive = false;
@@ -144,7 +155,7 @@ export function runBattle(app, { mine, theirs, title, raid = false, time = 120, 
         const box = document.createElement('div'); box.className = 'bend';
         box.innerHTML = `<h2 style="color:${result === 'win' ? '#ffcf2e' : '#ff9dba'}">${{ win: 'Victory!', lose: 'Your team fainted', timeout: "Time's up!", run: 'You ran away' }[result]}</h2><button class="pill play" style="font-size:28px;padding:8px 40px 12px">Continue</button>`;
         el.appendChild(box); if (result === 'win') { sfx('burst', 0.55); voice('yay', 0.7); hx.success(); } else { sfx('breakout', 0.4); hx.warning(); }
-        box.querySelector('button').onclick = () => { sfx('button', 0.35); st.stop(); el.remove(); app.inBattle = false; res({ result, battle: b }); };
+        box.querySelector('button').onclick = () => { sfx('button', 0.35); st.stop(); el.remove(); app.inBattle = false; playMusic('map'); res({ result, battle: b }); };
       }, result === 'run' ? 0 : 900);
     }
   });
@@ -165,13 +176,13 @@ export function chooseFaction(app) {
 }
 
 // ---------- healing ----------
-/** The best healing item for a Kiki right now (a pillow if it fainted). */
+/** The best healing item for a Kiki right now (Revival Dew if it fainted). */
 export function healKiki(app, k) {
   const p = app.progress, max = R.battleStats(k).maxHp, hp = R.hpOf(k);
-  if (hp >= max) return toast('Already full of stuffing!');
+  if (hp >= max) return toast('Already full of energy!');
   const order = hp === 0 ? ['pillow'] : max - hp > 80 && p.items.superstitch ? ['superstitch', 'stitch'] : ['stitch', 'superstitch'];
   const item = order.find(id => p.items[id] > 0);
-  if (!item) { hx.warning(); return toast(hp === 0 ? 'You need a Revive Pillow. Spin supply stops to find some.' : 'You need a Stitch Kit. Spin supply stops to find some.'); }
+  if (!item) { hx.warning(); return toast(hp === 0 ? 'You need Revival Dew. Spin supply stops to find some.' : 'You need a Herb Salve. Spin supply stops to find some.'); }
   const got = R.heal(p, k, item); app.save(); sfx('pickup', 0.45); hx.light(); toast(`${R.ITEMS[item].name}: +${got} HP`);
   return got;
 }
@@ -184,23 +195,30 @@ async function ready(app) {
   const p = app.progress;
   if (R.levelOf(p.xp) < R.BATTLE_LEVEL) { hx.light(); toast(`Battles open at explorer level ${R.BATTLE_LEVEL}. Keep catching!`, 3000); return false; }
   if (!p.faction) await chooseFaction(app);
-  if (!p.kikis.some(k => R.hpOf(k) > 0 && !k.keeping)) { toast('All your Kikis need healing first. Use Stitch Kits from your bag.', 3200); return false; }
+  if (!p.kikis.some(k => R.hpOf(k) > 0 && !k.keeping)) { toast('All your Kikis need healing first. Use Herb Salves from your bag.', 3200); return false; }
   return true;
 }
-export function circlePanel(app, t) {
+export async function circlePanel(app, t) {
   const p = app.progress, sec = now(), L = R.levelOf(p.xp), mine = p.keepers[t.id], keeper = mine && p.kikis.find(k => k.uid === mine.uid);
   const raid = raidFor(t, sec), raidDone = raid && p.raidsDone[raid.id], fc = p.faction && R.FACTIONS[p.faction];
-  const team = mine ? [] : R.keeperTeam(t.id, sec, L), riteDone = (p.rites || {})[t.id] === R.dayKey(sec);
+  // Online: other explorers may keep this circle (Phase 4). Their Kikis replace the wild Keepers.
+  let shared = null; if (app.online && app.online.signedIn) { try { shared = (await app.online.circles([t.id]))[t.id] || null; } catch (e) {} }
+  const others = shared ? shared.keepers.filter(k => !k.mine) : [], sf = shared && R.FACTIONS[shared.faction];
+  const friendly = shared && shared.faction === p.faction, canJoin = friendly && !mine && shared.keepers.length < 6;
+  const team = mine || others.length ? [] : R.keeperTeam(t.id, sec, L), riteDone = (p.rites || {})[t.id] === R.dayKey(sec);
   const next = C.surgeNextIn(sec);
-  const pn = panel(`<h2 style="color:${mine && fc ? fc.color : '#7a00ff'}">${esc(t.name)}</h2>
-    ${raid && !raidDone ? `<div class="raidbox sticker"><div class="t">PORTAL SURGE RAID ${'★'.repeat(raid.tier)}</div><img src="${portrait('kiki:' + raid.sp, 192)}" alt="" style="width:120px"><div><b>${C.variant(raid.sp).name}</b> ${elChip(C.variant(raid.sp).element)}</div><div class="d">Weak to ${R.weakTo(C.variant(raid.sp).element).join(' and ')}. Bring up to 6 Kikis.</div>
+  const pn = panel(`<h2 style="color:${sf ? sf.color : mine && fc ? fc.color : '#7a00ff'}">${esc(t.name)}</h2>
+    ${raid && !raidDone ? `<div class="raidbox sticker"><div class="t">PORTAL SURGE RAID ${'★'.repeat(raid.tier)}</div><img src="${portrait('kiki:' + raid.sp, 192)}" alt="" style="width:120px"><div><b>${C.variant(raid.sp).name}</b> ${elChip(C.variant(raid.sp).element)}</div><div class="d">Weak to ${R.weakTo(C.variant(raid.sp).element).join(' and ')}. Bring up to 6 Kikis${app.online && app.online.signedIn ? '. Anyone raiding here at the same time shares the boss' : ''}.</div>
       <button class="pill pink" data-raid>${R.canRaid(p, sec) ? (p.raidDay !== R.dayKey(sec) ? 'Raid (free today)' : 'Raid (1 Portal Key)') : 'Need a Portal Key'}</button></div>`
       : raid ? '<p class="d">You beat this Portal Surge raid. Well done!</p>' : `<p class="d">Next Portal Surge in ${Math.floor(next / 3600)}h ${String(Math.floor(next % 3600 / 60)).padStart(2, '0')}m. Raid bosses come through the portal.</p>`}
     ${mine ? `<p style="font-size:18px">${keeper ? `Your <b>${esc(keeper.nick || C.variant(keeper.sp).name)}</b>` : 'Your Kiki'} keeps this circle${fc ? ` for the <b style="color:${fc.color}">${fc.name}</b>` : ''}.</p>
-        <p class="d">Circles gather 20 Sprouts every half hour for their keeper.</p>`
-      : `<p style="margin-bottom:4px">Keepers</p><div class="keepers">${team.map(k => `<div><img src="${portrait('kiki:' + k.sp, 128)}" alt=""><span>POWER ${R.power(k)}</span></div>`).join('')}</div>`}
+        <p class="d">Circles gather 20 Sprouts every half hour for their keeper${app.online && app.online.signedIn ? ', and 1 coin for every 10 minutes it stays (up to 50 a day)' : ''}.</p>` : ''}
+    ${others.length ? `<p style="margin-bottom:4px">Kept by the <b style="color:${sf ? sf.color : '#4d5aa6'}">${sf ? sf.name : 'explorers'}</b></p><div class="keepers">${others.map(k => `<div><img src="${portrait(kp(k.kiki), 128)}" alt=""><span>${esc(k.name)}<br>POWER ${R.power(k.kiki)}</span></div>`).join('')}</div>`
+      : !mine ? `<p style="margin-bottom:4px">Wild Keepers</p><div class="keepers">${team.map(k => `<div><img src="${portrait('kiki:' + k.sp, 128)}" alt=""><span>POWER ${R.power(k)}</span></div>`).join('')}</div>` : ''}
     <div class="stack">
-      ${mine ? '<button class="pill" data-collect>Collect Sprouts</button><button class="pill small cream" data-home>Call your keeper home</button>' : `<button class="pill" data-battle>${L >= R.BATTLE_LEVEL ? 'Battle the Keepers' : `Battles at level ${R.BATTLE_LEVEL}`}</button>`}
+      ${mine ? '<button class="pill" data-collect>Collect Sprouts</button><button class="pill small cream" data-home>Call your keeper home</button>'
+        : canJoin ? '<button class="pill" data-join>Add your Kiki to this circle</button>'
+        : `<button class="pill" data-battle>${L >= R.BATTLE_LEVEL ? 'Battle the Keepers' : `Battles at level ${R.BATTLE_LEVEL}`}</button>`}
       <button class="pill small sky" data-rite>${riteDone ? 'Spiral Rite (practice)' : 'Spiral Rite (Sprouts today)'}</button>
       <button class="pill small cream" data-x>Close</button></div>`);
   const q = s => pn.root.querySelector(s);
@@ -210,22 +228,41 @@ export function circlePanel(app, t) {
     p.rites[t.id] = R.dayKey(now()); const got = att * 3; p.sprouts += got; app.save(); toast(`Attunement ${att}: +${got} Sprouts!`, 2600); hx.success();
   }); };
   if (mine) {
-    q('[data-collect]').onclick = () => { const got = C.progressApi.collectCircle(p, t.id, now()); app.save(); toast(got ? `+${got} Sprouts from the circle!` : 'Nothing yet. Circles gather 20 Sprouts every half hour.'); if (got) { hx.success(); sfx('pickup', 0.5); } };
-    q('[data-home]').onclick = async () => { if (!await confirm('Call your keeper home? The circle goes back to wild Keepers.', 'Call home')) return; const got = C.progressApi.collectCircle(p, t.id, now()); R.callHome(p, t.id); app.save(); pn.close(); toast(`Your keeper is home${got ? ` with ${got} Sprouts` : ''}.`); app.world.nextPlan = 0; };
-  } else q('[data-battle]').onclick = async () => { pn.close(); await circleBattle(app, t, team); };
+    q('[data-collect]').onclick = () => { const got = C.progressApi.collectCircle(p, t.id, now()), coins = offlineCoins(app, t.id); app.save(); toast(got || coins ? `+${got} Sprouts${coins ? ` and ${coins} coins` : ''} from the circle!` : 'Nothing yet. Circles gather 20 Sprouts every half hour.'); if (got || coins) { hx.success(); sfx('pickup', 0.5); } };
+    q('[data-home]').onclick = async () => {
+      if (!await confirm('Call your keeper home? The circle goes back to wild Keepers.', 'Call home')) return;
+      const got = C.progressApi.collectCircle(p, t.id, now()); offlineCoins(app, t.id); R.callHome(p, t.id); app.save(); pn.close();
+      if (app.online && app.online.signedIn) { try { await app.online.circleHome(t.id); await app.checkIn(); } catch (e) {} }
+      toast(`Your keeper is home${got ? ` with ${got} Sprouts` : ''}.`); app.world.nextPlan = 0;
+    };
+  } else if (canJoin) q('[data-join]').onclick = async () => { pn.close(); if (!await ready(app)) return; await keep(app, t); };
+  else q('[data-battle]').onclick = async () => { pn.close(); await circleBattle(app, t, team, others.length > 0); };
   if (raid && !raidDone) q('[data-raid]').onclick = async () => { pn.close(); await raidBattle(app, t, raid); };
 }
-async function circleBattle(app, t, keepers) {
-  if (!await ready(app)) return;
-  const p = app.progress, team = await chooseTeam(app, 3, 'Your team'); if (!team) return;
-  const { result, battle } = await runBattle(app, { mine: team.map(k => R.fighter(k)), theirs: keepers.map(k => R.fighter(k, { full: true })), title: t.name, time: 120 });
-  writeBack(app, team, battle.sides[0]);
-  if (result !== 'win') { if (team.some(k => R.hpOf(k) < R.battleStats(k).maxHp)) toast('Heal your Kikis with Stitch Kits from your bag, then try again!', 3200); return; }
-  p.stats.wins = (p.stats.wins || 0) + 1; const ups = R.giveXp(p, 600); R.addItems(p, { stitch: 2 }, true); app.save(); app.did({ type: 'battle' });
-  await levelUps(app, ups);
-  const pick = await chooseTeam(app, 1, 'Who keeps the circle?'); if (!pick || !pick[0]) return toast('Nobody stayed behind. The wild Keepers will be back.');
+/** Playing offline, your keepers earn coins on this phone (online, the server pays them when they come home). */
+function offlineCoins(app, id) {
+  const kp = app.progress.keepers[id]; if (!kp || (app.online && app.online.signedIn)) return 0;
+  const t = now(), c = R.keeperCoins(app.progress, kp.coinAt || kp.since, t); kp.coinAt = t; return c;
+}
+/** Leave one of your Kikis at the circle (online too, when signed in). */
+async function keep(app, t) {
+  const p = app.progress, pick = await chooseTeam(app, 1, 'Who keeps the circle?'); if (!pick || !pick[0]) return toast('Nobody stayed behind. The wild Keepers will be back.');
+  if (app.online && app.online.signedIn) { try { await app.online.circleClaim(t.id, app.loc.fix, snapshot(pick[0])); } catch (e) { if (!/position|fast/.test(e.message)) toast(e.message, 3000); if (/beat the keepers|6 keepers|faction/.test(e.message)) return; } }
   R.takeCircle(p, t.id, pick[0], now()); app.save(); app.world.nextPlan = 0; sfx('burst', 0.5); hx.success();
   const f = R.FACTIONS[p.faction]; toast(`${pick[0].nick || C.variant(pick[0].sp).name} now keeps ${t.name}${f ? ' for the ' + f.name : ''}!`, 3200);
+}
+async function circleBattle(app, t, keepers, online) {
+  if (!await ready(app)) return;
+  const p = app.progress;
+  let foes = keepers.map(k => R.fighter(k, { full: true }));
+  if (online) { try { const d = await app.online.circleBattle(t.id); foes = d.map((x, i) => R.fighter({ uid: -1 - i, ...x.kiki, nick: x.kiki.nick || '' }, { full: true })); } catch (e) { return toast(e.message); } }
+  const team = await chooseTeam(app, 3, 'Your team'); if (!team) return;
+  const { result, battle } = await runBattle(app, { mine: team.map(k => R.fighter(k)), theirs: foes, title: t.name, time: 120 });
+  writeBack(app, team, battle.sides[0]);
+  if (result !== 'win') { if (team.some(k => R.hpOf(k) < R.battleStats(k).maxHp)) toast('Heal your Kikis with Herb Salves from your bag, then try again!', 3200); return; }
+  p.stats.wins = (p.stats.wins || 0) + 1; const ups = R.giveXp(p, 600); R.addItems(p, { stitch: 2 }, true); app.save(); app.did({ type: 'battle' });
+  await levelUps(app, ups);
+  await keep(app, t);
 }
 async function raidBattle(app, t, raid) {
   if (!await ready(app)) return;
@@ -233,8 +270,17 @@ async function raidBattle(app, t, raid) {
   if (!R.canRaid(p, sec)) { hx.warning(); return toast("You've used today's free raid. Portal Keys come from level-ups and tasks.", 3400); }
   const team = await chooseTeam(app, 6, 'Raid team'); if (!team) return;
   R.payRaid(p, sec); app.save();
-  const boss = R.raidBoss(raid);
-  const { result, battle } = await runBattle(app, { mine: team.map(k => R.fighter(k)), theirs: [boss], title: `${'★'.repeat(raid.tier)} Raid · ${t.name}`, raid: true, time: 180, aiQuick: 1.6, aiCharged: 8 });
+  const boss = R.raidBoss(raid); let sync = null;
+  if (app.online && app.online.signedIn) { // co-op: everyone raiding this boss now shares its HP (it's tougher with more people)
+    try {
+      const st = await app.online.raidJoin(raid.id, app.loc.fix), n = Math.min(6, Math.max(1, st.players.filter(x => x.active || x.me).length));
+      boss.maxHp = boss.hp = Math.round(boss.maxHp * (1 + 0.6 * (n - 1))); const startHp = Math.max(0, boss.maxHp - st.total);
+      if (st.total) boss.hp = startHp;
+      sync = async b => { const r = await app.online.raidHit(raid.id, b.dealt || 0); return { hp: boss.maxHp - r.total, players: r.players }; };
+      if (n > 1) toast(`${n - 1} other explorer${n > 2 ? 's are' : ' is'} raiding here too!`, 2600);
+    } catch (e) {}
+  }
+  const { result, battle } = await runBattle(app, { mine: team.map(k => R.fighter(k)), theirs: [boss], title: `${'★'.repeat(raid.tier)} Raid · ${t.name}`, raid: true, time: 180, aiQuick: 1.6, aiCharged: 8, sync });
   writeBack(app, team, battle.sides[0]);
   if (result !== 'win') return toast('The boss went back through the portal. Heal up and try the next surge!', 3400);
   const tier = R.RAID_TIERS[raid.tier], bonus = p.keepers[t.id] ? 2 : 0;

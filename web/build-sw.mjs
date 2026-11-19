@@ -12,6 +12,15 @@ const CACHE = '${cache}';
 const FILES = ${JSON.stringify(['./', ...files], null, 2)};
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith('kiki-safari-') && x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
+// Notifications (Phase 4): gifts, friend requests and Portal Surge reminders from the push server.
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) {}
+  e.waitUntil(self.registration.showNotification(d.title || 'KIKI SAFARI', { body: d.body || '', icon: 'assets/icons/icon-192.png', badge: 'assets/icons/icon-192.png', data: { url: d.url || './' } }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => list.length ? list[0].focus() : self.clients.openWindow(e.notification.data.url || './')));
+});
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return; // map data is cached by the game itself

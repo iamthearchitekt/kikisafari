@@ -13,8 +13,10 @@ import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
 import { circlePanel, healKiki } from './battle.js';
 import { startTitle } from './title.js';
+import { initOnline, connect, checkIn, openFriends, openLeagues, openAccount } from './social.js';
 import { cosmicCanvas } from './art.js';
-import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug } from './services.js';
+import { playMusic } from './music.js';
+import { $, toast, panel, hx, sfx, unlockAudio, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
 
 const app = {
   progress: loadProgress(), progressApi: C.progressApi, caught: new Set(), mapMode: true, tasks: new Set(), encounter: null,
@@ -26,12 +28,14 @@ app.loc = new Location();
 app.mods = () => mods(app);
 app.healKiki = k => healKiki(app, k);
 app.did = ev => did(app, ev);
-app.open = name => ({ eggs: openEggs, tasks: openTasks, medals: openMedals, events: openEvents })[name](app);
+app.open = name => ({ eggs: openEggs, tasks: openTasks, medals: openMedals, events: openEvents, friends: openFriends, leagues: openLeagues, account: openAccount })[name](app);
+initOnline(app);
+app.checkIn = () => checkIn(app);
 app.osm = new OsmLoader();
 
 // ---------- rendering ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), alpha: true, antialias: true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
 app.world = new WorldView(app);
 app.map = new StreetMap(app);
 app.osm.listeners.push((cell, area) => app.map.addArea(cell, area));
@@ -39,7 +43,10 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   for (const cam of [app.world.camera, app.map.camera]) { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
 }
-addEventListener('resize', resize); resize();
+addEventListener('resize', resize);
+/** Battery saver (Settings): a lighter picture (1× pixels) and 30 frames a second on the map. Catches stay smooth. */
+app.applyBattery = () => { renderer.setPixelRatio(settings.get('battery', false) ? 1 : Math.min(2, devicePixelRatio || 1)); resize(); };
+app.applyBattery();
 
 // ---------- title ----------
 let titleScene = null;
@@ -53,6 +60,8 @@ refreshTitle();
 app.setSound = on => { setSound(on); refreshTitle(); };
 soundBtn.onclick = () => { unlockAudio(); app.setSound(!settings.get('sound', true)); sfx('button', 0.35); };
 motionBtn.onclick = () => { const order = ['auto', 'reduced', 'full'], m = settings.get('motion', 'auto'); settings.set('motion', order[(order.indexOf(m) + 1) % 3]); refreshTitle(); sfx('button', 0.35); };
+// Music starts with the first tap (browsers keep sound off until then).
+$('title').addEventListener('pointerdown', () => { unlockAudio(); if (!$('title').hidden) playMusic('title'); });
 $('play').onclick = () => {
   unlockAudio(); sfx('button', 0.4); hx.light();
   if (localStorage.getItem('kiki-perms') === 'asked') startSensors(); else { $('perms').hidden = false; }
@@ -112,7 +121,8 @@ function startSensors() {
     hideTitleScene(); $('title').hidden = true; $('perms').hidden = true; $('game').hidden = false;
     app.mapMode = true; applyMode(); refreshHud(true);
     if (ori !== 'granted') toast("No motion access: the map won't turn with you. Drag to turn it.", 4200);
-    runTutorial(app);
+    runTutorial(app); playMusic('map'); app.started = true;
+    connect(app); // online features (Phase 4); the game works without them
   });
   const wx = () => { if (app.loc.fix) loadWeather(app); };
   setTimeout(wx, 3000); if (!app.wxTimer) app.wxTimer = setInterval(wx, 10 * 60e3);
@@ -122,7 +132,7 @@ function startSensors() {
 app.goHome = function goHome() {
   if (app.encounter) return;
   camOff(); camTapToResume = false;
-  $('game').hidden = true; $('title').hidden = false; app.mapMode = true; applyMode(); showTitleScene();
+  $('game').hidden = true; $('title').hidden = false; app.mapMode = true; applyMode(); showTitleScene(); playMusic('title');
 };
 $('btn-view').onclick = () => { app.mapMode = !app.mapMode; applyMode(); sfx('button', 0.35); hx.light(); };
 $('btn-north').onclick = () => { app.map.north(); sfx('button', 0.3); };
@@ -142,7 +152,7 @@ function applyMode() {
 app.interact = t => {
   if (app.loc.locked) return toast(C.MOVING_FAST);
   const d = C.distance(app.loc.fix, t.where);
-  if (d > C.ACTION) { hx.light(); return toast(`${t.kind === 'stop' ? 'That supply stop' : t.kind === 'circle' ? t.name : 'That Kiki'} is ${Math.round(d)} m away. Get inside the white circle.`); }
+  if (d > C.ACTION) { hx.light(); return toast(`${t.kind === 'stop' ? 'That supply stop' : t.kind === 'circle' ? t.name : 'That Kiki'} is ${fmtDist(d)} away. Get inside the white circle.`); }
   if (t.kind === 'kiki') startEncounter(t);
   else if (t.kind === 'stop') { sfx('button', 0.35); hx.light(); stopPanel(app, t); }
   else circlePanel(app, t);
@@ -174,14 +184,14 @@ app.rewardEncounter = sp => { const v = C.variant(sp); startEncounter({ kind: 'k
 
 async function startEncounter(t) {
   if (app.encounter) return;
-  if (app.progress.kikis.length >= R.KIKI_MAX) { hx.warning(); return toast(`Your collection is full (${R.KIKI_MAX}). Send some Kikis home from the menu first.`, 3600); }
+  if (app.progress.kikis.length >= R.kikiMax(app.progress)) { hx.warning(); return toast(`Your collection is full (${R.kikiMax(app.progress)}). Send some Kikis home, or get more room in the Shop.`, 3600); }
   if (!t.raid && !R.STONES.some(id => app.progress.items[id] > 0)) { hx.warning(); return toast('Out of stones! Spin a supply stop to get more.', 3200); }
   hx.medium(); sfx('pickup', 0.35);
-  app.encounter = { pending: true };
+  app.encounter = { pending: true }; playMusic('encounter');
   app.world.setVisible(false);
   await app.setEncounterAR(settings.get('ar', true));
   app.encounter = new Encounter(app, t, async why => {
-    const enc = app.encounter; app.encounter = null; app.world.orient.locked = false;
+    const enc = app.encounter; app.encounter = null; app.world.orient.locked = false; playMusic('map');
     if (why === 'caught' && !t.starter) app.caught.add(t.id);
     app.world.setVisible(!app.mapMode); app.world.nextPlan = 0; app.save(); resumeCam(); refreshHud(true);
     if (why === 'fled') toast(`The ${t.name} ran away!`, 2800);
@@ -244,6 +254,8 @@ addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key ==
 // ---------- loop ----------
 let last = performance.now(), time = 0, hudTick = 0, walkFix = null;
 function frame(now) {
+  // battery saver: 30 frames a second on the map and in AR (catches and battles stay at full speed)
+  if (settings.get('battery', false) && !app.encounter && !app.inBattle && now - last < 30) { requestAnimationFrame(frame); return; }
   const dt = Math.min(0.05, (now - last) / 1000); last = now; time += dt;
   for (const task of [...app.tasks]) if (task(dt)) app.tasks.delete(task);
   if (!$('game').hidden && app.loc.fix) {
@@ -280,7 +292,7 @@ function hud() {
   if (sig !== hudSig) {
     hudSig = sig;
     $('near-mini').innerHTML = show.map(t => `<img src="${portrait('kiki:' + t.variant.id, 96)}" alt="" class="${p.caught[t.variant.id] ? '' : 'sil'}">`).join('');
-    $('near-label').textContent = tracked ? `Tracking · ${Math.round(tracked.distance)} m` : kikis.length ? 'Nearby' : 'None nearby';
+    $('near-label').textContent = tracked ? `Tracking · ${fmtDist(tracked.distance)}` : kikis.length ? 'Nearby' : 'None nearby';
     $('btn-nearby').classList.toggle('tracking', !!tracked);
   }
   // starters wander off if you walk away: bring them back around you

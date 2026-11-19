@@ -61,7 +61,7 @@ Design direction: [`docs/DECISIONS.md`](docs/DECISIONS.md). Character canon: the
   - The reveal: the rarity stamp, Kiki drops onto a cosmic spiral and does one of five dances, the reward counts up,
     and the screen waits for **Keep playing**.
 - **Kiki** is ported from the claw game's own `makeMascot()` and tuned toward the official art. The six variants change
-  only the crown, embroidery and glow.
+  only the crown, markings and glow.
 - **Feel.** Sticker UI, the treatment's seven haptics (native on iPhone and Android), chiptune blips plus the real
   "yay" and "awww" clips, reduced motion and a sound toggle.
 - **Practice campground.** A fictional map for when there's no location, and for players under the digital age of
@@ -94,7 +94,14 @@ On a computer you can try it too: there's no camera or motion there, so catches 
 (up the map), drag turns the map, scroll zooms. Add `?lat=…&lon=…` to the address to start somewhere specific.
 `web/test/preview.html` shows every Kiki, stone, treat and outfit.
 
-Run the web tests with `node web/test/core.test.mjs`.
+**Online (Phase 4):** friends, gifts, trading, leagues, shared Rune Circles, co-op raids and cloud saves use the
+owner's Supabase project. The database and its server functions are in `supabase/schema.sql` (paste it into the
+Supabase SQL editor to set up a fresh project; anonymous sign-ins must be on). Push notifications are Netlify Functions
+in `netlify/functions`, deployed with the site, with nothing to configure. **Coins and the Shop (Phase 5)** are in the
+menu; music, battery saver, km or miles and the privacy page are in Settings.
+
+Run the web tests with `node web/test/core.test.mjs` (game rules) and `node web/test/push.test.mjs` (push server).
+`node web/test/online.live.mjs` plays two pretend players against the live Supabase project and deletes them after.
 
 ## Open it (Windows)
 
@@ -164,7 +171,6 @@ Serve `tools/ArtPreview/web` (for example `python -m http.server`) and open `ind
 
 ## Next
 
-- **The server.** Supabase sign-in, server-checked catches and shared Keepers (today a captured circle is remembered on
-  the phone), plus offline pending throws.
+- **The server in the Unity app.** The web version is online (Supabase, above); the Unity project hasn't caught up.
 - **Self-hosted map data for launch.** Development uses the free public Overpass service, which is fine for testing but
   not for a big launch. One endpoint constant in `OsmLoader.cs` switches it.

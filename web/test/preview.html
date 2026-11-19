@@ -21,7 +21,7 @@ if (show === 'kikis' || show === 'sparkle') {
   ['rune', 'moon', 'star'].forEach((t, i) => { const s = makeRuneStone(0.09, t); s.position.set((i - 2) * 0.5, 0.25, 0); s.rotation.set(-1.0, 0, 0.2); s.userData.update(0, 0.25); scene.add(s); });
   ['honey', 'sunseed'].forEach((t, i) => { const s = makeTreat(t, 0.25); s.position.set((i + 1.2) * 0.5, 0.25, 0); s.rotation.set(t === 'honey' ? 1.2 : 0.2, t === 'honey' ? Math.PI - 0.7 : 0.5, 0); scene.add(s); });
   cam.position.set(0, 0.5, 3); cam.lookAt(0, 0.25, 0); ground.visible = false;
-  for (const t of ['rune', 'moon', 'star', 'honey', 'sunseed']) g.insertAdjacentHTML('beforeend', `<div><img src="${portrait('item:' + t, 256)}">${t}</div>`);
+  for (const t of ['rune', 'moon', 'star', 'honey', 'sunseed', 'gift', 'stitch', 'superstitch', 'pillow', 'key']) g.insertAdjacentHTML('beforeend', `<div><img src="${portrait('item:' + t, 256)}">${t}</div>`);
 } else if (show === 'explorers') {
   OUTFITS.forEach((o, i) => { const e = makeExplorer(i, i % 5); e.position.x = (i - 2) * 0.75; e.rotation.y = 0.35; e.userData.update(0, i === 1 ? 1.2 : 0); scene.add(e); });
   const rs = makeRustle(); rs.position.set(2.2, 0, 0); rs.scale.setScalar(0.25); scene.add(rs);

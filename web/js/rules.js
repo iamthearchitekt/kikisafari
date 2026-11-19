@@ -1,4 +1,4 @@
-// Phase 1 rules (docs/ROADMAP.md): explorer level and XP, the bag and its items, individual Kikis with Plush Power,
+// Phase 1 rules (docs/ROADMAP.md): explorer level and XP, the bag and its items, individual Kikis with their Power,
 // size and hidden stats, powering up, evolving and sending home, catch and run-away odds, supply stop rewards, daily
 // streaks, and the save format. Plain JavaScript with no DOM, tested in node: node test/core.test.mjs
 import { RARITY, VARIANTS, variant, rng, hash, sysRng, quality, isNight } from './core.js';
@@ -36,7 +36,7 @@ export const BAG_MAX = 250, KIKI_MAX = 200;
 export const bagCount = p => Object.values(p.items).reduce((a, n) => a + n, 0);
 /** Add items as far as the bag has room; returns what actually went in. */
 export function addItems(p, items, ignoreLimit = false) {
-  const got = {}; let room = ignoreLimit ? Infinity : BAG_MAX - bagCount(p);
+  const got = {}; let room = ignoreLimit ? Infinity : (p.bagMax || BAG_MAX) - bagCount(p);
   for (const [id, n] of Object.entries(items)) { const k = Math.max(0, Math.min(n, room)); if (!k) continue; p.items[id] = (p.items[id] || 0) + k; got[id] = k; room -= k; }
   return got;
 }
@@ -50,7 +50,7 @@ export const STATS = ['Cuddle', 'Bounce', 'Zest'];
 
 // ---------- individual Kikis ----------
 export const levelMult = lvl => 0.25 + 0.075 * lvl;
-/** Plush Power: how strong a Kiki is. Grows with level, species and hidden stats. */
+/** Power: how strong a Kiki is. Grows with level, species and hidden stats. */
 export function power(k) { const v = variant(k.sp); return Math.max(10, Math.round(v.base * levelMult(k.lvl) * (1 + (k.iv[0] + k.iv[1] + k.iv[2]) / 90))); }
 /** Hidden stats (0–15 each), level and size, from a random source. Wild ones use a seed so they look the same each time. */
 export function rollKiki(sp, lvl, r = sysRng) {
@@ -169,6 +169,8 @@ export function newSave() {
     eggs: [], nests: [{ id: 'warm', uses: -1, egg: null }], buddy: null, tasks: [], stamps: { last: '', n: 0 }, story: { ch: 0, prog: [] }, medals: {},
     // Phase 3
     faction: null, raidDay: '', raidsDone: {},
+    // Phase 4 and 5
+    coins: 0, leagues: {}, tradesDone: {}, savedAt: 0,
   };
 }
 /** Add a caught Kiki to the collection. */
@@ -391,7 +393,7 @@ export const medalTier = (p, m) => m.tiers.filter(t => m.get(p) >= t).length;
 /** Medals that just reached a new tier (and remembers them). */
 export function newMedals(p) {
   const out = [];
-  for (const m of MEDALS) { const t = medalTier(p, m); if (t > (p.medals[m.id] || 0)) { p.medals[m.id] = t; out.push({ m, tier: t }); } }
+  for (const m of MEDALS) { const t = medalTier(p, m), was = p.medals[m.id] || 0; if (t > was) { p.medals[m.id] = t; let coins = 0; for (let i = was + 1; i <= t; i++) coins += MEDAL_COINS[i]; p.coins = (p.coins || 0) + coins; out.push({ m, tier: t, coins }); } }
   return out;
 }
 
@@ -425,9 +427,10 @@ export function eventMods(evs) {
 // Phase 3: battles, healing, Rune Circles, factions and raids
 // =====================================================================================================================
 export const BATTLE_LEVEL = 5; // battles, factions and raids open at explorer level 5
-ITEMS.stitch = { plural: 'Stitch Kits', name: 'Stitch Kit', kind: 'heal', heal: 60, unlock: BATTLE_LEVEL, blurb: 'Needle, thread and a hug. Restores 60 HP to a Kiki.' };
-ITEMS.superstitch = { plural: 'Super Stitch Kits', name: 'Super Stitch Kit', kind: 'heal', heal: 200, unlock: 12, blurb: 'Extra-soft stuffing. Restores 200 HP to a Kiki.' };
-ITEMS.pillow = { plural: 'Revive Pillows', name: 'Revive Pillow', kind: 'revive', unlock: BATTLE_LEVEL, blurb: 'A nap on this and a fainted Kiki is back on its feet with half its HP.' };
+ITEMS.stitch = { plural: 'Herb Salves', name: 'Herb Salve', kind: 'heal', heal: 60, unlock: BATTLE_LEVEL, blurb: 'A cooling balm of meadow herbs. Restores 60 HP to a Kiki.' };
+ITEMS.superstitch = { plural: 'Super Salves', name: 'Super Salve', kind: 'heal', heal: 200, unlock: 12, blurb: 'A rich balm of honey and moonflower. Restores 200 HP to a Kiki.' };
+ITEMS.pillow = { plural: 'Revival Dews', name: 'Revival Dew', kind: 'revive', unlock: BATTLE_LEVEL, blurb: 'A drop of dawn dew from a Rune Circle. A fainted Kiki wakes up with half its HP.' };
+ITEMS.gift = { plural: 'Gifts', name: 'Gift', kind: 'gift', unlock: 1, blurb: 'A little parcel to send to a friend from the Friends screen. One a day per friend.' };
 ITEMS.key = { plural: 'Portal Keys', name: 'Portal Key', kind: 'raid', unlock: BATTLE_LEVEL, blurb: 'Opens a Portal Surge raid. Your first raid each day is free.' };
 export const HEALS = ['stitch', 'superstitch', 'pillow'];
 { // battle supplies in level-up rewards and supply stops
@@ -471,6 +474,7 @@ export class Battle {
   hit(side, power, charged) {
     const att = side === 0 ? this.me : this.them, def = side === 0 ? this.them : this.me;
     let dmg = damage(power, att, def), dodged = false;
+    if (side === 0) this.dealt = (this.dealt || 0) + Math.min(dmg, def.hp);
     if (side === 1 && this.t - this.dodgeT < 0.6) { dmg = Math.max(1, Math.floor(dmg * 0.25)); dodged = true; }
     def.hp = Math.max(0, def.hp - dmg);
     const ev = [{ type: 'hit', side, dmg, eff: effectiveness(att.el, def.el), charged, dodged }];
@@ -495,6 +499,12 @@ export class Battle {
     return this.hit(0, CHARGED.power, true);
   }
   dodge() { if (this.done) return []; this.dodgeT = this.t; return [{ type: 'dodge' }]; }
+  /** Co-op raids: the boss's HP comes from everyone's damage on the server. */
+  setHp(side, hp) {
+    const f = side ? this.them : this.me; if (this.done || !f) return [];
+    f.hp = Math.max(0, Math.min(f.maxHp, Math.round(hp)));
+    return f.hp === 0 ? this.faint(side) : [{ type: 'sync', side }];
+  }
   update(dt) {
     if (this.done) return [];
     const ev = []; this.t += dt; this.cool = Math.max(0, this.cool - dt);
@@ -561,3 +571,45 @@ export function raidCatchKiki(raid, r = sysRng) {
 }
 TASKS.push({ type: 'battle', n: 1, text: 'Win a battle at a Rune Circle', reward: { items: { stitch: 5, pillow: 2 } } }, { type: 'raid', n: 1, text: 'Win a Portal Surge raid', reward: { items: { key: 1, star: 3 } } });
 MEDALS.push({ id: 'battler', name: 'Champion', what: 'battles won', get: p => p.stats.wins || 0, tiers: [10, 100, 1000] }, { id: 'raider', name: 'Portal Diver', what: 'raids won', get: p => p.stats.raids || 0, tiers: [5, 50, 500] });
+
+// =====================================================================================================================
+// Phase 5: coins and the shop (in-game coins only, no real money)
+// =====================================================================================================================
+export const bagMax = p => p.bagMax || BAG_MAX;
+export const kikiMax = p => p.kikiMax || KIKI_MAX;
+export const SPACE_MAX = 500;
+/** Coins: from keeping Rune Circles (1 per 10 minutes, up to 50 a day) and from medals. */
+export const MEDAL_COINS = [0, 10, 25, 50];
+export function keeperCoins(p, since, now) {
+  const day = dayKey(now); if (p.coinDay !== day) { p.coinDay = day; p.coinsToday = 0; }
+  const c = Math.max(0, Math.min(Math.floor((now - since) / 600), 50 - p.coinsToday));
+  p.coinsToday += c; p.coins = (p.coins || 0) + c; return c;
+}
+export const SHOP = [
+  { id: 'rune20', name: '20 Rune Stones', price: 60, items: { rune: 20 } },
+  { id: 'moon10', name: '10 Moon Stones', price: 100, items: { moon: 10 }, level: 5 },
+  { id: 'star10', name: '10 Star Stones', price: 180, items: { star: 10 }, level: 10 },
+  { id: 'honey10', name: '10 Honey Leaves', price: 60, items: { honey: 10 }, level: 2 },
+  { id: 'sun5', name: '5 Sun Seeds', price: 90, items: { sunseed: 5 }, level: 6 },
+  { id: 'salve10', name: '10 Herb Salves', price: 80, items: { stitch: 10 }, level: BATTLE_LEVEL },
+  { id: 'dew5', name: '5 Revival Dews', price: 100, items: { pillow: 5 }, level: BATTLE_LEVEL },
+  { id: 'key', name: 'Portal Key', price: 100, items: { key: 1 }, level: BATTLE_LEVEL },
+  { id: 'nest', name: 'Cozy Nest (3 eggs)', price: 150, nest: true },
+  { id: 'bag', name: 'Bigger bag (+50)', price: 200, bag: 50 },
+  { id: 'box', name: 'More Kiki room (+50)', price: 200, box: 50 },
+];
+export function canBuy(p, it) {
+  if ((p.coins || 0) < it.price) return { ok: false, why: `You need ${it.price} coins.` };
+  if (it.level && levelOf(p.xp) < it.level) return { ok: false, why: `Unlocks at explorer level ${it.level}.` };
+  if (it.bag && bagMax(p) >= SPACE_MAX) return { ok: false, why: 'Your bag is as big as it gets!' };
+  if (it.box && kikiMax(p) >= SPACE_MAX) return { ok: false, why: 'You have all the Kiki room there is!' };
+  if (it.items && bagCount(p) + Object.values(it.items).reduce((a, n) => a + n, 0) > bagMax(p)) return { ok: false, why: 'Not enough room in your bag.' };
+  return { ok: true };
+}
+export function buy(p, id) {
+  const it = SHOP.find(x => x.id === id), c = it && canBuy(p, it); if (!c || !c.ok) return false;
+  p.coins -= it.price;
+  if (it.items) addItems(p, it.items); if (it.nest) p.nests.push({ id: 'cozy' + p.nextUid++, uses: NEST_USES, egg: null });
+  if (it.bag) p.bagMax = bagMax(p) + it.bag; if (it.box) p.kikiMax = kikiMax(p) + it.box;
+  return true;
+}

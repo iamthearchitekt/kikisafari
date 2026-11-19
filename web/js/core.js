@@ -293,3 +293,12 @@ function addCircle(list, id, name, where, now, date, progress, caught, data, mod
     }
   }
 }
+
+/** Phase 5: smoother GPS. Small wobbles (inside the reading's own accuracy) are eased in, so you and the map don't
+ * jitter while standing still; a real step (bigger than the accuracy) moves you at once. */
+export function smoothFix(prev, fix, accuracy, speed = null) {
+  const d = distance(prev, fix), acc = Math.max(5, accuracy || 5);
+  if (d > acc || speed > 0.7) return fix; // a real step, or the phone says you're walking
+  const k = Math.max(0.3, d / acc);
+  return { lat: prev.lat + (fix.lat - prev.lat) * k, lon: prev.lon + (fix.lon - prev.lon) * k };
+}

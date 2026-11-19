@@ -2,7 +2,7 @@
 // you and stays put as you turn the phone. Flick the Rune Stone up from the bottom of the screen (circle it first for
 // spin), or tap "Tap to throw". On a hit the portal sucks Kiki in and seals into the stone; it wobbles, then bursts
 // (caught) or blasts open (SO CLOSE!). Phase 1: pick a Rune, Moon or Star Stone, feed a treat, the ring's colour shows how
-// hard the catch is, every Kiki has its own Plush Power, a Kiki that breaks out can run away, and AR can be turned off.
+// hard the catch is, every Kiki has its own Power, a Kiki that breaks out can run away, and AR can be turned off.
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';

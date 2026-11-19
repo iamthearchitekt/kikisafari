@@ -216,7 +216,7 @@ depth, with KIKI SAFARI's own creatures, names and look. Built in the web versio
   move; dodging cuts that hit to a quarter. Each element has a quick and a charged move (Leaf Flick / Petal Storm,
   Splash / Bubble Burst, Ember Puff / Flare Spin, Zap / Thunder Hug, Pebble Pop / Rock Roll, Moon Glimmer / Dream
   Spiral). Stats come from the species plus the hidden stats: Zest is attack, Bounce defence, Cuddle HP.
-- **Damage stays** after a battle. Stitch Kits, Super Stitch Kits and Revive Pillows (all placeholders) heal; they
+- **Damage stays** after a battle. Herb Salves, Super Salves and Revival Dew (all placeholders) heal; they
   come from supply stops and level-ups from level 5.
 - **Rune Circles:** today's wild Keepers (1 to 3, around your level, the same on every phone). Beat them with up to
   3 Kikis and one of yours keeps the circle in your faction's colour, gathering Sprouts until you call it home. A
@@ -230,3 +230,45 @@ depth, with KIKI SAFARI's own creatures, names and look. Built in the web versio
   Difficulty was tuned by simulation: one-star takes three level-20 Kikis about 40 seconds; five-star needs six and
   good dodging.
 - Raids are solo in the web version. Co-op raids, shared circles and other players need the Phase 4 server.
+
+## 16. Kikis are creatures, not plushies (owner)
+
+"Lets strip out this idea that they are plushies, they are little creatures not stuffed animals." Kikis keep Kiki's
+look (round body, spiral eyes, crowns) but have smooth skin: no seams, stitches or fabric texture. Tummy patterns and
+Moonbeam's stars are natural markings, not embroidery. The healing items are now Herb Salve, Super Salve and Revival Dew
+(they were Stitch Kits and Revive Pillows; saves carry over). "Plush Power" is just "Power". Kiki's origin as the Big
+Plush mascot is unchanged; this is about how the game presents them.
+
+## 17. Phase 4: online (owner: "lets move to 4 & 5", "supa base is fine i have an account")
+
+- **Server:** the owner's Supabase project. Players sign in anonymously (no email, password or real name). The tables
+  can't be read or written directly (row-level security with no policies); every action is a server function in
+  `supabase/schema.sql` that checks who's asking. The game's publishable key is in `web/js/online.js`, which is fine:
+  it's meant to be public. Secret keys are never in the game.
+- **Anti-cheat:** each player is rate-limited (150 calls a minute). Positions sent for trades, raids and circles are
+  checked for impossible speed (over 300 km/h). Kikis sent to the server are checked against the real species list,
+  level and stat limits. Coins are paid only by the server when you're online.
+- **Moving phones:** a one-time 8-letter moving code (Settings ▸ Online account), stored only as a hash, valid for 15
+  minutes.
+- **Shared circles:** up to 6 keepers of one faction. Another faction battles all of them (played by the game) to clear
+  the circle. Keepers earn coins: 1 per 10 minutes, up to 50 a day, paid when they come home or are beaten.
+- **Co-op raids:** same circle, same Surge. Boss HP × (1 + 0.6 for each extra player); damage adds up live every 2 s.
+- **Friends:** codes, one gift a day per friend (gifts come from supply stops, 1 in 4 spins), friendship levels from
+  days as friends: Friends (1), Good (7), Great (30), Best (90).
+- **Trading:** both players within 100 m, a 4-digit code, both confirm. 100 Sprouts each.
+- **Leagues:** Sprout (Power ≤ 500), Bloom (≤ 1500) and Open; you battle other players' saved teams, not live players,
+  so nobody has to be online at once.
+- **Push:** Netlify Functions with Netlify Blobs, so there's nothing to set up (the keys are made on first use). It asks
+  Supabase who the player is with their own sign-in, so it needs no Supabase secrets. On iPhone, notifications only
+  work from the Home Screen app (iOS 16.4+).
+
+## 18. Phase 5: polish
+
+- **Music:** original chiptune, generated in the browser from short composed patterns (no audio files, nothing
+  licensed). Title (dreamy), map (bouncy), catch (playful), battle and raid (driving). Settings ▸ Music turns it off
+  separately from sound effects. It goes quiet when the app is in the background.
+- **Coins:** earned only by playing (keeping circles, medals: 10 / 25 / 50 for bronze / silver / gold). No real money.
+  Bag and Kiki room go up to 500 each.
+- **Battery saver:** 1× pixels and 30 frames a second on the map; catches and battles stay smooth.
+- **Units:** km or miles for distances on screen. Egg names stay "2 km / 5 km / 10 km" (they're names).
+- **Privacy page** (Settings ▸ Privacy) lists what stays on the phone, what goes online and to which service.

@@ -19,10 +19,10 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 - [x] 3. **Nearby panel.** Kikis around you, with silhouettes for ones you haven't caught. Rustling leaves on
       the map where something is hiding.
 - [x] 4. **Encounters with stakes.** Kikis can break out of the stone and run away. A coloured catch ring
-      (green, yellow, red) shows how hard each one is. Every Kiki shows its Plush Power*.
+      (green, yellow, red) shows how hard each one is. Every Kiki shows its Power.
 - [x] 5. **Stone tiers and treats.** Rune Stone, Moon Stone*, Star Stone* with better catch rates. Honey Leaf*
       makes a catch easier; Sun Seed* doubles the reward.
-- [x] 6. **Every Kiki is its own.** Plush Power, size (XS to XL), hidden stats, catch date and place. Nickname,
+- [x] 6. **Every Kiki is its own.** Power, size (XS to XL), hidden stats, catch date and place. Nickname,
       favourite, sort and filter.
 - [x] 7. **Growth.** Sprouts (from everything) plus that family's Fluff* (from catching it) power a Kiki up.
       Fluff evolves it. Send extras home for more Fluff. The three commons each evolve once for now: Meadow → Grand
@@ -39,7 +39,7 @@ street map with you on it; Safari Log; Sprouts; Portal Surges; Spiral Rite; spee
 **Done in the web version.** All 48 Kikis are Kikis (Kiki's body and spiral eyes) in new colours and crowns, since
 the owner hadn't picked between "Kiki variants only" and "Kiki plus friends".
 
-- [x] 12. **A real roster.** 48 Kikis in evolution families (some three stages), all in Kiki's plush style, including
+- [x] 12. **A real roster.** 48 Kikis in evolution families (some three stages), all in Kiki's style (little creatures, not stuffed toys), including
       six legendaries that only come through raids and story rewards. Listed in `web/js/species.js`.
 - [x] 13. **Elements***: Leaf, Water, Ember, Spark, Stone, Moon. Each is strong against two and weak to two.
 - [x] 14. **Live weather boosts** from local weather (Open-Meteo: free, no key). Rain boosts Water Kikis, etc.
@@ -58,7 +58,7 @@ the owner hadn't picked between "Kiki variants only" and "Kiki plus friends".
 
 - [x] 21. **Battle system.** Each Kiki has a quick move and a charged move. Tap to attack, swipe to dodge,
       fill a meter for the charged move.
-- [x] 22. **Health and healing items***: Stitch Kits (+60 HP), Super Stitch Kits (+200 HP) and Revive Pillows.
+- [x] 22. **Health and healing items***: Herb Salves (+60 HP), Super Salves (+200 HP) and Revival Dew.
 - [x] 23. **Rune Circle battles** against today's wild Keepers (1 to 3). Win and one of your Kikis keeps the circle.
       The Spiral Rite stays as a once-a-day attunement for Sprouts.
 - [x] 24. **Three factions***: Dusk Weavers, Tide Keepers and Bloom Wardens, chosen at level 5.
@@ -67,28 +67,45 @@ the owner hadn't picked between "Kiki variants only" and "Kiki plus friends".
 
 ## Phase 4: online (needs a server and accounts)
 
-- [ ] 26. **Accounts and cloud saves.** Play on any device, never lose progress.
-- [ ] 27. **Faction-held Rune Circles.** Leave a Kiki to defend; other players battle to take it; earn coins*
-      while it holds.
-- [ ] 28. **Co-op raids** with other players at the same circle.
-- [ ] 29. **Friends.** Friend codes, gifts from stops, friendship levels.
-- [ ] 30. **In-person trading** (within 100 m).
-- [ ] 31. **Player-vs-player battles** in leagues.
-- [ ] 32. **Push notifications** (iPhone Home Screen app, iOS 16.4+): surges, eggs hatching, defender knocked out.
-- [ ] 33. **Anti-cheat basics.** Server-side checks for GPS spoofing and teleporting.
+**Done in the web version.** The server is Supabase (owner's account): the schema and every server function are in
+`supabase/schema.sql`. Push notifications run as Netlify Functions next to the game (`netlify/functions`). Everything
+online is optional: offline, the game carries on and catches up when the signal is back.
+
+- [x] 26. **Accounts and cloud saves.** An anonymous account (no email or real name), made the first time you play.
+      Progress backs up as you play. Settings ▸ Online account gives a one-time moving code for a new phone.
+- [x] 27. **Faction-held Rune Circles.** Up to 6 keepers of one faction per circle; other factions battle them to take
+      it. Keepers earn coins (1 per 10 minutes, up to 50 a day), paid when they come home or are beaten.
+- [x] 28. **Co-op raids.** Everyone at the same circle in the same Portal Surge fights one boss together; the boss gets
+      more HP for each player, and the damage everyone does adds up live.
+- [x] 29. **Friends.** Friend codes, gifts (from supply stops, one a day per friend), friendship levels from days as
+      friends (Friends, Good, Great, Best).
+- [x] 30. **In-person trading** within 100 m, with a 4-digit trade code. Costs 100 Sprouts.
+- [x] 31. **Leagues.** Sprout (Power up to 500), Bloom (up to 1500) and Open. You battle other players' saved teams (the
+      game plays them, so nobody has to be online at the same time) and climb a ladder.
+- [x] 32. **Push notifications** (on iPhone, from the Home Screen app, iOS 16.4+): gifts, friend requests and Portal
+      Surge reminders. Egg hatching can't be pushed: walking only counts while the game is open.
+- [x] 33. **Anti-cheat basics.** The server rejects moves faster than 300 km/h, checks Kikis it's sent (species, level,
+      stats), rate-limits every player, and every action goes through a server function that checks who you are.
 
 ## Phase 5: polish
 
-- [ ] 34. **Original music and sound.** Map theme, encounter theme, catch fanfare.
-- [ ] 35. **Map look.** Day and night colours, green parks, blue water, 3D Rune Circle towers and stop markers.
-- [ ] 36. **Battery saver**, smoother GPS, offline grace period.
-- [ ] 37. **Settings.** Units, sound, AR on/off, privacy.
-- [ ] 38. **Shop** with in-game coins for bag and collection space and incubators. No real money for now.
+**Done in the web version.**
+
+- [x] 34. **Original music and sound.** Chiptune themes made in the game (no audio files) for the title, map, catches,
+      battles and raids, on top of the existing sound effects and catch fanfare.
+- [x] 35. **Map look.** Day and night colours, green parks, blue water, 3D Rune Circle towers and stop markers, plus a
+      soft horizon, cloud shadows by day and fireflies at night.
+- [x] 36. **Battery saver** (a lighter picture and 30 frames a second on the map), smoother GPS (small wobbles are
+      eased, real steps aren't), and an offline grace period (map areas stay on the phone for two weeks; online
+      features catch up when the signal returns).
+- [x] 37. **Settings.** Sound, music, motion, AR, battery saver, km or miles, privacy page.
+- [x] 38. **Shop** with in-game coins (from keeping circles and medals) for items, Cozy Nests, a bigger bag and more Kiki
+      room. No real money.
 
 ## Decisions for the owner
 
 - ~~**Home screen:** map first, with the camera in encounters, or keep camera first.~~ Map first (owner: "lets tackle phase 1"). The camera view stays one tap away (the AR button).
-- **Server for Phase 4:** Supabase recommended (free tier, works with Netlify).
-- **Names:** Plush Power, Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), Grand Meadow / Elder Pine /
+- ~~**Server for Phase 4:** Supabase recommended.~~ Supabase (owner: "supa base is fine i have an account").
+- **Names:** Fluff, Moon/Star Stone, Honey Leaf, Sun Seed, Ranger Rue (the guide), Grand Meadow / Elder Pine /
   Bloom Kiki, the hidden stats Cuddle / Bounce / Zest, elements, factions. Approve or rename.
 - **New creatures:** Kiki variants only, or Kiki plus friends? Built as Kiki variants for now; say if you want friends too.

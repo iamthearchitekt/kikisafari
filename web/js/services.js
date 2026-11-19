@@ -6,7 +6,7 @@ const SAVE = 'kiki-safari-progress';
 export function loadProgress() {
   try { return migrate(JSON.parse(localStorage.getItem(SAVE))); } catch (e) { return migrate(null); }
 }
-export const saveProgress = p => { try { localStorage.setItem(SAVE, JSON.stringify(p)); } catch (e) {} };
+export const saveProgress = p => { try { p.savedAt = Date.now(); localStorage.setItem(SAVE, JSON.stringify(p)); } catch (e) {} };
 
 export const settings = {
   get(k, d) { try { const v = localStorage.getItem('kiki-' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -53,6 +53,8 @@ export function unlockAudio() {
   }
   if (ac.state === 'suspended') ac.resume();
 }
+/** For the music player: the shared audio context and master volume (null until the first tap). */
+export const audioOut = () => (ac ? { ac, master } : null);
 export function setSound(on) { settings.set('sound', on); if (master) master.gain.value = on ? 1 : 0; }
 const NOTES = {
   tick: [['square', 1800, 1800, .02, .4]], button: [['square', 880, 1320, .05, .5]], throw: [['triangle', 300, 900, .16, 1]],
@@ -106,3 +108,7 @@ export function shake(el, px = 14, ms = 400) {
   requestAnimationFrame(step);
 }
 export const wait = ms => new Promise(r => setTimeout(r, ms));
+// ---------- units (Phase 5): kilometres or miles ----------
+export const miles = () => settings.get('units', 'km') === 'mi';
+export function fmtDist(m) { if (!miles()) return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km'; const ft = m * 3.281; return ft < 1000 ? Math.round(ft) + ' ft' : (m / 1609.34).toFixed(1) + ' mi'; }
+export const fmtKm = (km, d = 1) => miles() ? (km / 1.60934).toFixed(d) + ' mi' : km.toFixed(d) + ' km';

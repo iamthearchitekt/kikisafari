@@ -1,6 +1,6 @@
 // KIKI SAFARI art for the web, in three.js. Kiki is the claw game's makeMascot() (Big Plush), with the same tweaks as
 // the Unity project's Core/Art: chubbier pear body, bigger grin, bolder mirrored spirals, a V-folded leaf fan, and the
-// six variants' crowns, embroidery and glow. Plus the Rune Stone, the portal, Rune Circles and sparkles.
+// six variants' crowns, markings and glow. Kikis are little creatures, not stuffed toys (owner): smooth skin, no seams. Plus the Rune Stone, the portal, Rune Circles and sparkles.
 import * as THREE from '../vendor/three.module.min.js';
 import { rng, hash, variant } from './core.js';
 
@@ -25,7 +25,7 @@ export function lookFor(id, sparkle = false) {
   return out;
 }
 
-// ---------- face texture and plush normal map (canvas, like the claw game) ----------
+// ---------- skin texture and normal map (canvas) ----------
 const CX = 512, EYE_Y = 190, EYE_DX = 66, SPIRAL_R = 38, MY = 250, MW = 98, MH = 56;
 function spiralPath(g, x, y, R, dir, turns = 2.4) {
   g.beginPath();
@@ -36,7 +36,7 @@ function mouthPath(g, sx = 1, sy = 1) {
   g.beginPath(); g.moveTo(...T(CX - MW, MY)); g.quadraticCurveTo(...T(CX, MY - 8), ...T(CX + MW, MY));
   g.bezierCurveTo(...T(CX + MW * 0.85, MY + MH * 1.3), ...T(CX - MW * 0.85, MY + MH * 1.3), ...T(CX - MW, MY)); g.closePath();
 }
-/** Tummy embroidery shapes (Phase 2), centred at (x, y), about 2R across. */
+/** Tummy marking shapes (Phase 2), centred at (x, y), about 2R across. */
 function bellyPath(g, shape, x = 512, y = 366, R = 52) {
   g.beginPath();
   const P = pts => pts.forEach(([px, py], i) => i ? g.lineTo(x + px * R, y + py * R) : g.moveTo(x + px * R, y + py * R));
@@ -60,7 +60,7 @@ function faceTextures(look) {
   const g = c.getContext('2d');
   g.fillStyle = HEX(look.body); g.fillRect(0, 0, 1024, 512);
   const r = rng(1);
-  for (let i = 0; i < 3000; i++) { g.fillStyle = r.next() < 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(120,60,0,.04)'; g.fillRect(r.next() * 1024, r.next() * 512, 2, 2); }
+  for (let i = 0; i < 900; i++) { g.fillStyle = r.next() < 0.5 ? 'rgba(255,255,255,.035)' : 'rgba(120,60,0,.03)'; g.beginPath(); g.arc(r.next() * 1024, r.next() * 512, 3 + r.next() * 6, 0, 7); g.fill(); } // soft skin mottling
   g.lineCap = 'round'; g.lineJoin = 'round';
   if (look.stars) {
     g.strokeStyle = look.starColor || '#c77dff';
@@ -73,7 +73,7 @@ function faceTextures(look) {
   if (look.belly) {
     const [shape, dark, light] = look.belly;
     if (bellyPath(g, shape) === 'stroke') { g.strokeStyle = dark; g.lineWidth = 10; g.stroke(); bellyPath(g, shape); g.strokeStyle = light; g.lineWidth = 5.5; g.stroke(); }
-    else { g.fillStyle = light; g.fill(); g.strokeStyle = dark; g.lineWidth = 7; g.stroke(); g.setLineDash([7, 6]); g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 2; bellyPath(g, shape, 512, 366, 40); g.stroke(); g.setLineDash([]); }
+    else { g.fillStyle = light; g.fill(); g.strokeStyle = dark; g.lineWidth = 5; g.stroke(); } // a natural marking, like a patch of colour
   }
   for (const s of [-1, 1]) {
     g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(CX + s * EYE_DX, EYE_Y, 44, 0, 7); g.fill();
@@ -87,27 +87,15 @@ function faceTextures(look) {
   texCache.set(key, res);
   return res;
 }
-/** Plush normal map: fabric grain, seams (groove + raised stitches), domed eye discs, raised piping, carved mouth. Only depends on the tummy shape. */
+/** Skin normal map: smooth, with the eyes very slightly domed and the mouth carved in. (No seams or stitches: Kikis are creatures.) */
 function normalMap(belly) {
+  belly = ''; // markings are colour only
   if (normCache.has(belly)) return normCache.get(belly);
   const n = document.createElement('canvas'); n.width = 1024; n.height = 512;
   const h = n.getContext('2d', { willReadFrequently: true });
   h.fillStyle = '#808080'; h.fillRect(0, 0, 1024, 512);
-  const r2 = rng(2);
-  for (let i = 0; i < 14000; i++) { h.fillStyle = r2.next() < .5 ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.02)'; h.beginPath(); h.arc(r2.next() * 1024, r2.next() * 512, .6 + r2.next() * 1.2, 0, 7); h.fill(); }
-  for (const sx of [256, 768]) {
-    for (let w = 11; w >= 1; w -= 2) { h.strokeStyle = 'rgba(0,0,0,.09)'; h.lineWidth = w; h.beginPath(); h.moveTo(sx, 0); h.lineTo(sx, 512); h.stroke(); }
-    h.setLineDash([8, 7]); h.lineCap = 'round';
-    for (const side of [-1, 1]) { h.strokeStyle = 'rgba(255,255,255,.35)'; h.lineWidth = 3; h.beginPath(); h.moveTo(sx + side * 8, 4); h.lineTo(sx + side * 8, 508); h.stroke(); }
-    h.setLineDash([]);
-  }
   h.lineCap = 'round'; h.lineJoin = 'round';
-  for (const s of [-1, 1]) {
-    const ex = CX + s * EYE_DX;
-    for (let k = 0; k < 8; k++) { h.fillStyle = 'rgba(255,255,255,.045)'; h.beginPath(); h.arc(ex, EYE_Y, 50 - k * 3, 0, 7); h.fill(); }
-    for (const [w, a] of [[14, .22], [10, .3], [6, .35]]) { spiralPath(h, ex, EYE_Y, SPIRAL_R, s); h.strokeStyle = `rgba(255,255,255,${a})`; h.lineWidth = w; h.stroke(); }
-  }
-  if (belly) for (const [w, a] of [[12, .2], [7, .3]]) { const kind = bellyPath(h, belly); if (kind === 'fill') { h.fillStyle = 'rgba(255,255,255,.08)'; h.fill(); } h.strokeStyle = `rgba(255,255,255,${a})`; h.lineWidth = w; h.stroke(); }
+  for (const s of [-1, 1]) { const ex = CX + s * EYE_DX; for (let k = 0; k < 8; k++) { h.fillStyle = 'rgba(255,255,255,.04)'; h.beginPath(); h.arc(ex, EYE_Y, 50 - k * 3, 0, 7); h.fill(); } }
   for (let k = 0; k < 24; k++) { mouthPath(h, 1 - k * 0.026, 1 - k * 0.03); h.fillStyle = 'rgba(0,0,0,.05)'; h.fill(); }
   const src = h.getImageData(0, 0, 1024, 512).data, H = new Float32Array(1024 * 512);
   for (let i = 0; i < H.length; i++) H[i] = src[i * 4] / 255;
@@ -490,7 +478,7 @@ function crownGeometry(id, look, key = id) {
 }
 
 // ---------- materials ----------
-/** Matte plush with a soft velvet rim (treatment section 3: roughness ~0.4, metalness 0, never shiny). */
+/** Soft, matte skin with a gentle rim light (roughness ~0.4, metalness 0, never shiny). Used for Kikis and props. */
 export function plush(params, rim = 0.4) {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0, ...params });
   m.onBeforeCompile = sh => {
@@ -973,6 +961,35 @@ export function makeEgg(km, height = 1) {
   return root;
 }
 
+// ---------- bag items with their own looks (Phase 3 and 4) ----------
+/** Gift box, Herb Salve (a jar of green balm), Super Salve (honey and moonflower), Revival Dew (a glowing drop), Portal Key. About 1 unit. */
+export function makeItem(id) {
+  const g = new THREE.Group(), M = (c, r = 0.45) => plush({ color: c, roughness: r }, 0.3);
+  if (id === 'gift') {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1, 0.8, 1, 2, 2, 2), M(0xff6fae)); g.add(box);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.22, 1.1), M(0xff8fc0)); lid.position.y = 0.48; g.add(lid);
+    for (const [sx, sz] of [[0.18, 1.12], [1.12, 0.18]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.86, sz), M(0xffd23f)); g.add(r); const r2 = new THREE.Mesh(new THREE.BoxGeometry(sx * 1.02, 0.24, sz * 1.02), M(0xffd23f)); r2.position.y = 0.48; g.add(r2); }
+    for (const s2 of [-1, 1]) { const bow = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.07, 10, 20), M(0xffd23f)); bow.position.set(s2 * 0.18, 0.72, 0); bow.rotation.set(0, Math.PI / 2, s2 * 0.6); g.add(bow); }
+  } else if (id === 'stitch' || id === 'superstitch') {
+    const sup = id === 'superstitch', jar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 0.62, 28), new THREE.MeshStandardMaterial({ color: sup ? 0xffe6a0 : 0xd8f2ff, roughness: 0.15, transparent: true, opacity: 0.75 }));
+    g.add(jar); const balm = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.34, 0.46, 28), M(sup ? 0xffb000 : 0x5fd34b, 0.6)); balm.position.y = -0.06; g.add(balm);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.16, 28), M(sup ? 0x8c4dff : 0x2f8f3a)); lid.position.y = 0.39; g.add(lid);
+    const leaf = new THREE.Mesh(leafGeometry(0.6, 0.8, 0x2f9e24, 0x9be36a, true), M(0xffffff)); leaf.material.vertexColors = true; leaf.position.set(0, 0.48, -0.15); leaf.rotation.x = -0.5; leaf.scale.setScalar(0.5); g.add(leaf);
+    if (sup) { const fl = new THREE.Mesh(new THREE.OctahedronGeometry(0.13), M(0xffffff)); fl.position.set(0.18, 0.6, 0.1); g.add(fl); }
+  } else if (id === 'pillow') {
+    const pts = []; for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI, y = -Math.cos(a); pts.push(new THREE.Vector2(Math.max(1e-4, Math.sin(a) * 0.45 * Math.pow((1 - y) / 2, 0.55)), y * 0.6)); }
+    const drop = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), new THREE.MeshStandardMaterial({ color: 0x8fdcff, roughness: 0.08, emissive: 0x2a6aff, emissiveIntensity: 0.35, transparent: true, opacity: 0.88 }));
+    g.add(drop); const halo = glowShell(drop.geometry, 1.1, 1.8, 0x7fd0ff); halo.scale.setScalar(1.3); g.add(halo);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })); shine.position.set(-0.12, -0.05, 0.3); g.add(shine);
+  } else if (id === 'key') {
+    const gold = M(0xffc928, 0.3), ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.1, 12, 32), gold); ring.position.y = 0.45; g.add(ring);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 12), gold); shaft.position.y = -0.2; g.add(shaft);
+    for (const [y, w] of [[-0.5, 0.26], [-0.32, 0.2]]) { const t = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, 0.1), gold); t.position.set(w / 2, y, 0); g.add(t); }
+    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), M(0x8c4dff, 0.2)); gem.position.y = 0.45; g.add(gem);
+  }
+  return g;
+}
+
 // ---------- portraits for the menus (Kikis, items, your explorer), rendered once and cached ----------
 let pr = null; const portraits = new Map();
 function portraitRenderer() {
@@ -997,6 +1014,7 @@ export function portrait(what, size = 256) {
   else if (kind === 'egg') { obj = makeEgg(+a, 1); obj.rotation.y = -0.25; cam.position.set(0, 0.55, 2.6); cam.lookAt(0, 0.5, 0); }
   else if (kind === 'explorer') { obj = makeExplorer(+a, +b); obj.userData.update(0, 0); obj.rotation.y = -0.3; cam.position.set(0, 0.78, 1.35); cam.lookAt(0, 0.74, 0); }
   else if (kind === 'explorer-full') { obj = makeExplorer(+a, +b); obj.userData.update(0, 0); obj.rotation.y = -0.4; cam.position.set(0, 0.62, 2.6); cam.lookAt(0, 0.5, 0); }
+  else if (['gift', 'stitch', 'superstitch', 'pillow', 'key'].includes(a)) { obj = makeItem(a); obj.rotation.set(0.35, -0.6, 0); cam.position.set(0, 0, 4.4); cam.lookAt(0, 0, 0); }
   else if (a === 'honey' || a === 'sunseed') { obj = makeTreat(a, 1); if (a === 'honey') obj.rotation.set(1.2, Math.PI - 0.7, 0); else obj.rotation.set(0.2, 0.5, -0.3); cam.position.set(0, 0, a === 'honey' ? 4.3 : 3.8); cam.lookAt(0, 0, 0); }
   else { obj = makeRuneStone(1, a); obj.rotation.set(-1.05, 0, 0.25); obj.userData.update(0, 0.25); cam.position.set(0, 0, 6.4); cam.lookAt(0, 0, 0); }
   scene.add(obj); r.render(scene, cam); const url = r.domElement.toDataURL('image/png'); scene.remove(obj);
