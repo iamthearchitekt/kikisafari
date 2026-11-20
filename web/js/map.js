@@ -42,19 +42,36 @@ function ribbon(layer, pts, width, y, color) {
   for (let i = 0; i < n - 1; i++) { layer.tri(L[i], R[i], L[i + 1], color); layer.tri(R[i], R[i + 1], L[i + 1], color); }
 }
 const openRing = pts => { const r = pts.slice(); if (r.length > 1 && r[0].x === r[r.length - 1].x && r[0].z === r[r.length - 1].z) r.pop(); return r; };
+/** A footprint pulled in by d metres all round (so neighbouring buildings never share a wall in the same place). */
+function inset(ring, d) {
+  let A = 0; for (let i = 0; i < ring.length; i++) { const p = ring[i], q = ring[(i + 1) % ring.length]; A += p.x * q.z - q.x * p.z; }
+  const s = A > 0 ? 1 : -1, n = ring.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = ring[(i - 1 + n) % n], p = ring[i], p1 = ring[(i + 1) % n];
+    const e1x = p.x - p0.x, e1z = p.z - p0.z, l1 = Math.hypot(e1x, e1z) || 1, e2x = p1.x - p.x, e2z = p1.z - p.z, l2 = Math.hypot(e2x, e2z) || 1;
+    const n1x = -e1z / l1 * s, n1z = e1x / l1 * s, n2x = -e2z / l2 * s, n2z = e2x / l2 * s; // inward normals
+    let bx = n1x + n2x, bz = n1z + n2z; const bl = Math.hypot(bx, bz) || 1; bx /= bl; bz /= bl;
+    const k = d / Math.max(0.35, bx * n1x + bz * n1z);
+    out.push({ x: p.x + bx * k, z: p.z + bz * k });
+  }
+  return out;
+}
 function building(layer, pts, h, pal, holes = []) {
-  const ring = openRing(pts); if (ring.length < 3) return;
+  let ring = openRing(pts); if (ring.length < 3) return;
+  ring = inset(ring, 0.15);
+  h += (Math.abs(Math.round(ring[0].x * 13.7 + ring[0].z * 5.3)) % 17) * 0.035; // each roof at its own height, never level with a neighbour's
   // each building a slightly different shade; walls darker at the foot (soft contact shadow) and lit by direction
   const vary = 0.94 + ((Math.abs(Math.round(ring[0].x * 7.13 + ring[0].z * 3.71)) % 13) / 13) * 0.12, wall = new THREE.Color(pal.wall).multiplyScalar(vary);
-  for (const r of [ring, ...holes.map(openRing)]) for (let i = 0; i < r.length; i++) { // outside walls, and the walls round courtyards
+  // Walls in two bands that never overlap (overlapping faces flicker on phones): the wall itself, darker at the foot,
+  // and a lighter band along the top edge. Courtyard walls get the same.
+  const rimC = new THREE.Color(pal.roof).lerp(new THREE.Color(0xffffff), 0.3), band = Math.min(0.5, h * 0.12), split = h - band;
+  for (const r of [ring, ...holes.map(openRing)]) for (let i = 0; i < r.length; i++) {
     const a = r[i], b = r[(i + 1) % r.length], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); if (l < 1e-6) continue;
-    const shade = 0.8 + 0.2 * Math.abs(dz / l), top = wall.clone().multiplyScalar(shade), foot = top.clone().multiplyScalar(0.66);
-    layer.tri([a.x, 0.06, a.z], [b.x, 0.06, b.z], [b.x, h, b.z], foot, foot, top); layer.tri([a.x, 0.06, a.z], [b.x, h, b.z], [a.x, h, a.z], foot, top, top);
+    const shade = 0.8 + 0.2 * Math.abs(dz / l), top = wall.clone().multiplyScalar(shade), foot = top.clone().multiplyScalar(0.66), rim = rimC.clone().multiplyScalar(0.85 + 0.15 * shade);
+    layer.tri([a.x, 0.06, a.z], [b.x, 0.06, b.z], [b.x, split, b.z], foot, foot, top); layer.tri([a.x, 0.06, a.z], [b.x, split, b.z], [a.x, split, a.z], foot, top, top);
+    layer.tri([a.x, split, a.z], [b.x, split, b.z], [b.x, h, b.z], rim, rim, rim); layer.tri([a.x, split, a.z], [b.x, h, b.z], [a.x, h, a.z], rim, rim, rim);
   }
   flat(layer, ring, h, new THREE.Color(pal.roof).multiplyScalar(vary), holes);
-  // a lighter rim along the roof edge
-  const rim = new THREE.Color(pal.roof).lerp(new THREE.Color(0xffffff), 0.35);
-  for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; layer.tri([a.x, h + 0.02, a.z], [b.x, h + 0.02, b.z], [b.x, h - 0.5, b.z], rim, rim, rim.clone().multiplyScalar(0.8)); layer.tri([a.x, h + 0.02, a.z], [b.x, h - 0.5, b.z], [a.x, h - 0.5, a.z], rim, rim.clone().multiplyScalar(0.8), rim.clone().multiplyScalar(0.8)); }
 }
 
 // ---------- trees in parks and woods (premium part 2): stylised, board-game trees, all instanced ----------

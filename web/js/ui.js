@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, HAIR_STYLES, HATS, GLASSES, BAGS, PATTERNS, LEGS, EXTRAS, HAIR_COLORS, EYE_COLORS, CLOTHES } from './art.js';
+import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, HAIR_STYLES, BEARDS, HATS, GLASSES, BAGS, PATTERNS, LEGS, EXTRAS, HAIR_COLORS, EYE_COLORS, CLOTHES } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -353,6 +353,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
       ${sw('skin', SKINS, 'Skin')}
       ${chips('hair', HAIR_STYLES, 'Hair')}
       ${sw('hairC', HAIR_COLORS, 'Hair colour')}
+      ${chips('beard', BEARDS, 'Beard')}
       ${sw('eyes', EYE_COLORS, 'Eyes')}
       ${chips('hat', HATS, 'Hat')}
       <div class="look-if" data-if="hat">${sw('hatC', CLOTHES, 'Hat colour')}</div>

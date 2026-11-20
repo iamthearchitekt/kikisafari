@@ -135,9 +135,12 @@ function eggGeometry() {
 }
 function armGeometry() {
   return cached('arm', () => {
+    // A rounded shoulder (a ball that stays buried inside the body) so the arm never opens up at the seam when it waves
+    // or swings, then the arm itself, tapering to a round tip.
     const pts = [];
+    for (let j = 0; j < 8; j++) { const f = -Math.PI / 2 + j / 8 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, 0.3 * Math.cos(f)), -0.12 + 0.3 * Math.sin(f))); }
     for (let i = 0; i <= 14; i++) { const t = i / 14, tip = Math.max(0, (t - 0.72) / 0.28); pts.push(new THREE.Vector2(Math.max(1e-4, (0.3 - 0.07 * t) * Math.sqrt(1 - tip * tip)), -0.12 + 0.62 * t)); }
-    return new THREE.LatheGeometry(pts, 16);
+    return new THREE.LatheGeometry(pts, 20);
   });
 }
 const M4 = (x, y, z, rx, ry, sx, sy, sz) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0, 'YXZ')), new THREE.Vector3(sx, sy, sz));
@@ -532,7 +535,7 @@ export function makeKiki(id, height = 0.42, sparkle = false) {
   model.add(new THREE.Mesh(eggGeometry(), m.body));
   model.add(new THREE.Mesh(feetGeometry(), m.limb));
   const arms = [];
-  for (const [x, y, rz] of [[-0.9, 0.0, 0.62], [0.9, -0.05, -2.15]]) {
+  for (const [x, y, rz] of [[-0.86, 0.0, 0.62], [0.86, -0.05, -2.15]]) { // shoulders set a little into the body
     const pivot = new THREE.Object3D(); pivot.position.set(x, y, 0.05); pivot.rotation.z = rz; pivot.userData.rest = rz;
     pivot.add(new THREE.Mesh(armGeometry(), m.limb)); model.add(pivot); arms.push(pivot);
   }
@@ -682,28 +685,31 @@ export function standingStoneGeometry() {
   });
 }
 let _void;
-function voidTexture() {
-  if (_void) return _void;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), id = x.createImageData(128, 128);
-  for (let y = 0; y < 128; y++) for (let X = 0; X < 128; X++) { const r = Math.hypot((X + .5) / 64 - 1, (y + .5) / 64 - 1), a = Math.pow(Math.min(1, Math.max(0, (1 - r) / .35)), 1.2) * .94, i = (y * 128 + X) * 4; id.data[i] = 20; id.data[i + 1] = 5; id.data[i + 2] = 51; id.data[i + 3] = a * 255; }
-  x.putImageData(id, 0, 0); _void = new THREE.CanvasTexture(c); _void.colorSpace = THREE.SRGBColorSpace; return _void;
-}
 /** The capture portal: a dark void with a swirling UV-purple vortex (screen blend). Billboard it toward the camera. */
 export function makePortal(size = 1) {
+  // A swirling vortex (owner: "a high end swirling portal … no hard black edge"): spiral arms winding inwards and
+  // turning, fine pink streaks, a cyan sheen, a deep violet eye with a bright pinpoint, and edges that fade to nothing.
   const g = new THREE.Group(), disc = new THREE.Group(); g.add(disc);
-  disc.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: voidTexture(), transparent: true, depthWrite: false })));
-  const u = { t: { value: 0 }, pull: { value: 1.5 }, speed: { value: 3 }, k: { value: 1.15 } };
-  const vx = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneMinusDstColorFactor, blendDst: THREE.OneFactor, uniforms: u,
+  const u = { t: { value: 0 }, pull: { value: 1 }, speed: { value: 1.6 }, k: { value: 1 } };
+  const vx = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, premultipliedAlpha: true, uniforms: u,
     vertexShader: 'varying vec2 uv2; void main(){ uv2 = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: `uniform float t, pull, speed, k; varying vec2 uv2;
-      void main(){ vec2 c = uv2*2.-1.; float r = length(c); if (r>1.) discard; float ang = atan(c.y,c.x);
-        float arms = pow(.5+.5*cos(ang*4. + log(r+.04)*6.4 + t*speed), 3.);
-        float streams = pow(.5+.5*cos(ang*9. - log(r+.04)*6. + t*speed*1.7 + r*pull*8.), 8.);
-        float edge = smoothstep(1.,.72,r); float rim = smoothstep(.75,.92,r)*edge; float core = pow(clamp(1.-r*1.6,0.,1.),2.);
-        float kk = (arms*.75 + streams*.35 + rim*.9 + core*1.3)*edge;
-        vec3 col = mix(vec3(.25,.05,.85), vec3(.478,0.,1.), clamp(arms+core,0.,1.));
-        gl_FragColor = vec4(col*kk*k, 1.); }` }));
-  vx.position.z = 0.002; vx.renderOrder = 2; disc.add(vx);
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+      void main(){
+        vec2 c = uv2*2.-1.; float r = length(c); if (r > 1.) discard;
+        float ang = atan(c.y, c.x), sw = ang + log(r + .035) * (2.4 + pull * .9) - t * speed;
+        float arms = pow(.5 + .5 * sin(sw * 3.), 2.2);
+        float grain = n(vec2(sw * 2.4, r * 6. - t * speed * .7)), streak = pow(.5 + .5 * sin(sw * 9. + grain * 3.2), 6.);
+        float fade = smoothstep(1., .5, r), halo = smoothstep(1., .3, r) * .5, eye = smoothstep(.0, .45, r), core = pow(max(0., 1. - r * 2.6), 3.);
+        vec3 deep = vec3(.05, .01, .16), purple = vec3(.5, .07, 1.), pink = vec3(1., .38, .88), cyan = vec3(.4, .86, 1.);
+        vec3 col = mix(deep, purple, eye * (.3 + arms * .7));
+        col = mix(col, pink, streak * .55 * eye);
+        col += cyan * pow(arms, 4.) * .35 * fade + vec3(1., .85, 1.) * core * 1.4;
+        float a = clamp((fade * (.5 + .5 * arms) + halo * .45) * mix(1., .9, eye) + core, 0., 1.);
+        gl_FragColor = vec4(col * k * a, a);
+      }` }));
+  vx.renderOrder = 2; disc.add(vx);
   disc.scale.setScalar(0.0001);
   g.userData = { disc, u, open: 0, target: 0, size, boost: 0 };
   g.userData.update = (dt, time, camera) => {
@@ -711,11 +717,43 @@ export function makePortal(size = 1) {
     const rate = d.target > d.open ? 3.2 : 4.5;
     d.open += Math.sign(d.target - d.open) * Math.min(Math.abs(d.target - d.open), dt * rate);
     const s = d.target >= d.open ? easeOutBack(d.open) : d.open * d.open;
-    d.disc.scale.setScalar(Math.max(0.0001, d.size * s));
-    d.u.speed.value = 3 + d.boost * 6; d.u.pull.value = 1.5 + d.boost * 3; d.u.k.value = 1.15 + d.boost * 0.5;
+    d.disc.scale.setScalar(Math.max(0.0001, d.size * s * (1 + d.boost * 0.18)));
+    d.u.speed.value = 1.6 + d.boost * 5; d.u.pull.value = 1 + d.boost * 2.5; d.u.k.value = 1 + d.boost * 0.45;
     if (camera) g.quaternion.copy(camera.quaternion);
   };
   return g;
+}
+/**
+ * Get a Kiki ready to be sucked into a portal (owner: "distorts the Kiki like when people get sucked into Jumanji").
+ * Its materials get a vertex twist, worked out in world space: round the line from the camera through the portal, the
+ * Kiki swirls like water down a drain (the inner parts faster), its outer edges lag and smear into spiral arms, and it
+ * all shrinks into the eye. set(suck 0..1, portal centre (world), axis (world, camera → portal), time).
+ */
+export function vortexify(obj) {
+  const U = { vxSuck: { value: 0 }, vxC: { value: new THREE.Vector3() }, vxAx: { value: new THREE.Vector3(0, 0, -1) }, vxT: { value: 0 } };
+  const HEAD = `uniform float vxSuck; uniform vec3 vxC; uniform vec3 vxAx; uniform float vxT;
+    vec3 vxRot(vec3 p, vec3 ax, float a){ float c = cos(a), s = sin(a); return p*c + cross(ax, p)*s + ax*dot(ax, p)*(1.-c); }
+    void main() {`;
+  const BODY = `vec4 vxW = modelMatrix * vec4(transformed, 1.0);
+    if (vxSuck > 0.0) {
+      vec3 p = vxW.xyz - vxC; float along = dot(p, vxAx); vec3 lat = p - vxAx * along; float r = length(lat);
+      float f = clamp(vxSuck * (1.3 - r * 0.9), 0.0, 1.0);
+      lat = vxRot(lat, vxAx, pow(f, 1.4) * (2.5 + 1.5 / (r + 0.05)) + vxT * 5.0 * f); // inner parts spin much faster: a real twist
+      lat *= 1.0 - pow(f, 1.5);
+      vxW.xyz = vxC + vxAx * along * (1.0 - f) + lat;
+    }
+    vec4 mvPosition = viewMatrix * vxW;
+    gl_Position = projectionMatrix * mvPosition;`;
+  obj.traverse(o => {
+    if (!o.isMesh || !o.material || o.userData.noVortex) return;
+    const one = src => {
+      const m = src.clone(), prev = src.onBeforeCompile, key = src.customProgramCacheKey.bind(src);
+      m.onBeforeCompile = (sh, r) => { prev.call(m, sh, r); Object.assign(sh.uniforms, U); sh.vertexShader = sh.vertexShader.replace('void main() {', HEAD).replace('#include <project_vertex>', BODY); };
+      m.customProgramCacheKey = () => key() + '|vortex'; return m;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(one) : one(o.material);
+  });
+  return { set(suck, centre, axis, time) { U.vxSuck.value = suck; U.vxC.value.copy(centre); U.vxAx.value.copy(axis).normalize(); U.vxT.value = time; } };
 }
 export const easeOutBack = (t, s = 1.70158) => { t = Math.min(1, Math.max(0, t)) - 1; return t * t * ((s + 1) * t + s) + 1; };
 
@@ -848,7 +886,8 @@ export function makeTreat(id, size = 0.06) {
 // A look is a flat object of numbers (see LOOK_KEYS; colours are 0xRRGGBB). Old saves only have { outfit, skin }:
 // lookOf() turns those into a full look.
 export const SKINS = [0xffe6cf, 0xffd3ae, 0xf1bd8e, 0xdba06e, 0xbf8452, 0x9b6339, 0x744626, 0x50301a];
-export const HAIR_STYLES = ['Short', 'Bob', 'Long', 'Ponytail', 'Space buns', 'Curly', 'Spiky', 'Buzz', 'Dreads', 'Mohawk', 'Braids'];
+export const HAIR_STYLES = ['Short', 'Bob', 'Long', 'Ponytail', 'Space buns', 'Curly', 'Spiky', 'Buzz', 'Dreads', 'Mohawk', 'Braids', 'Bald'];
+export const BEARDS = ['No beard', 'Stubble', 'Beard', 'Big beard', 'Mustache'];
 export const HATS = ['No hat', 'Bucket', 'Trucker', 'Beanie', 'Cowboy', 'Flower crown', 'Bandana', 'Ranger'];
 export const GLASSES = ['No shades', 'Round', 'Hearts', 'Shutter', 'LED'];
 export const BAGS = ['Backpack', 'Hydration pack', 'Fanny pack', 'No bag'];
@@ -861,17 +900,17 @@ export const CLOTHES = [0xffffff, 0xfff2c4, 0xffcf2e, 0xff8a00, 0xe23a3a, 0xff5d
 const OLD_SKIN = [0, 2, 3, 5, 6];
 // Quick looks (old saves' outfits 0 to 3 become the first four; Ranger Rue is the guide).
 export const OUTFITS = [
-  ['Wook', { hair: 8, hairC: 0x6e4426, hat: 1, hatC: 0x3fae2a, top: 0xff5d8f, topPat: 1, bottom: 0xc79a5b, botPat: 5, pants: 1, shoes: 0x6b4a2a, pack: 0x2b3a8f, bag: 1, glasses: 1, glassC: 0xff8a00, eyes: 0x5a3218, kandi: 1, totem: 1 }],
+  ['Wook', { hair: 8, beard: 3, hairC: 0x6e4426, hat: 1, hatC: 0x3fae2a, top: 0xff5d8f, topPat: 1, bottom: 0xc79a5b, botPat: 5, pants: 1, shoes: 0x6b4a2a, pack: 0x2b3a8f, bag: 1, glasses: 1, glassC: 0xff8a00, eyes: 0x5a3218, kandi: 1, totem: 1 }],
   ['Raver', { hair: 4, hairC: 0xff7ab8, hat: 0, hatC: 0xffcf2e, top: 0xffffff, topPat: 2, bottom: 0x1f1f2e, botPat: 4, pants: 0, shoes: 0xffffff, pack: 0xc77dff, bag: 2, glasses: 2, glassC: 0xff5d8f, eyes: 0x2f7fe0, kandi: 1, gloves: 1 }],
   ['Bass Head', { hair: 9, hairC: 0x48a8ff, hat: 0, hatC: 0x1f1f2e, top: 0x8c4dff, topPat: 3, bottom: 0x1f1f2e, botPat: 0, pants: 1, shoes: 0x1f1f2e, pack: 0x1f1f2e, bag: 2, glasses: 4, glassC: 0x2bc4b6, eyes: 0x7a3ad6, gloves: 1 }],
   ['Flower Child', { hair: 2, hairC: 0xf2cf6b, hat: 5, hatC: 0xff5d8f, top: 0xfff2c4, topPat: 7, bottom: 0x36b6ff, botPat: 0, pants: 1, shoes: 0xc79a5b, pack: 0xff8a00, bag: 3, glasses: 1, glassC: 0xffcf2e, eyes: 0x2f8f3a, kandi: 1 }],
   ['Ranger Rue', { hair: 2, hairC: 0x9b3d22, hat: 7, hatC: 0x7a5a2a, top: 0xffcf2e, bottom: 0x2f6b3a, shoes: 0x3a2a1a, pack: 0x3fae2a, bag: 0, eyes: 0x2f8f3a, kandi: 1 }],
 ];
-export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem'];
-const LIMITS = { skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: GLASSES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
+export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem', 'beard'];
+const LIMITS = { beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: GLASSES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
 /** A full look from a saved explorer (or a friend's avatar): { look } or the old { outfit, skin }. */
 export function lookOf(e = {}) {
-  const base = { skin: 2, topPat: 0, botPat: 0, pants: 0, glasses: 0, glassC: 0x1f1f2e, bag: 0, kandi: 0, gloves: 0, totem: 0, ...(OUTFITS[e.outfit] || OUTFITS[0])[1] };
+  const base = { skin: 2, beard: 0, topPat: 0, botPat: 0, pants: 0, glasses: 0, glassC: 0x1f1f2e, bag: 0, kandi: 0, gloves: 0, totem: 0, ...(OUTFITS[e.outfit] || OUTFITS[0])[1] };
   if (e.skin != null) base.skin = OLD_SKIN[e.skin] ?? 2;
   const out = { ...base, ...(e.look || {}) };
   for (const k of LOOK_KEYS) { out[k] = Math.max(0, Math.floor(+out[k] || 0)); if (LIMITS[k]) out[k] %= LIMITS[k]; }
@@ -974,11 +1013,10 @@ export function makeExplorer(look = {}, skin) {
     const fanny = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.11, 6, 12), packM); fanny.rotation.z = Math.PI / 2; fanny.position.set(0.02, 0.28, 0.15); fanny.scale.set(1, 1, 0.75); body.add(fanny);
     const zip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.006, 0.005), M(0xf6f1e4)); zip.position.set(0.02, 0.29, 0.183); body.add(zip);
   }
-  // a festival totem: a pole with a flag and a little Kiki on top, so your crew can find you
+  // a festival totem: a pole with a little Kiki on top, so your crew can find you
   if (L.totem) {
     const totem = new THREE.Group(); totem.position.set(0.25, 0.22, 0.02); body.add(totem);
     const pole = cyl(0.011, 0.011, 0.72, M(0xf6f1e4), 8); pole.position.y = 0.36; totem.add(pole);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.14), new THREE.MeshBasicMaterial({ map: patternTex('Rainbow', 0xffffff), side: THREE.DoubleSide })); flag.position.set(0.12, 0.62, 0); totem.add(flag);
     const mini = makeKiki('meadow', 0.15); mini.position.y = 0.72; mini.remove(mini.userData.shadow); totem.add(mini);
   }
 
@@ -1025,7 +1063,8 @@ export function makeExplorer(look = {}, skin) {
   const tuft = (x, y, z, r, sx = 1, sy = 1, sz = 1) => { const m = sph(r, hairM, 14, 10); m.position.set(x, y, z); m.scale.set(sx, sy, sz); hair.add(m); return m; };
   const fringe = (n = 5, y = 0.16, r = 0.07) => { for (let i = 0; i < n; i++) { const t = (i / (n - 1) - 0.5) * 1.6, x = Math.sin(t) * 0.2; tuft(x, y - Math.abs(t) * 0.04, zOn(x, y) - 0.04, r, 1.05, 0.62, 0.55); } };
   const style = HAIR_STYLES[L.hair];
-  if (style === 'Buzz' || style === 'Mohawk') shell(R + 0.006, 0.52, -0.5, style === 'Mohawk' ? M(dark(L.hairC, 0.7)) : hairM);
+  if (style === 'Bald') { /* just a little shine on top */ const shine = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 })); shine.position.set(-0.06, R * SY * 0.93, 0.05); shine.rotation.x = -1.2; head.add(shine); }
+  else if (style === 'Buzz' || style === 'Mohawk') shell(R + 0.006, 0.52, -0.5, style === 'Mohawk' ? M(dark(L.hairC, 0.7)) : hairM);
   else { shell(); if (!['Spiky', 'Dreads'].includes(style)) fringe(style === 'Curly' ? 4 : 5); }
   if (style === 'Bob') { for (const s of [-1, 1]) tuft(s * 0.215, -0.07, -0.02, 0.12, 0.62, 1.35, 1); tuft(0, -0.08, -0.15, 0.2, 1.15, 0.85, 0.7); }
   if (style === 'Long') { tuft(0, -0.16, -0.14, 0.22, 1.15, 1.45, 0.62); for (const s of [-1, 1]) tuft(s * 0.21, -0.12, 0.0, 0.085, 0.7, 1.9, 0.8); }
@@ -1041,6 +1080,23 @@ export function makeExplorer(look = {}, skin) {
     if (i % 4 === 0) { const bead = cyl(0.03, 0.03, 0.025, M([0xffcf2e, 0xff5d8f, 0x2bc4b6][i % 3]), 10); bead.position.set(x * 1.02, -0.06 - len, z * 1.02 - 0.01); hair.add(bead); }
   }
   if (style === 'Braids') for (const s of [-1, 1]) { for (let i = 0; i < 6; i++) tuft(s * (0.2 - i * 0.008), -0.08 - i * 0.05, -0.05 + i * 0.012, 0.042 - i * 0.002, 1, 1.1, 1); const tie = sph(0.022, M(0xff4fd8), 8, 6); tie.position.set(s * 0.15, -0.38, 0.02); hair.add(tie); }
+
+  // beards and mustaches, in the hair colour
+  if (L.beard) {
+    const bM = M(dark(L.hairC, 0.92)), part = (rad, p0, pl, t0, tl, m = bM) => { const g = new THREE.Mesh(new THREE.SphereGeometry(rad, 28, 12, p0, pl, t0, tl), m); g.scale.set(1, SY, SZ + 0.02); head.add(g); return g; };
+    const front = Math.PI / 2, mustache = (big) => { for (const s of [-1, 1]) { const m = cap(big ? 0.022 : 0.017, big ? 0.06 : 0.045, bM); m.position.set(s * 0.04, -0.088, zOn(s * 0.04, -0.088, 0.012)); m.rotation.set(0, 0, s * (Math.PI / 2 - 0.35)); head.add(m); } };
+    if (L.beard === 1) { const st = part(R * 1.008, front - 1.25, 2.5, 2.08, 0.8, new THREE.MeshStandardMaterial({ color: L.hairC, transparent: true, opacity: 0.45, roughness: 1 })); st.renderOrder = 1; }
+    if (L.beard === 2 || L.beard === 3) {
+      part(R * 1.045, front - 1.35, 2.7, 2.14, 0.8); // round the jaw and chin, below the mouth
+      for (const s of [-1, 1]) part(R * 1.03, front + s * 1.25 - 0.12, 0.24, 1.55, 0.62); // sideburns
+      mustache(L.beard === 3);
+      if (L.beard === 3) { // a big, full beard hanging down onto the chest
+        const bulk = sph(0.16, bM, 20, 14); bulk.scale.set(1.05, 1.25, 0.72); bulk.position.set(0, -0.27, 0.1); head.add(bulk);
+        for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 1.8, t = sph(0.055, bM, 10, 8); t.position.set(Math.sin(a) * 0.13, -0.36 - Math.cos(a) * 0.04, 0.12 + Math.cos(a) * 0.04); head.add(t); }
+      }
+    }
+    if (L.beard === 4) mustache(true);
+  }
 
   // hat
   const hatM = M(L.hatC), H = 1.14;

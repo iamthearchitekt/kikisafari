@@ -8,7 +8,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, makeRuneStone, makePortal, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makePortal, vortexify, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
 import { EYE } from './world.js';
 import { $, hx, sfx, voice, pop, shake, toast, tuning, reducedMotion, settings } from './services.js';
 import { liveStage } from './ui.js';
@@ -320,14 +320,20 @@ export class Encounter {
       case 'suck': {
         this.portal.userData.boost = 1;
         this.sparkles.implode(portalPos, 0.35, 26, 0x7a00ff, 0.028, d); this.sparkles.implode(portalPos, 0.25, 12, 0x8c59ff, 0.02, d * 0.9);
+        // Jumanji: Kiki twists into the swirl like water down a drain, edges smearing into spiral arms, until it's gone
         const start = this.kiki.position.clone(), s0 = this.scale, rot0 = this.kiki.rotation.clone();
-        await this.anim(d, (k, dt, t) => {
-          const e = k * k * (3 - 2 * k), shrink = 1 - e * e;
-          this.kiki.position.lerpVectors(start, portalPos.clone().add(new THREE.Vector3(0, -GROUND * s0 * (1 - e), 0)), e);
-          this.kiki.scale.set(s0 * shrink * (1 - 0.25 * e), s0 * shrink * (1 + 0.35 * e), s0 * shrink);
-          if (!reduced) this.kiki.rotation.z = e * e * Math.PI * 3;
+        if (!this.vortex) this.vortex = vortexify(this.kiki);
+        const axis = portalPos.clone().sub(this.camera.position).normalize(), centre = portalPos.clone();
+        this.kiki.updateMatrixWorld(true);
+        await this.anim(reduced ? d : d * 1.25, (k, dt, t) => {
+          const e = k * k * (3 - 2 * k);
+          if (reduced) { this.kiki.scale.setScalar(s0 * (1 - e)); return; }
+          this.vortex.set(Math.min(1, e * 1.08), centre, axis, t);
+          this.kiki.position.lerpVectors(start, portalPos, e * 0.35); // a little drift towards the eye as it goes
+          if (k > 0.85) this.kiki.scale.setScalar(s0 * Math.max(0.0001, 1 - (k - 0.85) / 0.15)); // the last gulp
           st.position.copy(hover).y += Math.sin(t * 20) * 0.004;
         });
+        this.vortex.set(0, centre, axis, 0);
         this.kiki.visible = false; this.kiki.position.copy(start); this.kiki.scale.setScalar(s0); this.kiki.rotation.copy(rot0);
         return;
       }

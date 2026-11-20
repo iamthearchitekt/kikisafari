@@ -404,3 +404,20 @@ exist in 3D … premium … that extra layer of care and dialing in."
   different shade, with a lighter rim along the roof edge. Parks and woods get stylised, faceted board-game trees
   (round trees in parks, pines mixed into woods; all instanced), kept clear of roads, buildings, water, and 16 m around
   Rune Circles and supply stops so they never hide them.
+
+## 27. Portal, Kiki arms, beards, bald, house flicker (owner)
+
+- **Portal** (owner: "I hate the hard black edge … a high end swirling portal animation that distorts the Kiki like
+  when people get sucked into Jumanji"): the portal is one swirling vortex shader: spiral arms winding inwards and
+  turning, pink streaks, a cyan sheen, a deep violet eye with a bright pinpoint, edges fading to nothing (no dark disc,
+  no rim). When a stone hits, the Kiki is twisted into it on the graphics card (`vortexify` in art.js): round the line
+  from the camera through the portal it swirls like water down a drain (inner parts faster), its edges smear into
+  spiral arms, and it shrinks into the eye.
+- **Kiki arms** (owner: "when the Kiki waves their arm comes off at the seam"): arms have a rounded shoulder buried in
+  the body, set a little further in, so they never open up at the seam.
+- **Explorers:** the Wook's totem lost its flag (owner); the totem is the pole with a little Kiki on top. New Beard
+  choice (stubble, beard, big beard, mustache, in the hair colour); the Wook has a big beard. New Bald hairstyle.
+- **Map houses flickering** (owner: "the houses have a trembling element"): overlapping faces fought on phones. Walls
+  are now two non-overlapping bands (wall, then a lighter top edge); building outlines hidden behind their parts and
+  floating upper parts are skipped; each footprint is pulled in 15 cm so neighbours never share a wall plane; each
+  roof sits at its own height.

@@ -101,7 +101,8 @@ function tagsFor(layer, p) {
       if (['cemetery', 'military'].includes(c)) return T({ landuse: c });
       return null;
     case 'park': return c === 'park' ? T({ leisure: 'park' }) : ['nature_reserve', 'national_park', 'protected_area'].includes(c) ? T({ leisure: 'nature_reserve' }) : null;
-    case 'building': return { building: 'yes', height: p.render_height != null ? String(p.render_height) : undefined };
+    // outlines hidden behind their building parts, and parts that float above the ground, would only overlap other parts
+    case 'building': return p.hide_3d || p.render_min_height > 0 ? null : { building: 'yes', height: p.render_height != null ? String(p.render_height) : undefined };
     case 'aeroway': return ['aerodrome', 'runway', 'helipad', 'heliport'].includes(c) ? { aeroway: c === 'heliport' ? 'helipad' : c } : null;
     case 'poi':
       if (TOURISM.has(s)) return T({ tourism: s });
