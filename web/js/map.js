@@ -3,7 +3,7 @@
 // tap anything within 40 m. Map data © OpenStreetMap contributors.
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
-import { roadHalf } from './osm.js';
+import { roadHalf, insideShape } from './osm.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle, lookOf } from './art.js';
 import { STOP_COOLDOWN } from './rules.js';
 import { reducedMotion } from './services.js';
@@ -14,7 +14,9 @@ const MAJOR = new Set(['motorway', 'trunk', 'primary', 'secondary']);
 
 class Layer {
   constructor() { this.pos = []; this.col = []; }
-  tri(a, b, c, color) { const k = new THREE.Color(color); for (const p of [a, b, c]) { this.pos.push(p[0], p[1], p[2]); this.col.push(k.r, k.g, k.b); } }
+  tri(a, b, c, color, cb = color, cc = color) { // one colour, or one per corner (for soft shading)
+    [[a, color], [b, cb], [c, cc]].forEach(([p, col]) => { const k = col instanceof THREE.Color ? col : new THREE.Color(col); this.pos.push(p[0], p[1], p[2]); this.col.push(k.r, k.g, k.b); });
+  }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
@@ -42,13 +44,51 @@ function ribbon(layer, pts, width, y, color) {
 const openRing = pts => { const r = pts.slice(); if (r.length > 1 && r[0].x === r[r.length - 1].x && r[0].z === r[r.length - 1].z) r.pop(); return r; };
 function building(layer, pts, h, pal, holes = []) {
   const ring = openRing(pts); if (ring.length < 3) return;
-  const wall = new THREE.Color(pal.wall);
+  // each building a slightly different shade; walls darker at the foot (soft contact shadow) and lit by direction
+  const vary = 0.94 + ((Math.abs(Math.round(ring[0].x * 7.13 + ring[0].z * 3.71)) % 13) / 13) * 0.12, wall = new THREE.Color(pal.wall).multiplyScalar(vary);
   for (const r of [ring, ...holes.map(openRing)]) for (let i = 0; i < r.length; i++) { // outside walls, and the walls round courtyards
     const a = r[i], b = r[(i + 1) % r.length], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz); if (l < 1e-6) continue;
-    const shade = 0.82 + 0.18 * Math.abs(dz / l); const c = wall.clone().multiplyScalar(shade);
-    layer.tri([a.x, 0.06, a.z], [b.x, 0.06, b.z], [b.x, h, b.z], c); layer.tri([a.x, 0.06, a.z], [b.x, h, b.z], [a.x, h, a.z], c);
+    const shade = 0.8 + 0.2 * Math.abs(dz / l), top = wall.clone().multiplyScalar(shade), foot = top.clone().multiplyScalar(0.66);
+    layer.tri([a.x, 0.06, a.z], [b.x, 0.06, b.z], [b.x, h, b.z], foot, foot, top); layer.tri([a.x, 0.06, a.z], [b.x, h, b.z], [a.x, h, a.z], foot, top, top);
   }
-  flat(layer, ring, h, pal.roof, holes);
+  flat(layer, ring, h, new THREE.Color(pal.roof).multiplyScalar(vary), holes);
+  // a lighter rim along the roof edge
+  const rim = new THREE.Color(pal.roof).lerp(new THREE.Color(0xffffff), 0.35);
+  for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; layer.tri([a.x, h + 0.02, a.z], [b.x, h + 0.02, b.z], [b.x, h - 0.5, b.z], rim, rim, rim.clone().multiplyScalar(0.8)); layer.tri([a.x, h + 0.02, a.z], [b.x, h - 0.5, b.z], [a.x, h - 0.5, a.z], rim, rim.clone().multiplyScalar(0.8), rim.clone().multiplyScalar(0.8)); }
+}
+
+// ---------- trees in parks and woods (premium part 2): stylised, board-game trees, all instanced ----------
+const TREE_GEO = { trunk: new THREE.CylinderGeometry(0.35, 0.55, 1, 7), round: new THREE.IcosahedronGeometry(1, 1), cone: new THREE.ConeGeometry(1, 1, 8) };
+function parkTrees(area, o, pal, avoid, night) {
+  const spots = [];
+  for (const f of area.features) {
+    if (!f.poly || (f.kind !== 'park' && f.kind !== 'woods')) continue;
+    let A = 0; for (let i = 0, j = f.local.length - 1; i < f.local.length; j = i++) A += (f.local[j].e + f.local[i].e) * (f.local[j].n - f.local[i].n); A = Math.abs(A / 2);
+    const want = Math.min(f.kind === 'woods' ? 90 : 60, Math.floor(A / (f.kind === 'woods' ? 380 : 650))); let tries = 0, got = 0, seed = Math.abs(Math.round(f.minE * 3 + f.minN * 7));
+    const rnd = () => { seed = (seed * 16807) % 2147483647 || 1; return seed / 2147483647; };
+    while (got < want && tries++ < want * 12) {
+      const p = { e: f.minE + rnd() * (f.maxE - f.minE), n: f.minN + rnd() * (f.maxN - f.minN) };
+      if (!insideShape(f, p) || area.unsafe(C.fromLocal(area.origin, p.e, p.n)) || avoid.some(a => Math.hypot(a.e - p.e, a.n - p.n) < 16) || spots.some(s => Math.hypot(s.e - p.e, s.n - p.n) < 7)) continue;
+      spots.push({ ...p, cone: f.kind === 'woods' && rnd() < 0.6, s: 0.8 + rnd() * 0.5, tone: rnd() }); got++;
+    }
+  }
+  if (!spots.length) return null;
+  const g = new THREE.Group(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+  const leafA = new THREE.Color(night ? 0x1f4a4a : 0x2f8a3a), leafB = new THREE.Color(night ? 0x3a6a62 : 0x8fd65a);
+  const trunks = new THREE.InstancedMesh(TREE_GEO.trunk, new THREE.MeshLambertMaterial({ color: night ? 0x3a2a3a : 0x6a4428 }), spots.length);
+  const rounds = spots.filter(s => !s.cone), cones = spots.filter(s => s.cone);
+  const blob = rounds.length ? new THREE.InstancedMesh(TREE_GEO.round, new THREE.MeshLambertMaterial({ flatShading: true }), rounds.length * 2) : null;
+  const pine = cones.length ? new THREE.InstancedMesh(TREE_GEO.cone, new THREE.MeshLambertMaterial({ flatShading: true }), cones.length * 2) : null;
+  let bi = 0, ci = 0;
+  spots.forEach((s, i) => {
+    const x = s.e + o.e, z = -(s.n + o.n), k = s.s;
+    m.compose(v.set(x, 1.6 * k, z), q.identity(), sc.set(k, 3.2 * k, k)); trunks.setMatrixAt(i, m);
+    col.copy(leafA).lerp(leafB, 0.3 + s.tone * 0.6);
+    if (s.cone) for (let j = 0; j < 2; j++) { m.compose(v.set(x, (4.4 + j * 2.6) * k, z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.tone * 6 + j), sc.set((3.4 - j * 1.1) * k, (5 - j) * k, (3.4 - j * 1.1) * k)); pine.setMatrixAt(ci, m); pine.setColorAt(ci++, col.clone().multiplyScalar(0.85 + j * 0.15)); }
+    else for (let j = 0; j < 2; j++) { m.compose(v.set(x + (j ? 1.2 : -0.6) * k, (5.4 + j * 1.6) * k, z + (j ? -0.6 : 0.4) * k), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.tone * 6 + j), sc.setScalar((3.4 - j * 0.9) * k)); blob.setMatrixAt(bi, m); blob.setColorAt(bi++, col.clone().multiplyScalar(0.9 + j * 0.15)); }
+  });
+  for (const x of [trunks, blob, pine]) if (x) { x.instanceMatrix.needsUpdate = true; if (x.instanceColor) x.instanceColor.needsUpdate = true; g.add(x); }
+  return g;
 }
 
 export class StreetMap {
@@ -95,6 +135,9 @@ export class StreetMap {
     const g = new THREE.Group();
     L.forEach((l, i) => { if (!l.pos.length) return; const m = new THREE.Mesh(l.geometry(), this.mats[i]); m.renderOrder = -10 + i; g.add(m); });
     if (B.pos.length) g.add(new THREE.Mesh(B.geometry(), this.buildMat));
+    // trees in the parks and woods, kept clear of this area's Rune Circles and supply stops
+    const entry = this.app.osm && this.app.osm.data.cells.get(cell.x + ':' + cell.y), avoid = entry ? [...entry.stops, ...entry.circles].map(t => area.local(t.where)) : [];
+    const trees = parkTrees(area, o, pal, avoid, this.night); if (trees) g.add(trees);
     this.layers.add(g);
   }
 

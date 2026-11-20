@@ -8,7 +8,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { makeKiki, KikiMotion, makePortal, Sparkles, leafGeometry, plush } from './art.js';
 import { liveStage } from './ui.js';
-import { realTree, realFern, realBush, leafMass, taperedTube, barkMaterial } from './foliage.js';
+import { realTree, realFern, realBush, leafMass, taperedTube, barkMaterial, blade, lawn } from './foliage.js';
 import { light } from './lux.js';
 import { reducedMotion } from './services.js';
 
@@ -24,27 +24,6 @@ function grass(h, dark = 0x123f26, light = 0x6fd65a) {
   const g = new THREE.Group();
   for (let i = 0; i < 7; i++) { const m = new THREE.Mesh(blade(), LEAF); m.scale.setScalar(h * (0.7 + (i % 3) * 0.22)); m.rotation.set(-(Math.PI / 2 - 0.3 - (i % 3) * 0.16), i / 7 * Math.PI * 2 + i * 0.3, 0, 'YXZ'); g.add(m); }
   return g;
-}
-/** One grass blade: a thin tapering strip (8 points), dark at the root and bright at the tip, pointing up +z like a leaf. */
-let bladeGeo = null;
-function blade() {
-  if (bladeGeo) return bladeGeo;
-  const pos = [], col = [], idx = [], a = C(0x123f26), b = C(0x7fe05a);
-  for (let i = 0; i < 4; i++) { const t = i / 3, w = 0.07 * (1 - t) + 0.004, bend = -0.18 * t * t; pos.push(-w, bend, t, w, bend, t); const c = a.clone().lerp(b, t); col.push(c.r, c.g, c.b, c.r, c.g, c.b); }
-  for (let i = 0; i < 3; i++) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
-  bladeGeo = new THREE.BufferGeometry(); bladeGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bladeGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); bladeGeo.setIndex(idx); bladeGeo.computeVertexNormals();
-  return bladeGeo;
-}
-/** A carpet of grass: hundreds of blades in clumps, drawn in one go (one instanced mesh, light on the phone). */
-function lawn(clumps) {
-  const blades = clumps.reduce((a, c) => a + c.n, 0), mesh = new THREE.InstancedMesh(blade(), LEAF, blades);
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(); let i = 0;
-  for (const c of clumps) for (let k = 0; k < c.n; k++) {
-    const a = Math.random() * Math.PI * 2, r = Math.random() * c.r;
-    v.set(c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r); e.set(-(Math.PI / 2 - 0.25 - Math.random() * 0.4), Math.random() * Math.PI * 2, 0, 'YXZ'); q.setFromEuler(e);
-    sc.setScalar(c.h * (0.6 + Math.random() * 0.6)); m.compose(v, q, sc); mesh.setMatrixAt(i++, m);
-  }
-  mesh.instanceMatrix.needsUpdate = true; return mesh;
 }
 /** A wildflower: a stem, two leaves and a little round flower. */
 function flower(h, petal) {

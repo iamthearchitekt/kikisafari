@@ -171,3 +171,26 @@ export function realBush(rad = 0.6, flowers = null, seed = 5) {
   }
   return g;
 }
+
+// ---------- grass ----------
+/** One grass blade: a thin tapering strip (8 points), dark at the root and bright at the tip, pointing up +z like a leaf. */
+let bladeGeo = null;
+export function blade() {
+  if (bladeGeo) return bladeGeo;
+  const pos = [], col = [], idx = [], a = C(0x123f26), b = C(0x7fe05a);
+  for (let i = 0; i < 4; i++) { const t = i / 3, w = 0.07 * (1 - t) + 0.004, bend = -0.18 * t * t; pos.push(-w, bend, t, w, bend, t); const c = a.clone().lerp(b, t); col.push(c.r, c.g, c.b, c.r, c.g, c.b); }
+  for (let i = 0; i < 3; i++) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  bladeGeo = new THREE.BufferGeometry(); bladeGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bladeGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); bladeGeo.setIndex(idx); bladeGeo.computeVertexNormals();
+  return bladeGeo;
+}
+/** A carpet of grass: hundreds of blades in clumps, drawn in one go (one instanced mesh, light on the phone). */
+export function lawn(clumps, material = leafMaterial()) {
+  const blades = clumps.reduce((a, c) => a + c.n, 0), mesh = new THREE.InstancedMesh(blade(), material, blades);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(); let i = 0;
+  for (const c of clumps) for (let k = 0; k < c.n; k++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * c.r;
+    v.set(c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r); e.set(-(Math.PI / 2 - 0.25 - Math.random() * 0.4), Math.random() * Math.PI * 2, 0, 'YXZ'); q.setFromEuler(e);
+    sc.setScalar(c.h * (0.6 + Math.random() * 0.6)); m.compose(v, q, sc); mesh.setMatrixAt(i++, m);
+  }
+  mesh.instanceMatrix.needsUpdate = true; return mesh;
+}

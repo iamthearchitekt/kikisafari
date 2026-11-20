@@ -5,6 +5,7 @@ import * as C from './core.js';
 import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './osm.js';
 import { tilesFor } from './tiles.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
+import { meadow } from './meadow.js';
 import { $, toast, hx, sfx, debug, reducedMotion, fmtDist } from './services.js';
 import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
 
@@ -212,24 +213,16 @@ export class WorldView {
 
   /** Stand-in when there's no camera: a sky and meadow behind the 3D. */
   setStandIn(on, night) {
-    $('sky').hidden = !on; $('sky').classList.toggle('night', !!night); $('cam').hidden = on;
+    // No camera picture (AR off, or no camera): a real meadow to stand in (meadow.js): sky dome and clouds, grass
+    // blades, wildflowers and a tree line; moonlit with fireflies at night. The flat CSS sky stays as a fallback.
+    $('sky').hidden = true; $('sky').classList.toggle('night', !!night); $('cam').hidden = on;
     if (on && (!this.ground || this.groundNight !== !!night)) {
-      if (this.ground) { this.scene.remove(this.ground); this.ground.material.map.dispose(); }
-      // A grassy meadow: soft blades of grass on a 128 px tile (about 4 m), fading into the sky at the horizon.
-      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = C.rng(11);
-      g.fillStyle = night ? '#2c4a5c' : '#6cbf45'; g.fillRect(0, 0, 128, 128);
-      for (let i = 0; i < 520; i++) {
-        const x = r.next() * 128, y = r.next() * 128, h = 3 + r.next() * 6, lean = (r.next() - 0.5) * 3, k = r.next();
-        g.strokeStyle = night ? (k < 0.5 ? 'rgba(90,140,150,.55)' : 'rgba(20,40,60,.4)') : (k < 0.5 ? 'rgba(160,225,110,.65)' : 'rgba(60,140,40,.5)');
-        g.lineWidth = 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - h); g.stroke();
-      }
-      for (let i = 0; i < 14; i++) { g.fillStyle = night ? 'rgba(200,170,255,.7)' : ['#fff8de', '#ffd23f', '#ff9dba'][i % 3]; g.beginPath(); g.arc(r.next() * 128, r.next() * 128, 1.6, 0, 7); g.fill(); }
-      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(300, 300); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-      this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshBasicMaterial({ map: t }));
-      this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -EYE - 0.01; this.scene.add(this.ground); this.groundNight = !!night;
+      if (this.ground) { this.scene.remove(this.ground); this.ground.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+      this.standIn = meadow({ mood: night ? 'night' : 'day', y: -EYE, grassRadius: 8, treeRing: [20, 32], trees: 12, seed: 7, density: 18 });
+      this.ground = this.standIn.group; this.scene.add(this.ground); this.groundNight = !!night;
     }
     if (this.ground) this.ground.visible = on;
-    this.scene.fog = on ? new THREE.Fog(night ? 0x52298c : 0xd9f1ff, 6, 70) : null;
+    this.scene.fog = on ? new THREE.Fog(this.standIn ? this.standIn.fog : (night ? 0x52298c : 0xd9f1ff), 10, 65) : null;
   }
 
   /** Position in the 3D world (x = east, z = south) of a real place, relative to the player. */
@@ -304,6 +297,7 @@ export class WorldView {
     if (!app.loc.fix) return;
     if (this.time >= this.nextPlan) { this.nextPlan = this.time + 1; this.plan(); }
     this.sparkles.update(dt); // catches started from the map use these too
+    if (this.standIn && this.ground && this.ground.visible) this.standIn.update(dt, this.time); // clouds drift, fireflies dance
     if (app.mapMode) return;
     const camPos = this.camera.position, now = Date.now() / 1000;
     for (const v of this.views.values()) {

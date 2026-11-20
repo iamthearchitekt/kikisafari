@@ -391,3 +391,16 @@ exist in 3D … premium … that extra layer of care and dialing in."
   colours stay true) and a soft light environment (a sky gradient and studio softboxes, made in code) for gentle
   reflections and sheen on Kikis, stones, circles and props: day light for the map, catches, menus and stages, purple
   "cosmic" light on the title screen. Kiki skin is a touch more satin.
+
+## 26. Premium 3D, part 2: meadow, arena, map (owner)
+
+- `web/js/meadow.js`: a meadow to stand in, used for battles and for catches without the camera: a sky dome with
+  soft clouds and a sun (a moon and stars at night), a lit ground with painted grass, a carpet of real grass blades and
+  wildflowers (instanced) that leaves the Kikis' spots clear, a ring of real trees and leafy bushes in the distance,
+  and fireflies at night. Moods: day, night, and a purple portal clearing for raids.
+- Battles stand each side on a carved stone dais (bevelled stone with a bump map, a glowing inlaid ring that breathes)
+  instead of flat discs.
+- Map: building walls are darker at the foot (a soft contact shadow) and lit by direction, each building a slightly
+  different shade, with a lighter rim along the roof edge. Parks and woods get stylised, faceted board-game trees
+  (round trees in parks, pines mixed into woods; all instanced), kept clear of roads, buildings, water, and 16 m around
+  Rune Circles and supply stops so they never hide them.

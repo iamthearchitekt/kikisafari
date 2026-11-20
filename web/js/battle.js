@@ -8,6 +8,7 @@ import { makeKiki, KikiMotion, Sparkles, portrait } from './art.js';
 import { $, toast, panel, hx, sfx, voice, pop, shake, reducedMotion, wait, debug } from './services.js';
 import { liveStage, levelUps, guide, confirm } from './ui.js';
 import { spiralRite } from './rite.js';
+import { meadow, dais } from './meadow.js';
 import { snapshot } from './online.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -69,15 +70,19 @@ export function runBattle(app, { mine, theirs, title, raid = false, time = 120, 
     $('overlay').appendChild(el); app.inBattle = true;
     const q = s => el.querySelector(s);
     let A, B, sparkles, motA, motB, cam, flashA = 0, flashB = 0, slide = 0, slideTo = 0;
-    const PA = new THREE.Vector3(-0.42, 0, 1.15), PB = new THREE.Vector3(0.38, 0, -1.5), shots = [];
+    const PA = new THREE.Vector3(-0.42, 0.13, 1.15), PB = new THREE.Vector3(0.38, 0.13, -1.5), shots = []; // y: standing on the stone daises
     const st = liveStage(q('.bstage'), (scene, c) => {
       // Portrait phones see a narrow slice, so the camera pulls back and widens until both sides fit.
       cam = c; const tall = innerHeight > innerWidth; c.position.set(-0.55, tall ? 1.7 : 1.35, tall ? 5.4 : 4.4); c.lookAt(0.05, 0.55, -0.35); c.fov = tall ? 52 : 38; c.updateProjectionMatrix();
-      const pad = (x, z, r, col) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, 0.06, 40), new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 })); m.position.set(x, -0.03, z); scene.add(m); };
-      pad(PA.x, PA.z, 0.6, raid ? 0x3a2a7a : 0x8fd45e); pad(PB.x, PB.z, raid ? 1.1 : 0.75, raid ? 0x4a2a9a : 0x7cc44e);
+      // the arena: a meadow (a moonlit portal clearing for raids) with a carved stone dais under each side
+      const md = meadow({ mood: raid ? 'raid' : 'day', keepClear: [{ x: PA.x, z: PA.z, r: 0.9 }, { x: PB.x, z: PB.z, r: raid ? 1.4 : 1.05 }], grassRadius: 7, treeRing: [11, 19], trees: 11 });
+      scene.add(md.group); scene.fog = new THREE.Fog(md.fog, 12, 42);
+      const dA = dais(0.62, 0x8fd8ff), dB = dais(raid ? 1.15 : 0.78, raid ? 0xc77dff : 0xff7ad9);
+      dA.position.set(PA.x, 0.02, PA.z); dB.position.set(PB.x, 0.02, PB.z); scene.add(dA, dB);
       sparkles = new Sparkles(scene);
-      return { update(dt) {
-        if (A) { A.position.set(PA.x + slide, 0, PA.z); slide += (slideTo - slide) * Math.min(1, dt * 14); if (Math.abs(slideTo) > 0 && Math.abs(slide - slideTo) < 0.02) slideTo = 0; A.scale.setScalar(A.userData.s * (1 + flashA * 0.12)); flashA = Math.max(0, flashA - dt * 4); motA.update(dt); }
+      return { update(dt, t) {
+        md.update(dt, t); for (const d of [dA, dB]) d.userData.halo.material.opacity = 0.14 + Math.sin(t * 2 + (d === dA ? 0 : 1.5)) * 0.06;
+        if (A) { A.position.set(PA.x + slide, PA.y, PA.z); slide += (slideTo - slide) * Math.min(1, dt * 14); if (Math.abs(slideTo) > 0 && Math.abs(slide - slideTo) < 0.02) slideTo = 0; A.scale.setScalar(A.userData.s * (1 + flashA * 0.12)); flashA = Math.max(0, flashA - dt * 4); motA.update(dt); }
         if (B) { B.scale.setScalar(B.userData.s * (1 + flashB * 0.12)); flashB = Math.max(0, flashB - dt * 4); motB.update(dt); }
         for (let i = shots.length - 1; i >= 0; i--) { const s = shots[i]; s.t += dt / s.dur; if (s.t >= 1) { scene.remove(s.m); shots.splice(i, 1); sparkles.burst(s.to, s.big ? 30 : 10, s.col, s.big ? 0.12 : 0.06, s.big ? 1.4 : 0.7, 0.6); continue; } s.m.position.lerpVectors(s.from, s.to, s.t).y += Math.sin(s.t * Math.PI) * (s.big ? 0.5 : 0.2); }
         sparkles.update(dt);
