@@ -19,6 +19,7 @@ export const SHIRTS = ['Short sleeve', 'Long sleeve'];
 export const LEGWEAR = ['Jeans', 'Shorts', 'Skirt']; // the skirt is on the female body
 export const HAIRDOS = ['Bald', 'Buzz cut', 'Short', 'Spiky', 'Undercut', 'Bob', 'Long', 'Ponytail', 'Space buns', 'Curly', 'Locs'];
 const HAIR_FILE = [null, null, 'short', 'spiky', 'undercut', 'bob', 'long', 'pony', 'buns', 'curly', 'locs'];
+const BEARD_FILE = [null, null, 'short', 'full', 'mustache', 'goatee']; // stubble (1) is painted on
 export const SHADES = ['No shades', 'Aviators', 'Classic', 'Round', 'Sport', 'Cat-eye'];
 export const FRAMES = [0x1d1d22, 0x6b3f22, 0xc9a24a, 0xb9bdc6, 0xf4f1ea, 0xb8322a, 0x2b3a8f];
 export const LENSES = [0x23272e, 0x4a3020, 0x2c4632, 0x2763c9, 0xc9577f, 0xd59a2a];
@@ -27,21 +28,21 @@ export const bodyKey = L => `${L.sex ? 'f' : 'm'}-${L.shirt ? 'lt' : 'st'}-${'js
 const ALL_BODIES = ['m-st-j', 'm-st-s', 'm-lt-j', 'm-lt-s', 'f-st-j', 'f-st-s', 'f-st-k', 'f-lt-j', 'f-lt-s', 'f-lt-k'];
 
 // ---------- loading: each body and hairstyle on demand (yours first, the rest when they are needed) ----------
-const BASE = 'assets/explorers/', bodies = {}, hairs = [], pending = new Map();
+const BASE = 'assets/explorers/', bodies = {}, hairs = [], beards = [], pending = new Map();
 let loader = null;
 function fetchPart(kind, id) {
   const key = kind + id; if (pending.has(key)) return pending.get(key);
   loader ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const file = kind === 'body' ? `body-${id}.glb` : `hair-${HAIR_FILE[id]}.glb`;
-  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[id] = prepBody(g); else hairs[id] = prepHair(g); });
+  const file = kind === 'body' ? `body-${id}.glb` : kind === 'beard' ? `beard-${BEARD_FILE[id]}.glb` : `hair-${HAIR_FILE[id]}.glb`;
+  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[id] = prepBody(g); else if (kind === 'beard') beards[id] = prepHair(g); else hairs[id] = prepHair(g); });
   p.catch(() => pending.delete(key)); pending.set(key, p); return p;
 }
 /** Loads what one look needs (its body and hairstyle). */
-export function preloadExplorer(L) { return Promise.all([fetchPart('body', bodyKey(L)), HAIR_FILE[L.hairdo] ? fetchPart('hair', L.hairdo) : null]); }
+export function preloadExplorer(L) { return Promise.all([fetchPart('body', bodyKey(L)), HAIR_FILE[L.hairdo] ? fetchPart('hair', L.hairdo) : null, BEARD_FILE[L.beard] ? fetchPart('beard', L.beard) : null]); }
 /** Loads every hairstyle and the bodies for one sex (or all), for the look picker. */
-export function loadExplorerKit(sex) { return Promise.all([...ALL_BODIES.filter(k => sex == null || k[0] === 'mf'[sex]).map(k => fetchPart('body', k)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null)]); }
+export function loadExplorerKit(sex) { return Promise.all([...ALL_BODIES.filter(k => sex == null || k[0] === 'mf'[sex]).map(k => fetchPart('body', k)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null), ...BEARD_FILE.map((b, i) => b ? fetchPart('beard', i) : null)]); }
 /** True when makeExplorer3D(L) can build this look right now. */
-export const explorerReady = L => !!bodies[bodyKey(L)] && (!HAIR_FILE[L.hairdo] || !!hairs[L.hairdo]);
+export const explorerReady = L => !!bodies[bodyKey(L)] && (!HAIR_FILE[L.hairdo] || !!hairs[L.hairdo]) && (!BEARD_FILE[L.beard] || !!beards[L.beard]);
 
 // ---------- cel shading and ink ----------
 const TOON = (() => { const t = new THREE.DataTexture(new Uint8Array([150, 205, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
@@ -103,11 +104,12 @@ function prepBody(g) {
   const attr = new THREE.Box3(), bone = new THREE.Box3(), v = new THREE.Vector3(), inv = headBone.matrixWorld.clone().invert();
   // some rigs give the head bone a turned rest pose: hair, hats and shades use an upright frame at the head instead
   const R = headBone.getWorldQuaternion(new THREE.Quaternion());
-  let yMin = Infinity, yMax = -Infinity; const pts = [];
+  let yMin = Infinity, yMax = -Infinity; const pts = [], neckPts = [];
+  const nj = mesh.skeleton.bones.findIndex(b => b.name === 'neck');
   for (let i = 0; i < P.count; i++) {
     const y = P.getY(i); if (y < yMin) yMin = y; if (y > yMax) yMax = y;
     let dom = -1, best = -1; for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > best) { best = w; dom = SI.getComponent(i, k); } }
-    if (dom !== hj) continue;
+    if (dom !== hj) { if (dom === nj && i % 2 === 0) { v.fromBufferAttribute(P, i); mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(R); neckPts.push(v.x, v.y, v.z); } continue; }
     v.fromBufferAttribute(P, i); attr.expandByPoint(v);
     mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(R); bone.expandByPoint(v);
     if (i % 3 === 0) pts.push(v.x, v.y, v.z);
@@ -117,7 +119,7 @@ function prepBody(g) {
   const clips = Object.fromEntries(g.animations.map(a => [a.name, a]));
   const parentWorld = {}; for (const b of mesh.skeleton.bones) parentWorld[b.name] = b.parent.getWorldQuaternion(new THREE.Quaternion());
   const boneToAttrY = y => attr.min.y + (y - bone.min.y) * (attr.max.y - attr.min.y) / (bone.max.y - bone.min.y);
-  return { gltf: g, mesh, parentWorld, headPts: new Float32Array(pts), boneToAttrY, headBox: bone, headUpright: R.clone().invert(), attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
+  return { gltf: g, mesh, parentWorld, headPts: new Float32Array(pts), neckPts: new Float32Array(neckPts), boneToAttrY, headBox: bone, headUpright: R.clone().invert(), attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
 }
 function prepHair(g) {
   const meshes = []; g.scene.traverse(o => { if (o.isMesh) { meshes.push(o); addInkNormals(o.geometry); } });
@@ -156,55 +158,43 @@ const BEARD_GLSL = `float beardW(vec3 q, float style) {
         if (style > 4.5) return max(chin * (1.0 - lip), mus);
         return max(max(jaw, side) * (1.0 - lip), mus);
       }`;
-// how thick each beard grows (share of the head's height), and how far a full beard hangs below the chin
-const BEARD_DEPTH = { 2: 0.022, 3: 0.04, 4: 0.02, 5: 0.028 };
-/** A beard as a shell grown out of the face's own surface (bind pose, the body's vertex space), skinned like it. */
-function beardShell(src, style, sex) {
-  src.beards ||= {}; const key = style + ':' + sex; if (src.beards[key]) return src.beards[key];
-  const geo = src.mesh.geometry, P = geo.attributes.position, N = geo.attributes.inkNormal, I = geo.index.array;
-  const SI = geo.attributes.skinIndex, SW = geo.attributes.skinWeight;
-  const c = src.attrHead.getCenter(new THREE.Vector3()), h = src.attrHead.getSize(new THREE.Vector3()).multiplyScalar(0.5), K = BEARD_K[sex] || BEARD_K[0], H = h.y * 2;
-  const w = new Float32Array(P.count), qy = new Float32Array(P.count);
-  for (let i = 0; i < P.count; i++) {
-    const x = (P.getX(i) - c.x) / h.x * K[0], y = (P.getY(i) - c.y) / h.y * K[1], z = (P.getZ(i) - c.z) / h.z;
-    w[i] = beardW(x, y, z, style); qy[i] = y;
+// ---------- generated beards, rebuilt on each face ----------
+// Each beard piece was made on a mannequin head; the packer stored, for every vertex, how far it stands off the
+// mannequin's skin along a line from a point inside the head at mouth height (_offset). Here it is placed on our head
+// the same way as the hair, then every vertex is moved to that same distance off *our* skin along its line, so the
+// beard hugs this jaw: it cannot sink into the face or float off it.
+const AZ = 72, EL = 48;
+const dirBin = (x, y, z) => { const r = Math.hypot(x, y, z) || 1e-9, az = Math.atan2(x, z), el = Math.asin(Math.max(-1, Math.min(1, y / r)));
+  return Math.min(AZ - 1, Math.floor((az + Math.PI) / (2 * Math.PI) * AZ)) + Math.min(EL - 1, Math.floor((el + Math.PI / 2) / Math.PI * EL)) * AZ; };
+const BEARD_FIT = { scale: 1.0, y: 0.0, z: 0.0, off: 1.0, per: { mustache: { scale: 0.86, y: 0.02 }, full: { scale: 0.92, off: 0.62 }, goatee: { scale: 0.84, off: 0.6 } } };
+function fittedBeard(src, style) {
+  src.fitted ||= {}; if (src.fitted[style]) return src.fitted[style];
+  const b = beards[style], hb = src.headBox, hc = hb.getCenter(new THREE.Vector3()), hs = hb.getSize(new THREE.Vector3());
+  const M = b.box, Mc = M.getCenter(new THREE.Vector3()), Ms = M.getSize(new THREE.Vector3()), f = { ...BEARD_FIT, ...(BEARD_FIT.per[BEARD_FILE[style]] || {}) };
+  // placed like the hair (same width, crowns and faces lined up), then resized per style about the mouth point C
+  const s0 = hs.x / Ms.x, Cm = new THREE.Vector3(Mc.x, M.min.y + 0.42 * Ms.y, Mc.z);
+  const C = new THREE.Vector3((Cm.x - Mc.x) * s0, (Cm.y - M.max.y) * s0 + (hb.max.y - hc.y) + hs.y * f.y, (Cm.z - M.max.z) * s0 + (hb.max.z - hc.z) + hs.z * f.z);
+  const s = s0 * f.scale, T = p => p.clone().sub(Cm).multiplyScalar(s).add(C);
+  // our skin, seen from C: the farthest head or neck point in each direction
+  const R = new Float32Array(AZ * EL);
+  for (const pts of [src.headPts, src.neckPts]) for (let i = 0; i < pts.length; i += 3) { const x = pts[i] - hc.x - C.x, y = pts[i + 1] - hc.y - C.y, z = pts[i + 2] - hc.z - C.z, k = dirBin(x, y, z); R[k] = Math.max(R[k], Math.hypot(x, y, z)); }
+  for (let pass = 0; pass < 4; pass++) for (let k = 0; k < R.length; k++) if (!R[k]) { const a = k % AZ, e = Math.floor(k / AZ); let sum = 0, n = 0; for (const [da, de] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const e2 = e + de; if (e2 < 0 || e2 >= EL) continue; const v = R[(a + da + AZ) % AZ + e2 * AZ]; if (v) { sum += v; n++; } } if (n) R[k] = sum / n; }
+  const parts = [];
+  b.gltf.scene.updateMatrixWorld(true);
+  for (const o of b.meshes) {
+    const g = o.geometry, P = g.attributes.position, O = g.attributes._offset, pos = new Float32Array(P.count * 3), v = new THREE.Vector3(), eps = hs.y * 0.004;
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); const q = T(v).sub(C), r = q.length(), Rk = R[dirBin(q.x, q.y, q.z)];
+      const want = Rk ? Rk + Math.max(0, O ? O.getX(i) : 0) * s * f.off + eps : r;
+      q.multiplyScalar(want / (r || 1)).add(C); pos.set([q.x, q.y, q.z], i * 3);
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    if (g.attributes.uv) geo.setAttribute('uv', g.attributes.uv);
+    if (g.index) geo.setIndex(g.index);
+    geo.computeVertexNormals(); addInkNormals(geo);
+    parts.push({ geo, map: o.material.map });
   }
-  const map = new Map(), idx = [];
-  for (let t = 0; t < I.length; t += 3) {
-    const a = I[t], b = I[t + 1], d = I[t + 2]; if (w[a] + w[b] + w[d] < 0.03) continue;
-    for (const v of [a, b, d]) { if (!map.has(v)) map.set(v, map.size); idx.push(map.get(v)); }
-  }
-  const n = map.size, pos = new Float32Array(n * 3), base = new Float32Array(n * 3), wt = new Float32Array(n), si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
-  const depth = BEARD_DEPTH[style] || 0.02;
-  for (const [v, j] of map) {
-    const k = w[v], off = H * (0.002 + depth * ss(0.2, 0.85, k));
-    let x = P.getX(v) + N.getX(v) * off, y = P.getY(v) + N.getY(v) * off, z = P.getZ(v) + N.getZ(v) * off;
-    if (style === 3) { const low = ss(-0.62, -0.88, qy[v]) * k; y -= H * 0.08 * low; z += H * 0.025 * low; } // a full beard hangs down a little
-    pos.set([x, y, z], j * 3); base.set([P.getX(v), P.getY(v), P.getZ(v)], j * 3); wt[j] = k;
-    for (let q = 0; q < 4; q++) { si[j * 4 + q] = SI.getComponent(v, q); sw[j * 4 + q] = SW.getComponent(v, q); }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('basePos', new THREE.BufferAttribute(base, 3)); g.setAttribute('beardW', new THREE.BufferAttribute(wt, 1));
-  g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
-  g.setIndex(idx); g.computeVertexNormals();
-  return (src.beards[key] = g);
-}
-/** Beard material: cel-shaded in the hair colour, with fine downward strands, darker where it thins out; its outline
- * is cut per pixel from the same smooth shape as the painted beard (not along the mesh's triangles). */
-function beardMaterial(color, src, style, sex) {
-  const m = toon({ color, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-  const U = { uBC: { value: src.attrHead.getCenter(new THREE.Vector3()) }, uBH: { value: src.attrHead.getSize(new THREE.Vector3()).multiplyScalar(0.5) },
-    uBK: { value: new THREE.Vector2(...(BEARD_K[sex] || BEARD_K[0])) }, uBS: { value: style } };
-  m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'attribute float beardW; attribute vec3 basePos; varying float vBW; varying vec3 vBP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvBW = beardW; vBP = basePos;');
-    sh.fragmentShader = 'varying float vBW; varying vec3 vBP; uniform vec3 uBC, uBH; uniform vec2 uBK; uniform float uBS;\n' + BEARD_GLSL +
-      '\nfloat bHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }\n' +
-      sh.fragmentShader.replace('void main() {', 'void main() {\n  vec3 bq = (vBP - uBC) / uBH; bq.xy *= uBK; float bw = beardW(bq, uBS); if (bw < 0.32) discard;')
-        .replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= (0.74 + 0.26 * smoothstep(0.32, 0.8, bw)) * (0.84 + 0.24 * bHash(floor(vBP * vec3(1500.0, 260.0, 1500.0))));');
-  };
-  m.customProgramCacheKey = () => 'beard3d';
-  return m;
+  return (src.fitted[style] = parts);
 }
 
 // ---------- the repaint shader ----------
@@ -264,7 +254,7 @@ function bodyMaterial(src, L, debug = 0) {
           else col = mix(col, uHair * (0.75 + 0.3 * hsv.z), scalp * (0.55 + 0.25 * grain) * max(wSkin, 0.5));
         }
         // facial hair painted on the skin (under the 3D beard, so its edges blend; stubble is only this)
-        if (uBeard > 0.5) {
+        if (uBeard > 0.5 && uBeard < 1.5) {
           vec3 qb = q; qb.xy *= uBeardK;
           float b = beardW(qb, uBeard);
           if (uBeard < 1.5) b *= 0.25 + 0.3 * kHash(floor(vKPos * 1600.0));
@@ -366,7 +356,7 @@ function buildShades(kind, frameC, lensC, w) {
 // ---------- tuning: how the hair pieces sit on the head (head-bone space, fractions of the head box) ----------
 const HAIR_FIT = { scale: 1.0, y: 0.16, z: -0.12, per: { pony: { scale: 1.18, y: 0.12, z: -0.14 }, buns: { scale: 1.3, y: 0.06, z: -0.02 } } };
 const SHADE_FIT = { w: 0.8, y: 0.09, z: 0.46 }; // width share of the head box, height (head coords, from the brows), depth
-export const _tune = { HAIR_FIT, SHADE_FIT, FACE }; // for the dev viewer
+export const _tune = { HAIR_FIT, SHADE_FIT, FACE, BEARD_FIT }; // for the dev viewer
 
 /**
  * An explorer about 1 unit tall, feet at y = 0, facing +z. L is a full look (see art.js lookOf): sex, shirt, legs,
@@ -428,11 +418,10 @@ export function makeExplorer3D(L, opts = {}) {
     const F = FACE[L.sex] || FACE[0], sh = buildShades(L.glasses, L.glassC, L.lensC ?? LENSES[0], hs.x * SHADE_FIT.w); sh.position.set(0, (F[0] + SHADE_FIT.y) * hs.y / 2, hs.z * SHADE_FIT.z); attach.add(sh);
     if (!opts.noInk) { const list = []; sh.traverse(o => { if (o.isMesh && !o.userData.noInk) list.push(o); }); list.forEach(o => inkFor(o, 0.003)); }
   }
-  // facial hair with real volume: a shell grown from the face (stubble is painted only)
-  if (L.beard >= 2) {
-    const beard = new THREE.SkinnedMesh(beardShell(src, L.beard, L.sex), beardMaterial(L.hairC, src, L.beard, L.sex));
-    beard.bind(mesh.skeleton, mesh.bindMatrix); beard.frustumCulled = false;
-    beard.position.copy(mesh.position); beard.quaternion.copy(mesh.quaternion); beard.scale.copy(mesh.scale); mesh.parent.add(beard);
+  // facial hair: a generated beard rebuilt on this face (stubble is painted on)
+  if (BEARD_FILE[L.beard] && beards[L.beard]) for (const part of fittedBeard(src, L.beard)) {
+    const m = new THREE.Mesh(part.geo, toon({ color: L.hairC, map: part.map })); attach.add(m);
+    if (!opts.noInk) inkFor(m, 0.003);
   }
   // animation: the generated walk, and a calm standing pose made here (arms relaxed at the sides, breathing, a
   // look around now and then), cross-faded by speed

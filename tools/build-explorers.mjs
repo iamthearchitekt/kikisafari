@@ -22,7 +22,7 @@ const sampler = ({ data, info }) => (u, v) => {
 };
 
 async function finish(doc, file) {
-  await doc.transform(dedup(), prune(), resample(), reorder({ encoder: MeshoptEncoder }), quantize({ quantizeNormal: 8, quantizeTexcoord: 12, quantizePosition: 14 }));
+  await doc.transform(dedup(), prune(), resample(), reorder({ encoder: MeshoptEncoder }), quantize({ pattern: /^(POSITION|NORMAL|TEXCOORD_\d+|JOINTS_\d+|WEIGHTS_\d+)$/, quantizeNormal: 8, quantizeTexcoord: 12, quantizePosition: 14 }));
   doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
   await io.write(file, doc);
   console.log(path.basename(file), (fs.statSync(file).size / 1024).toFixed(0) + ' KB');
@@ -61,11 +61,12 @@ for (const X of fs.readdirSync(rawDir).filter(f => f.endsWith('-walk.glb')).map(
 }
 
 // ---------- hairstyles ----------
-const YAW = { spiky: 0 }; // degrees about y; the rest are -90
-for (const f of fs.readdirSync(rawDir).filter(f => /^hair-.*\.glb$/.test(f))) {
+const YAW = { spiky: 0, goatee: 90 }; // degrees about y; the rest are -90 (the goatee came out facing the other way)
+for (const f of fs.readdirSync(rawDir).filter(f => /^(hair|beard)-.*\.glb$/.test(f))) {
+  const isBeard = f.startsWith('beard-'), skin = []; // beards: the mannequin's skin, to measure how far each tuft stands off it
   const doc = await io.read(path.join(rawDir, f)), root = doc.getRoot();
   // turn the piece to face +z (Tripo's models face +x)
-  const yaw = (YAW[f.slice(5, -4)] ?? -90) * Math.PI / 180, qy = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
+  const yaw = (YAW[f.replace(/^(hair|beard)-/, '').slice(0, -4)] ?? -90) * Math.PI / 180, qy = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
   const qmul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
   if (yaw) for (const n of root.listScenes()[0].listChildren()) { const t = n.getTranslation(), c = Math.cos(yaw), sn = Math.sin(yaw); n.setTranslation([t[0] * c + t[2] * sn, t[1], -t[0] * sn + t[2] * c]); n.setRotation(qmul(qy, n.getRotation())); }
   const tex = root.listTextures()[0], img = await decode(tex), at = sampler(img);
@@ -84,7 +85,7 @@ for (const f of fs.readdirSync(rawDir).filter(f => /^hair-.*\.glb$/.test(f))) {
           const [r, g, bb] = at(UV[a * 2] * wa + UV[b * 2] * wb + UV[c * 2] * wc, UV[a * 2 + 1] * wa + UV[b * 2 + 1] * wb + UV[c * 2 + 1] * wc);
           if (r > 0.3 && r > g * 1.7 && r > bb * 1.7) red++; lsum += 0.3 * r + 0.59 * g + 0.11 * bb;
         }
-        if (red >= 2) { for (const v of [a, b, c]) { const p = wp(v); for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], p[k]); mx[k] = Math.max(mx[k], p[k]); } } }
+        if (red >= 2) { for (const v of [a, b, c]) { const p = wp(v); if (isBeard) skin.push(p); for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], p[k]); mx[k] = Math.max(mx[k], p[k]); } } }
         else { keep.push(a, b, c); lums.push(lsum / 4); }
       }
       prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(keep)));
@@ -97,6 +98,24 @@ for (const f of fs.readdirSync(rawDir).filter(f => /^hair-.*\.glb$/.test(f))) {
   const g = await sharp(Buffer.from(tex.getImage())).resize(512, 512).greyscale().linear(gain, 0).jpeg({ quality: 85 }).toBuffer();
   tex.setImage(new Uint8Array(g)).setMimeType('image/jpeg');
   root.listScenes()[0].setExtras({ mannequin: { min: mn, max: mx } });
+  if (isBeard) {
+    // how far each vertex stands off the mannequin's skin, along the line from a point inside the head at mouth height:
+    // the game rebuilds the beard on its own faces with these offsets, so it sits on any jaw without sinking or floating
+    const C = [(mn[0] + mx[0]) / 2, mn[1] + 0.42 * (mx[1] - mn[1]), (mn[2] + mx[2]) / 2], AZ = 72, EL = 48, R = new Float32Array(AZ * EL);
+    const bin = d => { const r = Math.hypot(d[0], d[1], d[2]) || 1e-9, az = Math.atan2(d[0], d[2]), el = Math.asin(Math.max(-1, Math.min(1, d[1] / r)));
+      return Math.min(AZ - 1, Math.floor((az + Math.PI) / (2 * Math.PI) * AZ)) + Math.min(EL - 1, Math.floor((el + Math.PI / 2) / Math.PI * EL)) * AZ; };
+    for (const p of skin) { const d = [p[0] - C[0], p[1] - C[1], p[2] - C[2]], k = bin(d); R[k] = Math.max(R[k], Math.hypot(...d)); }
+    for (let pass = 0; pass < 6; pass++) for (let k = 0; k < R.length; k++) if (!R[k]) { const a = k % AZ, e = Math.floor(k / AZ); let s2 = 0, n2 = 0; for (const [da, de] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const e2 = e + de; if (e2 < 0 || e2 >= EL) continue; const v = R[(a + da + AZ) % AZ + e2 * AZ]; if (v) { s2 += v; n2++; } } if (n2) R[k] = s2 / n2; }
+    for (const node of root.listNodes()) {
+      const mesh = node.getMesh(); if (!mesh) continue; const M = node.getWorldMatrix();
+      for (const prim of mesh.listPrimitives()) {
+        const P = prim.getAttribute('POSITION').getArray(), off = new Float32Array(P.length / 3);
+        for (let i = 0; i < off.length; i++) { const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2]; const p = [M[0] * x + M[4] * y + M[8] * z + M[12] - C[0], M[1] * x + M[5] * y + M[9] * z + M[13] - C[1], M[2] * x + M[6] * y + M[10] * z + M[14] - C[2]]; off[i] = Math.hypot(...p) - (R[bin(p)] || Math.hypot(...p)); }
+        prim.setAttribute('_OFFSET', doc.createAccessor().setType('SCALAR').setArray(off));
+      }
+    }
+    console.log('  beard skin points', skin.length, 'centre', C.map(v => v.toFixed(3)).join(','));
+  }
   await doc.transform(weld());
   await finish(doc, path.join(outDir, f));
   console.log('  mannequin head', mn.map(v => v.toFixed(3)).join(','), '→', mx.map(v => v.toFixed(3)).join(','), 'gain', gain.toFixed(2));

@@ -494,3 +494,14 @@ Owner: "the beards suck. Make sure hair and beards cover correctly."
 - **Hair covers:** under every hairstyle the scalp is painted in the hair colour, down to the hairline at the ears and
   nape (a little higher at the forehead, which the hair covers itself), so no bald patch shows through gaps between
   locks. Undercut sides read as shaved hair. Locs have no outline (it showed through their gaps).
+
+## 32. Beards, take 3: generated anime beards fitted to each face (owner)
+
+Owner: "you have done a very very shitty and lazy job. This looks ridiculous" (the shell beards of section 31 were
+flat shapes that did not match the hand-detailed anime hair). Beards are now made the same way as the hairstyles:
+generated anime 3D pieces (short beard, full beard, mustache, goatee) on the red mannequin head. The packer measures,
+for every vertex of a beard, how far it stands off the mannequin's skin along a line from a point inside the head at
+mouth height (stored as the _OFFSET attribute). In the game the beard is placed like the hair, then each vertex is
+moved to that same distance off our own head's skin along its line (a map of the head and neck seen from that point),
+so it hugs every jaw (male and female, every body) without sinking into the face or floating off it. Per-style size
+is set about the mouth point. Stubble stays painted on.
