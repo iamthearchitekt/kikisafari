@@ -63,7 +63,7 @@ export function playMusic(name) {
   if (bus) { const old = bus; old.gain.cancelScheduledValues(ac.currentTime); old.gain.setTargetAtTime(0, ac.currentTime, 0.2); setTimeout(() => old.disconnect(), 1500); }
   bus = null; track = null; clearInterval(timer);
   if (!name || !settings.get('music', true)) return;
-  bus = ac.createGain(); bus.gain.value = 0; bus.gain.setTargetAtTime(0.55, ac.currentTime, 0.4); bus.connect(master);
+  bus = ac.createGain(); bus.gain.value = 0; bus.gain.setTargetAtTime(0.26, ac.currentTime, 0.4); // music sits well under the sound effects (owner: "make the music quieter") bus.connect(master);
   track = TRACKS[name]; song = compose(track); step = 0; nextT = ac.currentTime + 0.1;
   timer = setInterval(tick, 60); tick();
 }

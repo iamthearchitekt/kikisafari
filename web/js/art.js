@@ -910,7 +910,11 @@ export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom
 const LIMITS = { beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: GLASSES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
 /** A full look from a saved explorer (or a friend's avatar): { look } or the old { outfit, skin }. */
 export function lookOf(e = {}) {
-  const base = { skin: 2, beard: 0, topPat: 0, botPat: 0, pants: 0, glasses: 0, glassC: 0x1f1f2e, bag: 0, kandi: 0, gloves: 0, totem: 0, ...(OUTFITS[e.outfit] || OUTFITS[0])[1] };
+  // A saved look keeps what it has, and anything added to the game later (beards, shades…) starts as "none"; only
+  // explorers with no look at all start from their preset outfit.
+  const none = { skin: 2, beard: 0, topPat: 0, botPat: 0, pants: 0, glasses: 0, glassC: 0x1f1f2e, bag: 0, kandi: 0, gloves: 0, totem: 0 };
+  const preset = (OUTFITS[e.outfit] || OUTFITS[0])[1];
+  const base = e.look ? { ...none, ...preset, beard: 0, glasses: 0, kandi: 0, gloves: 0, totem: 0, topPat: 0, botPat: 0, pants: 0, bag: 0 } : { ...none, ...preset };
   if (e.skin != null) base.skin = OLD_SKIN[e.skin] ?? 2;
   const out = { ...base, ...(e.look || {}) };
   for (const k of LOOK_KEYS) { out[k] = Math.max(0, Math.floor(+out[k] || 0)); if (LIMITS[k]) out[k] %= LIMITS[k]; }
@@ -956,14 +960,75 @@ function patternTex(pat, base) {
   patCache.set(key, t); return t;
 }
 
+// ---------- anime look (owner: "the avatars have to look slightly anime"): cel shading, ink outlines, painted eyes ----------
+const TOON = (() => { const d = new Uint8Array([105, 180, 255]); const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
+const INK = 0x2a1d3f, inkMats = new Map();
+/** The ink outline: the same shape, drawn back-facing and pushed out along its normals by w (in the mesh's own units). */
+function inkMat(w) {
+  const k = Math.round(w * 2000) / 2000; if (inkMats.has(k)) return inkMats.get(k);
+  const m = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide });
+  m.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3(position) + normalize(normal) * ${k.toFixed(4)};`); };
+  m.customProgramCacheKey = () => 'ink' + k; inkMats.set(k, m); return m;
+}
+function inkAll(root, w = 0.0065) {
+  const list = []; root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshToonMaterial && !o.userData.noInk && o.geometry.attributes.normal) list.push(o); });
+  for (const o of list) { const sc = Math.max(0.02, (Math.abs(o.scale.x) + Math.abs(o.scale.y) + Math.abs(o.scale.z)) / 3); const ol = new THREE.Mesh(o.geometry, inkMat(w / sc)); ol.userData.noInk = true; ol.renderOrder = -1; o.add(ol); }
+}
+const canv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+const animeTex = new Map();
+/** An anime eye: white, a tall glossy iris (dark at the top, glowing at the bottom), a pupil, two catch-lights and a
+ * bold upper lash line with a little wing at the outer corner (on the right; the left eye is mirrored). */
+function animeEye(color) {
+  const key = 'eye' + color; if (animeTex.has(key)) return animeTex.get(key);
+  const c = new THREE.Color(color), css = k => `rgb(${Math.round(Math.min(255, c.r * 255 * k))},${Math.round(Math.min(255, c.g * 255 * k))},${Math.round(Math.min(255, c.b * 255 * k))})`;
+  const t = canv(128, 160, (x, W, H) => {
+    x.save(); x.beginPath(); x.ellipse(64, 92, 46, 58, 0, 0, Math.PI * 2); x.clip(); // the eye opening
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(120,110,170,0.25)'; x.fillRect(0, 30, W, 26); // the lid's soft shadow on the white
+    const g = x.createLinearGradient(0, 50, 0, 146); g.addColorStop(0, css(0.35)); g.addColorStop(0.45, css(0.95)); g.addColorStop(1, css(1.6));
+    x.fillStyle = g; x.beginPath(); x.ellipse(64, 98, 36, 47, 0, 0, Math.PI * 2); x.fill();
+    x.lineWidth = 4; x.strokeStyle = css(0.3); x.stroke();
+    x.fillStyle = '#120a22'; x.beginPath(); x.ellipse(64, 100, 15, 22, 0, 0, Math.PI * 2); x.fill();
+    const glow = x.createRadialGradient(64, 132, 2, 64, 132, 30); glow.addColorStop(0, css(2)); glow.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = glow; x.globalAlpha = 0.6; x.beginPath(); x.ellipse(64, 128, 28, 16, 0, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1;
+    x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(48, 76, 13, 16, -0.3, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(82, 120, 6, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(74, 72, 3.5, 0, Math.PI * 2); x.fill();
+    x.restore();
+    // upper lash line: thick, arched, with a wing at the outer corner
+    x.fillStyle = '#1a0f2e'; x.beginPath(); x.moveTo(12, 70); x.quadraticCurveTo(58, 18, 116, 52); x.lineTo(126, 44); x.lineTo(120, 62); x.quadraticCurveTo(62, 36, 18, 80); x.closePath(); x.fill();
+    x.strokeStyle = 'rgba(26,15,46,0.5)'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(34, 146); x.quadraticCurveTo(66, 156, 96, 144); x.stroke(); // lower lid
+  });
+  animeTex.set(key, t); return t;
+}
+function animeMouth() {
+  if (animeTex.has('mouth')) return animeTex.get('mouth');
+  const t = canv(64, 48, x => { x.fillStyle = '#7a1f35'; x.beginPath(); x.moveTo(14, 14); x.quadraticCurveTo(32, 20, 50, 14); x.quadraticCurveTo(46, 42, 32, 42); x.quadraticCurveTo(18, 42, 14, 14); x.fill();
+    x.fillStyle = '#ff8a9a'; x.beginPath(); x.ellipse(32, 36, 10, 6, 0, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#3a1020'; x.lineWidth = 2.5; x.lineJoin = 'round'; x.beginPath(); x.moveTo(14, 14); x.quadraticCurveTo(32, 20, 50, 14); x.quadraticCurveTo(46, 42, 32, 42); x.quadraticCurveTo(18, 42, 14, 14); x.stroke(); });
+  animeTex.set('mouth', t); return t;
+}
+function animeBlush() {
+  if (animeTex.has('blush')) return animeTex.get('blush');
+  const t = canv(64, 40, x => { const g = x.createRadialGradient(32, 20, 2, 32, 20, 28); g.addColorStop(0, 'rgba(255,120,150,0.6)'); g.addColorStop(1, 'rgba(255,120,150,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 40);
+    x.strokeStyle = 'rgba(230,80,120,0.7)'; x.lineWidth = 2.2; for (let i = 0; i < 3; i++) { x.beginPath(); x.moveTo(20 + i * 10, 26); x.lineTo(27 + i * 10, 14); x.stroke(); } });
+  animeTex.set('blush', t); return t;
+}
+let lockGeo = null;
+/** One hair lock: a flattened, slightly curved point; base at y = 0, tip at y = -1, curling outwards (+z). */
+function hairLock() {
+  if (lockGeo) return lockGeo;
+  lockGeo = new THREE.ConeGeometry(1, 1, 8, 4); lockGeo.rotateX(Math.PI); lockGeo.translate(0, -0.5, 0);
+  const p = lockGeo.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, p.getZ(i) + 0.35 * y * y); }
+  lockGeo.computeVertexNormals(); return lockGeo;
+}
+
 /**
  * A chibi festival-goer about 1 unit tall, feet at y=0, facing +z. userData.update(dt, speed) walks (speed in m/s) or
  * idles, blinks, and makes LED things cycle colours. makeExplorer(look) or the old makeExplorer(outfit, skin).
  */
 export function makeExplorer(look = {}, skin) {
   const L = typeof look === 'number' ? lookOf({ outfit: look, skin }) : lookOf({ look });
-  const M = c => plush({ color: c, roughness: 0.55 }, 0.16), dark = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
-  const P = (pat, c) => pat ? plush({ color: 0xffffff, map: patternTex(PATTERNS[pat], c), roughness: 0.6 }, 0.12) : M(c);
+  // cel shading (three tones) for the anime look; ink outlines are added at the end (inkAll)
+  const M = c => new THREE.MeshToonMaterial({ color: c, gradientMap: TOON }), dark = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
+  const P = (pat, c) => pat ? new THREE.MeshToonMaterial({ color: 0xffffff, map: patternTex(PATTERNS[pat], c), gradientMap: TOON }) : M(c);
   const skinM = M(SKINS[L.skin]), hairM = M(L.hairC), topM = P(L.topPat, L.top), botM = P(L.botPat, L.bottom), shoeM = M(L.shoes), packM = M(L.pack);
   const glow = []; // LED things: their colour cycles in update()
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
@@ -1020,27 +1085,26 @@ export function makeExplorer(look = {}, skin) {
     const mini = makeKiki('meadow', 0.15); mini.position.y = 0.72; mini.remove(mini.userData.shadow); totem.add(mini);
   }
 
-  // head: chibi-big, with ears, eyes, brows, nose, mouth and blush on its surface
+  // head: anime chibi: big and round, cheeks soft, the chin tapering a little
   const head = new THREE.Group(); head.position.y = 0.7; body.add(head);
-  const R = 0.265, SY = 0.95, SZ = 0.93;
-  const skull = sph(R, skinM, 32, 24); skull.scale.set(1, SY, SZ); head.add(skull);
-  const zOn = (x, y, lift = 0.004) => SZ * Math.sqrt(Math.max(0, R * R - x * x - (y / SY) ** 2)) + lift; // the face's surface
-  for (const s of [-1, 1]) { const ear = sph(0.055, skinM, 12, 10); ear.scale.set(0.6, 1, 0.8); ear.position.set(s * 0.262, -0.02, 0); head.add(ear); }
-  const eyeM = new THREE.MeshBasicMaterial({ color: L.eyes }), pupilM = new THREE.MeshBasicMaterial({ color: 0x0b0f2e }), whiteM = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  // stick a flat feature (eye, mouth, blush) onto the face, turned to match the curve of the head there
-  const onFace = (mesh, x, y, lift) => { const z = zOn(x, y, lift), n = new THREE.Vector3(x / (R * R), y / (R * R * SY * SY), z / (R * R * SZ * SZ)).normalize(); mesh.position.set(x, y, z); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); head.add(mesh); return mesh; };
+  const R = 0.265, SY = 0.95, SZ = 0.93, headGeo = new THREE.SphereGeometry(R, 40, 30), hp = headGeo.attributes.position;
+  for (let i = 0; i < hp.count; i++) { let x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i); if (y < 0) { const t = Math.pow(-y / R, 1.6); x *= 1 - 0.2 * t; z *= 1 - 0.06 * t; y *= 1 + 0.06 * t; } hp.setXYZ(i, x, y, z); }
+  headGeo.computeVertexNormals();
+  const skull = new THREE.Mesh(headGeo, skinM); skull.scale.set(1.03, SY, SZ); head.add(skull);
+  // where the face is: rays from the front onto the head shape
+  const probe = new THREE.Mesh(headGeo); probe.scale.copy(skull.scale); probe.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster(), surf = (x, y) => { ray.set(new THREE.Vector3(x, y, 1), new THREE.Vector3(0, 0, -1)); const h = ray.intersectObject(probe)[0]; return h ? { p: h.point, n: h.face.normal.clone().transformDirection(probe.matrixWorld) } : { p: new THREE.Vector3(x, y, R * SZ), n: new THREE.Vector3(0, 0, 1) }; };
+  const zOn = (x, y, lift = 0.004) => surf(x, y).p.z + lift;
+  const onFace = (mesh, x, y, lift) => { const { p, n } = surf(x, y); mesh.position.copy(p).addScaledVector(n, lift); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); head.add(mesh); return mesh; };
+  for (const s of [-1, 1]) { const ear = sph(0.05, skinM, 12, 10); ear.scale.set(0.55, 1, 0.8); ear.position.set(s * 0.262, -0.035, -0.01); head.add(ear); }
+  const decal = (tex, w, h) => new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  const eyes = [];
   for (const s of [-1, 1]) {
-    const x = s * 0.092, y = -0.025;
-    const iris = onFace(new THREE.Mesh(new THREE.CircleGeometry(0.045, 24), eyeM), x, y, 0.003); iris.scale.set(0.82, 1.18, 1);
-    const pupil = onFace(new THREE.Mesh(new THREE.CircleGeometry(0.024, 18), pupilM), x, y - 0.004, 0.005); pupil.scale.set(0.85, 1.15, 1);
-    onFace(new THREE.Mesh(new THREE.CircleGeometry(0.014, 12), whiteM), x + s * 0.004 + 0.008, y + 0.022, 0.007);
-    onFace(new THREE.Mesh(new THREE.CircleGeometry(0.007, 10), whiteM), x - 0.012, y - 0.016, 0.007);
-    const brow = onFace(cap(0.009, 0.045, M(dark(L.hairC, 0.85))), x, y + 0.083, 0.008); brow.rotateZ(Math.PI / 2 - s * 0.14);
-    const blush = onFace(new THREE.Mesh(new THREE.CircleGeometry(0.032, 16), new THREE.MeshBasicMaterial({ color: 0xff7f9e, transparent: true, opacity: 0.45 })), s * 0.155, -0.085, 0.003); blush.scale.set(1.3, 0.8, 1);
+    const e = onFace(decal(animeEye(L.eyes), 0.112, 0.14), s * 0.094, -0.035, 0.004); e.scale.x = -s; e.renderOrder = 3; eyes.push(e); // mirrored so the wing is on the outside
+    const brow = onFace(new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.011), new THREE.MeshBasicMaterial({ color: dark(L.hairC, 0.7) })), s * 0.096, 0.058, 0.006); brow.rotateZ(-s * 0.12); brow.renderOrder = 3;
+    const blush = onFace(decal(animeBlush(), 0.075, 0.045), s * 0.152, -0.112, 0.004); blush.renderOrder = 2;
   }
-  const nose = sph(0.016, M(dark(SKINS[L.skin], 0.93)), 10, 8); nose.position.set(0, -0.068, zOn(0, -0.068, 0.002)); head.add(nose);
-  const mouth = onFace(new THREE.Mesh(new THREE.CircleGeometry(0.036, 18, Math.PI, Math.PI), new THREE.MeshBasicMaterial({ color: 0x7a1f35 })), 0, -0.115, 0.004); mouth.scale.set(1, 0.85, 1);
-  const tongue = onFace(new THREE.Mesh(new THREE.CircleGeometry(0.018, 12, Math.PI, Math.PI), new THREE.MeshBasicMaterial({ color: 0xff7a8a })), 0, -0.132, 0.006); tongue.scale.set(1.1, 0.7, 1);
+  const mouth = onFace(decal(animeMouth(), 0.05, 0.0375), 0, -0.145, 0.004); mouth.renderOrder = 3;
 
   // shades
   if (L.glasses) {
@@ -1057,24 +1121,39 @@ export function makeExplorer(look = {}, skin) {
     for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.008, 0.2), frameM); arm.position.set(s * 0.15, y + 0.01, z - 0.1); arm.rotation.y = s * 0.28; gl.add(arm); }
   }
 
-  // hair
+  // hair: anime style: a cap of hair, pointed locks for the fringe and sides, and a shine band
   const hat = L.hat, tallHat = [1, 2, 3, 4, 7].includes(hat), hr = R + 0.016, hair = new THREE.Group(); head.add(hair);
-  const shell = (r = hr, cover = 0.56, tilt = -0.42, m = hairM) => { const s = new THREE.Mesh(new THREE.SphereGeometry(r, 30, 18, 0, Math.PI * 2, 0, Math.PI * cover), m); s.rotation.x = tilt; s.scale.set(1, SY, SZ + 0.03); hair.add(s); return s; };
+  const shell = (r = hr, cover = 0.56, tilt = -0.42, m = hairM) => { const sh = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 18, 0, Math.PI * 2, 0, Math.PI * cover), m); sh.rotation.x = tilt; sh.scale.set(1.04, SY, SZ + 0.04); hair.add(sh); return sh; };
   const tuft = (x, y, z, r, sx = 1, sy = 1, sz = 1) => { const m = sph(r, hairM, 14, 10); m.position.set(x, y, z); m.scale.set(sx, sy, sz); hair.add(m); return m; };
-  const fringe = (n = 5, y = 0.16, r = 0.07) => { for (let i = 0; i < n; i++) { const t = (i / (n - 1) - 0.5) * 1.6, x = Math.sin(t) * 0.2; tuft(x, y - Math.abs(t) * 0.04, zOn(x, y) - 0.04, r, 1.05, 0.62, 0.55); } };
+  // a lock at angle phi round the head (0 = the middle of the forehead), starting at height y0, hanging len, leaning out
+  const lock = (phi, y0, len, w, out = 0.3, m = hairM) => {
+    const rr = R * Math.sqrt(Math.max(0.08, 1 - (y0 / (R * SY)) ** 2)), g = new THREE.Group();
+    g.position.set(Math.sin(phi) * rr * 1.08, y0, Math.cos(phi) * rr * (SZ + 0.08)); g.rotation.y = phi; hair.add(g);
+    const c = new THREE.Mesh(hairLock(), m); c.scale.set(w, len, w * 0.55); c.rotation.x = -out; g.add(c); return g;
+  };
+  const fringe = (n = 5, len0 = 0.11, len1 = 0.19, span = 1.0, y = 0.16) => { for (let i = 0; i < n; i++) { const t = n === 1 ? 0 : i / (n - 1) * 2 - 1, a = Math.abs(t); lock(t * span + (i % 2 ? 0.05 : -0.05), y - a * 0.03, len0 + (len1 - len0) * Math.pow(a, 1.4) + (i % 2) * 0.02, 0.085 - a * 0.012, 0.26 + a * 0.12); } };
+  const sides = (len, n = 2, from = 1.32) => { for (const s of [-1, 1]) for (let i = 0; i < n; i++) lock(s * (from + i * 0.24), 0.11 - i * 0.02, len - i * 0.03, 0.075, 0.12); };
+  const shine = r => { const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.007, 6, 48, Math.PI * 0.8), new THREE.MeshBasicMaterial({ color: new THREE.Color(L.hairC).lerp(new THREE.Color(0xffffff), 0.55), transparent: true, opacity: 0.75 })); ring.rotation.set(-0.95, 0, Math.PI * 0.1); ring.position.set(0, 0.06, 0); ring.scale.set(1.04, SY, SZ + 0.05); hair.add(ring); };
   const style = HAIR_STYLES[L.hair];
-  if (style === 'Bald') { /* just a little shine on top */ const shine = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 })); shine.position.set(-0.06, R * SY * 0.93, 0.05); shine.rotation.x = -1.2; head.add(shine); }
-  else if (style === 'Buzz' || style === 'Mohawk') shell(R + 0.006, 0.52, -0.5, style === 'Mohawk' ? M(dark(L.hairC, 0.7)) : hairM);
-  else { shell(); if (!['Spiky', 'Dreads'].includes(style)) fringe(style === 'Curly' ? 4 : 5); }
-  if (style === 'Bob') { for (const s of [-1, 1]) tuft(s * 0.215, -0.07, -0.02, 0.12, 0.62, 1.35, 1); tuft(0, -0.08, -0.15, 0.2, 1.15, 0.85, 0.7); }
-  if (style === 'Long') { tuft(0, -0.16, -0.14, 0.22, 1.15, 1.45, 0.62); for (const s of [-1, 1]) tuft(s * 0.21, -0.12, 0.0, 0.085, 0.7, 1.9, 0.8); }
+  if (style === 'Bald') { const gloss = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })); gloss.position.set(-0.06, R * SY * 0.93, 0.05); gloss.rotation.x = -1.2; head.add(gloss); }
+  else if (style === 'Buzz') shell(R + 0.006, 0.52, -0.5);
+  else if (style === 'Mohawk') shell(R + 0.006, 0.52, -0.5, M(dark(L.hairC, 0.7)));
+  else if (style === 'Curly') { shell(hr, 0.52, -0.45); const k = hat ? 0.75 : 1; for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, ring = i % 2; tuft(Math.cos(a) * 0.2 * k, 0.1 + ring * 0.07 + (hat ? -0.04 : 0), -0.02 + Math.sin(a) * 0.17 * k, 0.1 + ring * 0.01); } if (!tallHat) tuft(0, 0.26, -0.03, 0.15); for (let i = 0; i < 5; i++) tuft((i / 4 - 0.5) * 0.3, 0.15 - Math.abs(i / 4 - 0.5) * 0.06, 0.2, 0.055); }
+  else {
+    shell();
+    if (style === 'Dreads') fringe(5, 0.08, 0.12, 0.9);
+    else if (style === 'Spiky') fringe(6, 0.09, 0.14, 1.0);
+    else fringe(5, 0.11, ['Long', 'Bob'].includes(style) ? 0.22 : 0.19);
+    if (['Short', 'Ponytail', 'Space buns', 'Braids', 'Spiky'].includes(style)) sides(0.2);
+    if (style === 'Bob') { sides(0.3, 3); for (let i = 0; i < 6; i++) lock(Math.PI + (i / 5 - 0.5) * 2.4, 0.06, 0.3, 0.11, 0.18); }
+    if (style === 'Long') { sides(0.46, 3); for (let i = 0; i < 7; i++) lock(Math.PI + (i / 6 - 0.5) * 2.6, 0.09, 0.55 - Math.abs(i / 6 - 0.5) * 0.12, 0.12, 0.12); }
+    if (style !== 'Dreads') shine(R * 1.075);
+  }
   if (style === 'Ponytail') { const tail = cap(0.07, 0.2, hairM); tail.position.set(0, -0.06, -0.33); tail.rotation.x = 0.55; hair.add(tail); const tie = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.016, 8, 16), M(L.pack)); tie.position.set(0, 0.06, -0.27); tie.rotation.x = 0.9; hair.add(tie); }
   if (style === 'Space buns' && !tallHat) for (const s of [-1, 1]) { tuft(s * 0.17, 0.2, -0.04, 0.1); const tie = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 16), M(0xff4fd8)); tie.position.set(s * 0.15, 0.15, -0.04); tie.rotation.set(Math.PI / 2, 0, s * 0.5); hair.add(tie); }
-  if (style === 'Curly') { const k = hat ? 0.75 : 1; for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, ring = i % 2; tuft(Math.cos(a) * 0.2 * k, 0.1 + ring * 0.07 + (hat ? -0.04 : 0), -0.02 + Math.sin(a) * 0.17 * k, 0.1 + ring * 0.01); } if (!tallHat) tuft(0, 0.26, -0.03, 0.15); }
-  if (style === 'Spiky' && !tallHat) for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 2.2, c = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 10), hairM); c.position.set(Math.sin(a) * 0.17, 0.2 + Math.cos(a) * 0.05, -0.02 - Math.abs(a) * 0.02); c.rotation.set(-0.35, 0, -a * 0.55); hair.add(c); }
-  if (style === 'Spiky' || style === 'Dreads') fringe(4, 0.17, 0.06);
+  if (style === 'Spiky' && !tallHat) for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * 2.4, g = new THREE.Group(); g.position.set(Math.sin(a) * 0.16, 0.2 + Math.cos(a) * 0.05, -0.04 - Math.abs(a) * 0.03); g.rotation.set(0.5, 0, -a * 0.6); const c = new THREE.Mesh(hairLock(), hairM); c.scale.set(0.06, 0.2, 0.035); c.rotation.x = Math.PI; g.add(c); hair.add(g); }
   if (style === 'Mohawk' && !tallHat) for (let i = 0; i < 6; i++) { const a = -0.5 + i * 0.36, c = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.17, 10), hairM); c.scale.set(0.45, 1, 1); c.position.set(0, Math.cos(a) * 0.27, Math.sin(-a) * 0.27 * SZ); c.rotation.x = -a; hair.add(c); }
-  if (style === 'Dreads') for (let i = 0; i < 18; i++) { // locs hanging all round the back and sides
+  if (style === 'Dreads') for (let i = 0; i < 18; i++) {
     const a = Math.PI * (0.06 + 0.88 * (i / 17)) + (i % 2) * 0.05, x = Math.cos(a) * 0.235, z = -Math.sin(a) * 0.22 * SZ, len = 0.2 + (i % 3) * 0.05;
     const loc = cap(0.026, len, M(dark(L.hairC, 0.85 + (i % 3) * 0.08))); loc.position.set(x * 1.02, -0.03 - len / 2, z * 1.02 - 0.01); loc.rotation.set(-z * 0.6, 0, x * 0.5); hair.add(loc);
     if (i % 4 === 0) { const bead = cyl(0.03, 0.03, 0.025, M([0xffcf2e, 0xff5d8f, 0x2bc4b6][i % 3]), 10); bead.position.set(x * 1.02, -0.06 - len, z * 1.02 - 0.01); hair.add(bead); }
@@ -1135,7 +1214,7 @@ export function makeExplorer(look = {}, skin) {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x0d0a26, transparent: true, opacity: 0.35, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.005; root.add(shadow);
   let phase = 0, t = Math.random() * 10, blink = 2 + Math.random() * 2;
-  const lids = []; head.traverse(o => { if (o.material === eyeM || o.material === pupilM || o.material === whiteM) lids.push(o); });
+  inkAll(root); // ink outlines on everything cel-shaded
   root.userData = {
     head, body, look: L,
     update(dt, speed = 0) {
@@ -1147,7 +1226,7 @@ export function makeExplorer(look = {}, skin) {
       body.rotation.z = Math.sin(phase) * 0.04 * walk;
       head.rotation.y = (1 - walk) * Math.sin(t * 0.5) * 0.25;
       blink -= dt; const closed = blink < 0 && blink > -0.12; if (blink < -0.12) blink = 2.5 + Math.random() * 3;
-      for (const o of lids) o.visible = !closed;
+      for (const e of eyes) e.scale.y = closed ? 0.12 : 1;
       for (let i = 0; i < glow.length; i++) glow[i].color.setHSL((t * 0.25 + i * 0.3) % 1, 1, 0.6); // LED gloves and shades
     },
   };
