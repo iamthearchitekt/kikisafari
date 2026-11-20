@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, GLASSES, HAIR_COLORS, CLOTHES, CUTS, STYLES, loadExplorerKit, forgetExplorerPortraits } from './art.js';
+import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -339,8 +339,11 @@ export function openExplorer(app) {
   s.q('[data-look]').onclick = () => { s.close(); outfitPicker(app, { onDone: () => openExplorer(app) }); };
   s.q('[data-medals]').onclick = () => { sfx('button', 0.3); app.open('medals'); };
 }
-/** Pick your look (and name, the first time): outfit and its colours, skin, hairstyle and colour, facial hair, a hat
- * and shades (owner: "customize hair, facial hair, clothes colour, a few clothing options, hats and sunglasses"). */
+/** Pick your look (and name, the first time). Owner: "customize hair, facial hair, clothes colour, a few clothing
+ * options, hats and sunglasses"; then "basic wear like short sleeve and long sleeve t-shirt, jeans, shorts, skirt,
+ * male and female, basic sunglass options". */
+const BOTTOMS = [0x3e5f9a, 0x7d9cc9, 0x2b3a8f, 0x1f1f2e, ...CLOTHES.filter(c => ![0x2b3a8f, 0x1f1f2e].includes(c))]; // denim first
+const BY_INDEX = { skin: SKINS, lens: LENSES };
 export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
   const e = app.progress.explorer, look = lookOf(e);
   const hex = c => '#' + c.toString(16).padStart(6, '0');
@@ -351,23 +354,25 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
     <div class="look-stage"></div>
     <div class="sheet-body look-body">
       ${first ? `<input class="name-input" maxlength="15" placeholder="Your explorer name" value="${esc(e.name)}">` : ''}
-      <div class="look-row"><div class="look-label">Festival looks</div><div class="outfits">${OUTFITS.slice(0, 4).map((o, i) => `<button data-o="${i}"><img src="${presetImg(i)}" alt="">${o[0]}</button>`).join('')}</div></div>
-      ${chips('body', CUTS, 'Outfit')}
-      ${sw('top', CLOTHES, 'Top colour')}
-      ${sw('bottom', CLOTHES, 'Bottoms colour')}
+      <div class="look-row"><div class="look-label">Quick looks</div><div class="outfits">${OUTFITS.slice(0, 4).map((o, i) => `<button data-o="${i}"><img src="${presetImg(i)}" alt="">${o[0]}</button>`).join('')}</div></div>
+      ${chips('sex', SEXES, 'Body')}
       ${sw('skin', SKINS, 'Skin')}
-      ${chips('style', STYLES, 'Hair')}
+      ${chips('shirt', SHIRTS, 'T-shirt')}
+      ${sw('top', CLOTHES, 'T-shirt colour')}
+      ${chips('legs', LEGWEAR, 'Bottoms')}
+      ${sw('bottom', BOTTOMS, 'Bottoms colour')}
+      ${chips('hairdo', HAIRDOS, 'Hair')}
       <div class="look-if" data-if="hairC">${sw('hairC', HAIR_COLORS, 'Hair colour')}</div>
       ${chips('beard', BEARDS, 'Facial hair')}
       ${chips('hat', HATS, 'Hat')}
       <div class="look-if" data-if="hat">${sw('hatC', CLOTHES, 'Hat colour')}</div>
-      ${chips('glasses', GLASSES, 'Shades')}
-      <div class="look-if" data-if="glasses">${sw('glassC', CLOTHES, 'Shades colour')}</div>
+      ${chips('glasses', SHADES, 'Sunglasses')}
+      <div class="look-if" data-if="glasses">${sw('glassC', FRAMES, 'Frames')}${sw('lens', LENSES, 'Lenses')}</div>
     </div><div class="sheet-foot"><button class="pill" data-ok>${first ? "That's me!" : 'Done'}</button></div>`);
   // A live 3D preview: drag to turn your explorer around.
-  let holder, avatar, spin = -0.4, drag = null;
+  let holder, avatar, spin = -0.4, drag = null, shown = '';
   const st = liveStage(s.q('.look-stage'), (scene, cam) => {
-    cam.position.set(0, 0.62, 2.35); cam.lookAt(0, 0.52, 0);
+    cam.position.set(0, 0.6, 2.2); cam.lookAt(0, 0.5, 0);
     holder = new THREE.Group(); scene.add(holder);
     return { update: dt => { if (avatar) avatar.userData.update(dt, 0); if (!drag) spin += dt * 0.25; holder.rotation.y = spin; } };
   });
@@ -376,27 +381,34 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
   stage.addEventListener('pointermove', ev => { if (drag == null) return; spin += (ev.clientX - drag) * 0.012; drag = ev.clientX; });
   const endDrag = () => { drag = null; }; stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
   // keep the older chibi fields in step, for the moments before the 3D explorers have loaded
-  const OLD_HAIR = [0, 6, 2, 4, 5, 8, 9, 11];
-  const sync = () => { look.hair = OLD_HAIR[look.style] ?? 0; look.pants = look.body === 2 ? 1 : 0; };
-  const render = () => {
+  const OLD_HAIR = [11, 7, 0, 6, 9, 1, 2, 3, 4, 5, 8];
+  const sync = () => { look.hair = OLD_HAIR[look.hairdo] ?? 0; look.pants = look.legs === 0 ? 1 : 0; if (!look.sex && look.legs === 2) look.legs = 1; };
+  const showAvatar = () => {
+    const sig = encodeLook(look); if (sig === shown && avatar) return; shown = sig;
     if (avatar) holder.remove(avatar);
     avatar = makeExplorer(look); holder.add(avatar);
-    s.root.querySelectorAll('[data-c]').forEach(b => b.classList.toggle('on', b.dataset.c === 'skin' ? SKINS[look.skin] === +b.dataset.v : look[b.dataset.c] === +b.dataset.v));
-    s.root.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', look[b.dataset.s] === +b.dataset.v));
-    s.root.querySelectorAll('.look-if').forEach(d => { d.hidden = d.dataset.if === 'hairC' ? STYLES[look.style] === 'Bald' && !look.beard : !look[d.dataset.if]; });
   };
-  s.root.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c, v = +b.dataset.v; look[k] = k === 'skin' ? SKINS.indexOf(v) : v; sfx('button', 0.25); hx.light(); render(); });
+  const render = () => {
+    // the 3D parts this look needs load first (the current figure stays up meanwhile)
+    if (explorerReady(look) || !avatar) showAvatar(); else { stage.classList.add('loading'); preloadExplorer(look).then(() => { stage.classList.remove('loading'); if (s.root.isConnected) showAvatar(); }).catch(() => {}); }
+    s.root.querySelectorAll('[data-c]').forEach(b => { const k = b.dataset.c, list = BY_INDEX[k]; b.classList.toggle('on', list ? list[look[k]] === +b.dataset.v : look[k] === +b.dataset.v); });
+    s.root.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', look[b.dataset.s] === +b.dataset.v));
+    s.root.querySelector('[data-s="legs"][data-v="2"]').hidden = !look.sex; // the skirt is on the female body
+    s.root.querySelectorAll('.look-if').forEach(d => { d.hidden = d.dataset.if === 'hairC' ? HAIRDOS[look.hairdo] === 'Bald' && !look.beard : !look[d.dataset.if]; });
+  };
+  s.root.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c, v = +b.dataset.v; look[k] = BY_INDEX[k] ? BY_INDEX[k].indexOf(v) : v; sfx('button', 0.25); hx.light(); render(); });
   s.root.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { look[b.dataset.s] = +b.dataset.v; sync(); sfx('button', 0.25); hx.light(); render(); });
   s.root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { Object.assign(look, { ...lookOf({ outfit: +b.dataset.o }), skin: look.skin }); sfx('button', 0.3); hx.light(); render(); });
   s.q('[data-ok]').onclick = () => {
     if (first) { const n = cleanName(s.q('.name-input').value); if (!n) { hx.warning(); s.q('.name-input').focus(); return toast('Give your explorer a name!'); } e.name = n; }
-    e.look = { ...look }; app.save(); app.map.setExplorer(); app.refreshHud(); if (app.syncProfile) app.syncProfile();
+    sync(); e.look = { ...look }; app.save(); app.map.setExplorer(); app.refreshHud(); if (app.syncProfile) app.syncProfile();
     sfx('pickup', 0.45); hx.success(); st.stop(); s.close(); onDone();
   };
   render();
-  // every outfit and hairstyle, so each choice shows straight away (and the preset pictures in 3D)
-  loadExplorerKit().then(() => {
-    if (!s.root.isConnected) return; forgetExplorerPortraits(); render();
+  // this body's outfits and every hairstyle in the background, so most choices show straight away; then the
+  // quick-look pictures again, in 3D
+  loadExplorerKit(look.sex).then(() => loadExplorerKit()).then(() => {
+    if (!s.root.isConnected) return; forgetExplorerPortraits();
     s.root.querySelectorAll('[data-o] img').forEach((im, i) => { im.src = presetImg(i); });
   }).catch(() => {});
 }

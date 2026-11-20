@@ -29,7 +29,7 @@ async function finish(doc, file) {
 }
 
 // ---------- bodies ----------
-for (const X of ['a', 'b', 'c']) {
+for (const X of fs.readdirSync(rawDir).filter(f => f.endsWith('-walk.glb')).map(f => f.slice(0, -9))) {
   const walk = path.join(rawDir, `${X}-walk.glb`);
   if (!fs.existsSync(walk)) { console.log('skip body', X); continue; }
   // the walk clip only: standing still is posed in code (the catalog idles stretch, dab or hold an arm out)

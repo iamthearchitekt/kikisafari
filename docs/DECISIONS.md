@@ -459,3 +459,24 @@ slowly turning nebula, twinkling motes) with the stop as a rune medallion: an en
 and an inner ring turning the other way, runes shimmering one after another, a gold eight-point star, motes of light
 orbiting the floating rune stone, and a soft violet aura. Spinning it rolls a flash of light outwards; it glows a
 moment, then rests (dim and slow) while it restocks. All CSS and inline SVG, no images; still for reduced motion.
+
+## 30. Explorers, round 2: basic wear, male and female, real bald, everyday shades (owner)
+
+Owner: "the avatars aren't customizable enough. The bald option looks especially bad. Let's do some basic wear like
+short sleeve and long sleeve t-shirt, jeans, shorts, skirt. Male and female, basic sunglass options, nothing too wild."
+
+- **Ten bodies** (Magnific: concept, 4-view sheet, image-to-3D with Tripo 3.1, Meshy auto-rig, Casual Walk): male
+  and female, each in a short- or long-sleeve tee with jeans or shorts, plus a skirt for the female body; all with
+  white trainers. Tees are generated bright green and bottoms royal blue, so any colour can be painted on (denim
+  shades first in the bottoms palette). The festival outfits of round 1 are retired; old saves get the nearest body.
+- **Bald is the real head now:** the bodies were generated bald, so every hairstyle is a separate piece and "Bald"
+  is simply the head as made. Hairstyles: Bald, Buzz cut (painted over the scalp to a hairline), Short, Spiky,
+  Undercut, Bob, Long, Ponytail, Space buns, Curly, Locs. Eyebrows take the hair colour.
+- **Sunglasses** are everyday shapes built in code: aviators (thin metal, double bridge), classic (thick
+  wayfarer-style), round, a sport wrap, cat-eye; any frame colour (black, tortoise, gold, silver, white, red, navy)
+  and lens tint (smoke, brown, green, blue mirror, rose, amber).
+- Some auto-rigs give the head bone a turned rest pose; hair, hats and shades sit in an upright frame at the head,
+  so they line up on every body.
+- Files are ~450 KB per body and ~150 KB per hairstyle. Your own body and hairstyle load first; the look picker loads
+  your body's outfits and the hairstyles in the background, and shows "Loading…" if you pick one that is not in yet.
+  A friend's look loads when their picture is first drawn.

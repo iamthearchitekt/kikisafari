@@ -4,8 +4,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { rng, hash, variant } from './core.js';
 import { premium, light } from './lux.js';
-import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, CUTS, STYLES } from './explorer3d.js';
-export { preloadExplorer, loadExplorerKit, explorerReady, CUTS, STYLES };
+import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, SEXES, SHIRTS, LEGWEAR, HAIRDOS, SHADES, FRAMES, LENSES } from './explorer3d.js';
+export { preloadExplorer, loadExplorerKit, explorerReady, SEXES, SHIRTS, LEGWEAR, HAIRDOS, SHADES, FRAMES, LENSES };
 
 export const EGG_H = 1.15, GROUND = EGG_H + 0.12, BODY_H = GROUND + EGG_H;
 const C = h => new THREE.Color(h);
@@ -902,16 +902,18 @@ export const CLOTHES = [0xffffff, 0xfff2c4, 0xffcf2e, 0xff8a00, 0xe23a3a, 0xff5d
 const OLD_SKIN = [0, 2, 3, 5, 6];
 // the old hairstyles (HAIR_STYLES) → the 3D ones (STYLES): Short, Bob, Long, Ponytail, Space buns, Curly, Spiky, Buzz, Dreads, Mohawk, Braids, Bald
 const OLD_HAIR_TO_STYLE = [0, 2, 2, 2, 3, 4, 1, 7, 5, 6, 5, 7];
+// round-1 3D hairstyles (Short, Spiky, Long, Space buns, Curly, Locs, Undercut, Bald) → HAIRDOS; old shades → SHADES
+const STYLE_TO_HAIRDO = [2, 3, 6, 8, 9, 10, 4, 0], OLD_SHADES = [0, 3, 5, 2, 4];
 // Quick looks (old saves' outfits 0 to 3 become the first four; Ranger Rue is the guide).
 export const OUTFITS = [
-  ['Wook', { body: 2, style: 5, hair: 8, beard: 2, hairC: 0x6e4426, hat: 1, hatC: 0x3fae2a, top: 0xff5d8f, topPat: 1, bottom: 0xc79a5b, botPat: 5, pants: 1, shoes: 0x6b4a2a, pack: 0x2b3a8f, bag: 1, glasses: 1, glassC: 0xff8a00, eyes: 0x5a3218, kandi: 1, totem: 1 }],
-  ['Raver', { body: 0, style: 3, hair: 4, hairC: 0xff7ab8, hat: 0, hatC: 0xffcf2e, top: 0xffffff, topPat: 2, bottom: 0x1f1f2e, botPat: 4, pants: 0, shoes: 0xffffff, pack: 0xc77dff, bag: 2, glasses: 2, glassC: 0xff5d8f, eyes: 0x2f7fe0, kandi: 1, gloves: 1 }],
-  ['Bass Head', { body: 1, style: 6, hair: 9, hairC: 0x48a8ff, hat: 0, hatC: 0x1f1f2e, top: 0x8c4dff, topPat: 3, bottom: 0x1f1f2e, botPat: 0, pants: 1, shoes: 0x1f1f2e, pack: 0x1f1f2e, bag: 2, glasses: 4, glassC: 0x2bc4b6, eyes: 0x7a3ad6, gloves: 1 }],
-  ['Flower Child', { body: 2, style: 2, hair: 2, hairC: 0xf2cf6b, hat: 5, hatC: 0xff5d8f, top: 0xfff2c4, topPat: 7, bottom: 0x36b6ff, botPat: 0, pants: 1, shoes: 0xc79a5b, pack: 0xff8a00, bag: 3, glasses: 1, glassC: 0xffcf2e, eyes: 0x2f8f3a, kandi: 1 }],
-  ['Ranger Rue', { body: 1, style: 2, hair: 2, hairC: 0x9b3d22, hat: 7, hatC: 0x7a5a2a, top: 0xffcf2e, bottom: 0x2f6b3a, shoes: 0x3a2a1a, pack: 0x3fae2a, bag: 0, eyes: 0x2f8f3a, kandi: 1 }],
+  ['Wook', { sex: 0, shirt: 0, legs: 0, hairdo: 10, body: 2, style: 5, hair: 8, beard: 2, hairC: 0x6e4426, hat: 1, hatC: 0x3fae2a, top: 0xff5d8f, topPat: 1, bottom: 0xc79a5b, botPat: 5, pants: 1, shoes: 0x6b4a2a, pack: 0x2b3a8f, bag: 1, glasses: 3, glassC: 0x6b3f22, lens: 1, eyes: 0x5a3218, kandi: 1, totem: 1 }],
+  ['Raver', { sex: 1, shirt: 0, legs: 2, hairdo: 8, body: 0, style: 3, hair: 4, hairC: 0xff7ab8, hat: 0, hatC: 0xffcf2e, top: 0xffffff, topPat: 2, bottom: 0x1f1f2e, botPat: 4, pants: 0, shoes: 0xffffff, pack: 0xc77dff, bag: 2, glasses: 5, glassC: 0xf4f1ea, lens: 4, eyes: 0x2f7fe0, kandi: 1, gloves: 1 }],
+  ['Bass Head', { sex: 0, shirt: 1, legs: 0, hairdo: 4, body: 1, style: 6, hair: 9, hairC: 0x48a8ff, hat: 0, hatC: 0x1f1f2e, top: 0x8c4dff, topPat: 3, bottom: 0x1f1f2e, botPat: 0, pants: 1, shoes: 0x1f1f2e, pack: 0x1f1f2e, bag: 2, glasses: 4, glassC: 0x1d1d22, lens: 3, eyes: 0x7a3ad6, gloves: 1 }],
+  ['Flower Child', { sex: 1, shirt: 1, legs: 0, hairdo: 6, body: 2, style: 2, hair: 2, hairC: 0xf2cf6b, hat: 5, hatC: 0xff5d8f, top: 0xfff2c4, topPat: 7, bottom: 0x36b6ff, botPat: 0, pants: 1, shoes: 0xc79a5b, pack: 0xff8a00, bag: 3, glasses: 3, glassC: 0xc9a24a, lens: 5, eyes: 0x2f8f3a, kandi: 1 }],
+  ['Ranger Rue', { sex: 1, shirt: 1, legs: 0, hairdo: 7, body: 1, style: 2, hair: 2, hairC: 0x9b3d22, hat: 7, hatC: 0x7a5a2a, top: 0xffcf2e, bottom: 0x2f6b3a, shoes: 0x3a2a1a, pack: 0x3fae2a, bag: 0, eyes: 0x2f8f3a, kandi: 1 }],
 ];
-export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem', 'beard', 'body', 'style'];
-const LIMITS = { body: CUTS.length, style: STYLES.length, beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: GLASSES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
+export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem', 'beard', 'body', 'style', 'sex', 'shirt', 'legs', 'hairdo', 'lens'];
+const LIMITS = { body: 3, style: 8, sex: 2, shirt: 2, legs: 3, hairdo: HAIRDOS.length, lens: LENSES.length, beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: SHADES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
 /** A full look from a saved explorer (or a friend's avatar): { look } or the old { outfit, skin }. */
 export function lookOf(e = {}) {
   // A saved look keeps what it has, and anything added to the game later (beards, shades…) starts as "none"; only
@@ -924,6 +926,12 @@ export function lookOf(e = {}) {
   // looks saved before the 3D explorers: pick the nearest cut and hairstyle
   if (e.look && e.look.body == null) out.body = out.pants ? 2 : 0;
   if (e.look && e.look.style == null) out.style = OLD_HAIR_TO_STYLE[out.hair] ?? 0;
+  // looks saved before the basic-wear explorers (round 2): tee and shorts or jeans, the same hairstyle, everyday shades
+  if (e.look && e.look.hairdo == null) {
+    out.sex = 0; out.shirt = out.body === 1 ? 1 : 0; out.legs = out.body === 0 ? 1 : 0;
+    out.hairdo = STYLE_TO_HAIRDO[out.style] ?? 2;
+    out.glasses = OLD_SHADES[out.glasses] ?? 0; out.lens = 0;
+  }
   for (const k of LOOK_KEYS) { out[k] = Math.max(0, Math.floor(+out[k] || 0)); if (LIMITS[k]) out[k] %= LIMITS[k]; }
   return out;
 }
@@ -1034,7 +1042,7 @@ function hairLock() {
 export function makeExplorer(look = {}, skin) {
   const L = typeof look === 'number' ? lookOf({ outfit: look, skin }) : lookOf({ look });
   // the real 3D anime explorer once its outfit and hairstyle have loaded (explorer3d.js); this chibi one until then
-  if (explorerReady(L)) { const x = makeExplorer3D({ ...L, skinC: SKINS[L.skin] }); x.userData.is3D = true; return x; }
+  if (explorerReady(L)) { const x = makeExplorer3D({ ...L, skinC: SKINS[L.skin], lensC: LENSES[L.lens] }); x.userData.is3D = true; return x; }
   // cel shading (three tones) for the anime look; ink outlines are added at the end (inkAll)
   const M = c => new THREE.MeshToonMaterial({ color: c, gradientMap: TOON }), dark = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
   const P = (pat, c) => pat ? new THREE.MeshToonMaterial({ color: 0xffffff, map: patternTex(PATTERNS[pat], c), gradientMap: TOON }) : M(c);
@@ -1331,6 +1339,7 @@ export function portrait(what, size = 256) {
   const key = what + '@' + size; if (portraits.has(key)) return portraits.get(key);
   const { r, scene, cam } = portraitRenderer(); r.setSize(size, size, false);
   const [kind, a, b] = what.split(':'); let obj;
+  if (kind.startsWith('explorer') && !explorerReady(lookFrom(a, b))) preloadExplorer(lookFrom(a, b)).then(() => portraits.delete(key)).catch(() => {}); // drawn again in 3D next time
   if (kind === 'kiki') {
     obj = makeKiki(a, 1, b === 's'); obj.rotation.y = -0.35; obj.updateMatrixWorld(true);
     const sh = obj.userData.shadow; obj.remove(sh); const box = new THREE.Box3().setFromObject(obj); obj.add(sh);

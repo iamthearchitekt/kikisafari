@@ -42,11 +42,11 @@ app.world = new WorldView(app);
 app.map = new StreetMap(app);
 app.osm.listeners.push((cell, area) => app.map.addArea(cell, area));
 // The 3D anime explorer: yours loads first (the map avatar and portraits switch over as soon as it is in), then every
-// other outfit and hairstyle in the background for the look picker and friends' pictures.
+// outfit for your body and every hairstyle in the background for the look picker (friends' looks load when shown).
 // Ranger Rue (the guide, outfit 4) comes along, since she greets new explorers straight away.
 const freshPortraits = () => { forgetExplorerPortraits(); document.querySelectorAll('img.who').forEach(im => { im.src = portrait('explorer-full:4:3', 384); }); };
 Promise.all([preloadExplorer(lookOf(app.progress.explorer)), preloadExplorer(lookOf({ outfit: 4 }))]).then(() => { freshPortraits(); app.map.setExplorer(); }).catch(() => {})
-  .finally(() => setTimeout(() => loadExplorerKit().then(freshPortraits).catch(() => {}), 2000));
+  .finally(() => setTimeout(() => loadExplorerKit(lookOf(app.progress.explorer).sex).then(freshPortraits).catch(() => {}), 2000));
 light(renderer, app.map.scene, 'day', 0.5); light(renderer, app.world.scene, 'day', 0.6); // soft reflections on Kikis, stones and circles
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);

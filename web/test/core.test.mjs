@@ -409,17 +409,23 @@ test('more Kikis around, and a visitor near you every 5 minutes (even at home)',
 });
 // ---------- the 3D explorers' look ----------
 const A = await import('../js/art.js');
-test('older saved looks get the nearest 3D outfit and hairstyle, and nothing they never chose', () => {
+test('older saved looks get the nearest body, clothes and hairstyle, and nothing they never chose', () => {
   const L = A.lookOf({ look: { hair: 8, pants: 1, skin: 3, hat: 0 } }); // dreads and flowy pants, saved before the 3D explorers
-  assert.equal(A.STYLES[L.style], 'Locs'); assert.equal(A.CUTS[L.body], 'Tank + wide cargos'); assert.equal(L.beard, 0); assert.equal(L.hat, 0);
-  assert.equal(A.STYLES[A.lookOf({ look: { hair: 11 } }).style], 'Bald');
-  assert.equal(A.STYLES[A.lookOf({ look: { hair: 6, style: 4 } }).style], 'Curly', 'a 3D choice wins over the old hairstyle');
+  assert.equal(A.HAIRDOS[L.hairdo], 'Locs'); assert.equal(A.SEXES[L.sex], 'Male'); assert.equal(A.LEGWEAR[L.legs], 'Jeans'); assert.equal(L.beard, 0); assert.equal(L.hat, 0);
+  assert.equal(A.HAIRDOS[A.lookOf({ look: { hair: 11, hat: 0 } }).hairdo], 'Bald');
+  const v1 = A.lookOf({ look: { body: 1, style: 6, glasses: 2, hat: 0 } }); // a round-1 3D look: windbreaker, undercut, hearts
+  assert.equal(A.SHIRTS[v1.shirt], 'Long sleeve'); assert.equal(A.HAIRDOS[v1.hairdo], 'Undercut'); assert.equal(A.SHADES[v1.glasses], 'Cat-eye');
+  assert.equal(A.HAIRDOS[A.lookOf({ look: { hairdo: 9, hair: 6, hat: 0 } }).hairdo], 'Curly', 'a new choice wins over the old hairstyle');
+});
+const E = await import('../js/explorer3d.js');
+test('every look maps to one of the ten bodies (no skirt on the male body)', () => {
+  assert.equal(E.bodyKey({ sex: 0, shirt: 1, legs: 2 }), 'm-lt-s'); assert.equal(E.bodyKey({ sex: 1, shirt: 0, legs: 2 }), 'f-st-k'); assert.equal(E.bodyKey({ sex: 1, shirt: 1, legs: 0 }), 'f-lt-j');
 });
 test('looks round-trip through their short text key, old keys still decode', () => {
-  const L = A.lookOf({ look: { body: 1, style: 6, beard: 3, hat: 2, glasses: 4, top: 0xff5d8f } });
+  const L = A.lookOf({ look: { sex: 1, shirt: 1, legs: 2, hairdo: 7, beard: 0, hat: 2, glasses: 1, lens: 3, top: 0xff5d8f } });
   assert.deepEqual(A.lookOf({ look: A.decodeLook(A.encodeLook(L)) }), L);
-  const old = A.encodeLook(L).split('.').slice(0, 20).join('.'); // a friend on an older version sends no body/style
-  assert.equal(A.lookOf({ look: A.decodeLook(old) }).body, 0);
+  const old = A.encodeLook(L).split('.').slice(0, 20).join('.'); // a friend on an older version sends fewer keys
+  assert.equal(A.lookOf({ look: A.decodeLook(old) }).sex, 0);
 });
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

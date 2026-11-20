@@ -1,38 +1,47 @@
-// The explorer (your avatar), as a real 3D anime character (owner: "pro anime 3D characters", "make them believable",
-// "don't overdo stereotypes", "modern EDM festivals", "customize hair, facial hair, clothes colour, a few clothing
-// options, hats and sunglasses, anime adventure-hero style").
+// The explorer (your avatar), as a real 3D anime character. Owner, round 1: "pro anime 3D characters", "make them
+// believable", "don't overdo stereotypes". Round 2: "the avatars aren't customizable enough. The bald option looks
+// especially bad. Basic wear like short sleeve and long sleeve t-shirt, jeans, shorts, skirt. Male and female, basic
+// sunglass options, nothing too wild."
 //
-// Three generated, rigged and animated bodies (tee and cargo shorts, windbreaker and joggers, tank and wide cargos;
-// all with white chunky trainers and a hydration pack) share one face and skeleton. Their textures were painted with
-// key colours: the top is bright green, the bottoms royal blue, so a shader can repaint them any colour while keeping
-// every painted fold and shadow. Skin and the short base hair are repainted the same way. Hairstyles are separate
-// generated pieces that sit on the head bone (tinted from a grey texture); beards are painted onto the face; hats and
-// shades are built in code. Everything is cel-shaded with ink outlines.
+// Ten generated, rigged and animated bodies: male and female, each in a short- or long-sleeve tee with jeans or shorts
+// (and a skirt for the female body), all with white trainers. They were made bald so every hairstyle is a separate
+// piece and bald is simply the real head. Their textures were painted with key colours (bright green tops, royal
+// blue bottoms) so a shader can repaint them any colour while keeping every painted fold and shadow; skin is
+// repainted the same way. Hairstyles are generated pieces on the head bone, tinted from a grey texture; a buzz cut and
+// beards are painted on; hats and sunglasses are built in code. Everything is cel-shaded with ink outlines.
 import * as THREE from '../vendor/three.module.min.js';
 import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from '../vendor/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from '../vendor/addons/utils/SkeletonUtils.js';
 
-export const CUTS = ['Tee + cargo shorts', 'Windbreaker + joggers', 'Tank + wide cargos'];
-export const STYLES = ['Short', 'Spiky', 'Long', 'Space buns', 'Curly', 'Locs', 'Undercut', 'Bald'];
-const HAIR_FILE = [null, 'spiky', 'long', 'buns', 'curly', 'locs', 'undercut', null];
+export const SEXES = ['Male', 'Female'];
+export const SHIRTS = ['Short sleeve', 'Long sleeve'];
+export const LEGWEAR = ['Jeans', 'Shorts', 'Skirt']; // the skirt is on the female body
+export const HAIRDOS = ['Bald', 'Buzz cut', 'Short', 'Spiky', 'Undercut', 'Bob', 'Long', 'Ponytail', 'Space buns', 'Curly', 'Locs'];
+const HAIR_FILE = [null, null, 'short', 'spiky', 'undercut', 'bob', 'long', 'pony', 'buns', 'curly', 'locs'];
+export const SHADES = ['No shades', 'Aviators', 'Classic', 'Round', 'Sport', 'Cat-eye'];
+export const FRAMES = [0x1d1d22, 0x6b3f22, 0xc9a24a, 0xb9bdc6, 0xf4f1ea, 0xb8322a, 0x2b3a8f];
+export const LENSES = [0x23272e, 0x4a3020, 0x2c4632, 0x2763c9, 0xc9577f, 0xd59a2a];
+/** Which body file a look uses: m/f, st/lt (short or long sleeves), j/s/k (jeans, shorts, skirt). */
+export const bodyKey = L => `${L.sex ? 'f' : 'm'}-${L.shirt ? 'lt' : 'st'}-${'jsk'[L.sex ? L.legs % 3 : Math.min(L.legs % 3, 1)]}`;
+const ALL_BODIES = ['m-st-j', 'm-st-s', 'm-lt-j', 'm-lt-s', 'f-st-j', 'f-st-s', 'f-st-k', 'f-lt-j', 'f-lt-s', 'f-lt-k'];
 
-// ---------- loading: each outfit and hairstyle on demand (yours first, the rest in the background) ----------
-const BASE = 'assets/explorers/', bodies = [], hairs = [], pending = new Map();
+// ---------- loading: each body and hairstyle on demand (yours first, the rest when they are needed) ----------
+const BASE = 'assets/explorers/', bodies = {}, hairs = [], pending = new Map();
 let loader = null;
-function fetchPart(kind, i) {
-  const key = kind + i; if (pending.has(key)) return pending.get(key);
+function fetchPart(kind, id) {
+  const key = kind + id; if (pending.has(key)) return pending.get(key);
   loader ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const file = kind === 'body' ? `body-${'abc'[i]}.glb` : `hair-${HAIR_FILE[i]}.glb`;
-  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[i] = prepBody(g); else hairs[i] = prepHair(g); });
+  const file = kind === 'body' ? `body-${id}.glb` : `hair-${HAIR_FILE[id]}.glb`;
+  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[id] = prepBody(g); else hairs[id] = prepHair(g); });
   p.catch(() => pending.delete(key)); pending.set(key, p); return p;
 }
-/** Loads what one look needs (its outfit and hairstyle). */
-export function preloadExplorer(L) { return Promise.all([fetchPart('body', L.body % CUTS.length), HAIR_FILE[L.style] ? fetchPart('hair', L.style) : null]); }
-/** Loads every outfit and hairstyle (for the customiser and friends' portraits). */
-export function loadExplorerKit() { return Promise.all([...CUTS.map((_, i) => fetchPart('body', i)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null)]); }
+/** Loads what one look needs (its body and hairstyle). */
+export function preloadExplorer(L) { return Promise.all([fetchPart('body', bodyKey(L)), HAIR_FILE[L.hairdo] ? fetchPart('hair', L.hairdo) : null]); }
+/** Loads every hairstyle and the bodies for one sex (or all), for the look picker. */
+export function loadExplorerKit(sex) { return Promise.all([...ALL_BODIES.filter(k => sex == null || k[0] === 'mf'[sex]).map(k => fetchPart('body', k)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null)]); }
 /** True when makeExplorer3D(L) can build this look right now. */
-export const explorerReady = L => !!bodies[L.body % CUTS.length] && (!HAIR_FILE[L.style] || !!hairs[L.style]);
+export const explorerReady = L => !!bodies[bodyKey(L)] && (!HAIR_FILE[L.hairdo] || !!hairs[L.hairdo]);
 
 // ---------- cel shading and ink ----------
 const TOON = (() => { const t = new THREE.DataTexture(new Uint8Array([150, 205, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
@@ -92,13 +101,15 @@ function prepBody(g) {
   const headBone = mesh.skeleton.bones.find(b => b.name === 'Head'), hj = mesh.skeleton.bones.indexOf(headBone);
   const P = mesh.geometry.attributes.position, SI = mesh.geometry.attributes.skinIndex, SW = mesh.geometry.attributes.skinWeight;
   const attr = new THREE.Box3(), bone = new THREE.Box3(), v = new THREE.Vector3(), inv = headBone.matrixWorld.clone().invert();
+  // some rigs give the head bone a turned rest pose: hair, hats and shades use an upright frame at the head instead
+  const R = headBone.getWorldQuaternion(new THREE.Quaternion());
   let yMin = Infinity, yMax = -Infinity; const pts = [];
   for (let i = 0; i < P.count; i++) {
     const y = P.getY(i); if (y < yMin) yMin = y; if (y > yMax) yMax = y;
     let dom = -1, best = -1; for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > best) { best = w; dom = SI.getComponent(i, k); } }
     if (dom !== hj) continue;
     v.fromBufferAttribute(P, i); attr.expandByPoint(v);
-    mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv); bone.expandByPoint(v);
+    mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(R); bone.expandByPoint(v);
     if (i % 3 === 0) pts.push(v.x, v.y, v.z);
   }
   const whole = new THREE.Box3().setFromObject(g.scene, true);
@@ -106,7 +117,7 @@ function prepBody(g) {
   const clips = Object.fromEntries(g.animations.map(a => [a.name, a]));
   const parentWorld = {}; for (const b of mesh.skeleton.bones) parentWorld[b.name] = b.parent.getWorldQuaternion(new THREE.Quaternion());
   const boneToAttrY = y => attr.min.y + (y - bone.min.y) * (attr.max.y - attr.min.y) / (bone.max.y - bone.min.y);
-  return { gltf: g, mesh, parentWorld, headPts: new Float32Array(pts), boneToAttrY, headBox: bone, attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
+  return { gltf: g, mesh, parentWorld, headPts: new Float32Array(pts), boneToAttrY, headBox: bone, headUpright: R.clone().invert(), attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
 }
 function prepHair(g) {
   const meshes = []; g.scene.traverse(o => { if (o.isMesh) { meshes.push(o); addInkNormals(o.geometry); } });
@@ -115,6 +126,11 @@ function prepHair(g) {
 }
 
 // ---------- the repaint shader ----------
+// where things are on each head, in head coordinates (-1..1 from chin-and-neck to crown): brows from/to, the hairline
+// at the forehead, and at the nape
+const FACE = [[-0.13, 0.0, 0.34, -0.4], [-0.13, 0.0, 0.34, -0.4]];
+// beards were drawn for a head box that included hair; these stretch the bald heads' coordinates to match (x, y)
+const BEARD_K = [[0.92, 1.2], [0.92, 1.2]];
 const hex3 = c => new THREE.Vector3(((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255); // sRGB 0..1, as written
 function bodyMaterial(src, L, debug = 0) {
   const tex = src.mesh.material.map, hc = src.attrHead.getCenter(new THREE.Vector3()), hh = src.attrHead.getSize(new THREE.Vector3()).multiplyScalar(0.5);
@@ -123,14 +139,14 @@ function bodyMaterial(src, L, debug = 0) {
   const U = {
     uTop: { value: hex3(L.top) }, uBot: { value: hex3(L.bottom) }, uSkin: { value: hex3(L.skinC) }, uHair: { value: hex3(L.hairC) },
     uHeadC: { value: hc }, uHeadH: { value: hh }, uTopMin: { value: at(0.45) }, uBotMax: { value: at(0.6) },
-    uBald: { value: L.style === 7 ? 1 : 0 }, uHatCut: { value: 1e9 }, uBeard: { value: L.beard || 0 }, uDebug: { value: debug },
+    uFace: { value: new THREE.Vector4(...(FACE[L.sex] || FACE[0])) }, uBeardK: { value: new THREE.Vector2(...(BEARD_K[L.sex] || BEARD_K[0])) }, uBuzz: { value: L.hairdo === 1 ? 1 : 0 }, uHatCut: { value: 1e9 }, uBeard: { value: L.beard || 0 }, uDebug: { value: debug },
   };
   m.userData.uniforms = U;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vKPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvKPos = position;');
     sh.fragmentShader = `varying vec3 vKPos;
-      uniform vec3 uTop, uBot, uSkin, uHair, uHeadC, uHeadH; uniform float uTopMin, uBotMax, uBald, uBeard, uDebug, uHatCut;
+      uniform vec3 uTop, uBot, uSkin, uHair, uHeadC, uHeadH; uniform vec4 uFace; uniform vec2 uBeardK; uniform float uTopMin, uBotMax, uBuzz, uBeard, uDebug, uHatCut;
       vec3 kHsv(vec3 c) { vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0); vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
         vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r)); float d = q.x - min(q.w, q.y); return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x); }
       float kHue(float h, float c, float w) { float d = abs(h - c); d = min(d, 1.0 - d); return 1.0 - smoothstep(w * 0.55, w, d); }
@@ -141,22 +157,27 @@ function bodyMaterial(src, L, debug = 0) {
         vec3 sc = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.0 / 2.2)), hsv = kHsv(sc);
         if (vKPos.y > uHatCut) discard; // inside a hat
         vec3 q = (vKPos - uHeadC) / uHeadH; // -1..1 across the head
-        float head = step(-1.05, q.y);
         float sat = smoothstep(0.30, 0.46, hsv.y);
         float wTop = kHue(hsv.x, 0.27, 0.10) * sat * step(uTopMin, vKPos.y);
         float wBot = kHue(hsv.x, 0.625, 0.085) * sat * (1.0 - step(uBotMax, vKPos.y));
         float wSkin = kHue(hsv.x, 0.075, 0.065) * smoothstep(0.08, 0.17, hsv.y) * (1.0 - smoothstep(0.66, 0.8, hsv.y)) * smoothstep(0.28, 0.42, hsv.z);
-        // the eyes and brows (kept as painted): a band across the front of the face
-        float eyes = step(0.25, q.z) * step(-0.36, q.y) * step(q.y, 0.18) * step(abs(q.x), 0.78);
-        float wHair = step(-0.62, q.y) * head * (1.0 - smoothstep(0.26, 0.38, hsv.z)) * (1.0 - smoothstep(0.3, 0.5, hsv.y)) * (1.0 - eyes);
         vec3 col = sc;
         col = mix(col, uTop * clamp(hsv.z / 0.86, 0.0, 1.25), wTop);
         col = mix(col, uBot * clamp(hsv.z / 0.70, 0.0, 1.35), wBot);
         col = mix(col, uSkin * clamp(hsv.z / 0.93, 0.0, 1.15), wSkin);
-        vec3 hairCol = uBald > 0.5 ? uSkin * (0.88 + 0.25 * hsv.z) : uHair * (0.5 + 1.7 * hsv.z);
-        col = mix(col, hairCol, wHair);
+        // eyebrows in the hair colour (dark strokes just above the eyes)
+        float brow = step(0.45, q.z) * smoothstep(uFace.x, uFace.x + 0.03, q.y) * (1.0 - smoothstep(uFace.y - 0.03, uFace.y, q.y)) * step(abs(q.x), 0.75) * (1.0 - smoothstep(0.3, 0.45, hsv.z));
+        col = mix(col, uHair * (0.45 + 0.8 * hsv.z), brow);
+        // a buzz cut: very short hair painted over the scalp, down to a hairline round the forehead, ears and nape
+        if (uBuzz > 0.5) {
+          float line = mix(mix(uFace.w, -0.02, smoothstep(-0.65, -0.05, q.z)), uFace.z, smoothstep(0.25, 0.75, q.z)); // nape, above the ears, forehead
+          float scalp = smoothstep(line - 0.015, line + 0.05, q.y);
+          float grain = 0.5 + 0.5 * kHash(floor(vKPos * 1400.0));
+          col = mix(col, uHair * (0.75 + 0.3 * hsv.z), scalp * (0.55 + 0.25 * grain) * max(wSkin, 0.5));
+        }
         // painted facial hair, on the skin of the lower face (head coordinates q: nose about -0.43, mouth -0.55, chin -0.72)
         if (uBeard > 0.5) {
+          vec3 q0 = q; q.xy *= uBeardK;
           float ax = abs(q.x), front = smoothstep(-0.15, 0.1, q.z);
           float jawTop = mix(-0.6, -0.34, smoothstep(0.22, 0.75, ax)); // under the mouth in the middle, up the cheeks at the sides
           float onHead = 1.0 - smoothstep(1.0, 1.08, ax); // (not the shoulders, arms or legs)
@@ -169,10 +190,11 @@ function bodyMaterial(src, L, debug = 0) {
                   : uBeard < 3.5 ? full                                                                         // beard, big beard
                   : mus;                                                                                         // mustache
           col = mix(col, uHair * (0.55 + 0.9 * hsv.z), clamp(b, 0.0, 1.0) * wSkin);
+          q = q0;
         }
         if (uDebug > 1.5) { float b = floor(-q.y * 10.0); col = b == 3.0 ? vec3(1,0,1) : b == 4.0 ? vec3(1,1,0) : b == 5.0 ? vec3(1,0,0) : b == 6.0 ? vec3(0,1,0) : b == 7.0 ? vec3(0,0,1) : b == 8.0 ? vec3(0,1,1) : b == 9.0 ? vec3(1,0.5,0) : sc;
           if (abs(fract(q.x * 5.0 + 0.5) - 0.5) < 0.03) col = vec3(0.0); if (abs(q.z - 0.5) < 0.02) col = vec3(1.0); }
-        else if (uDebug > 0.5) col = vec3(wTop, wBot, wSkin) + vec3(wHair, 0.0, wHair) + vec3(0.0, eyes * 0.5, 0.0);
+        else if (uDebug > 0.5) col = vec3(wTop, wBot, wSkin) + vec3(brow, brow, 0.0);
         diffuseColor.rgb = kLin(col);
       }`);
   };
@@ -218,44 +240,62 @@ function buildHat(kind, color, r) {
   }
   return g;
 }
-function buildShades(kind, color, w) { // w: the face's width at the eyes
-  const g = new THREE.Group(), frameM = toon({ color }), s = w / 2;
-  const lensM = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(0.3), transparent: true, opacity: 0.85 });
-  const glow = [];
-  if (kind === 1) for (const x of [-1, 1]) { // round
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.34, s * 0.045, 8, 28), frameM); ring.position.set(x * s * 0.42, 0, 0); g.add(ring);
-    const lens = new THREE.Mesh(new THREE.CircleGeometry(s * 0.33, 28), lensM); lens.position.set(x * s * 0.42, 0, -s * 0.01); lens.userData.noInk = true; g.add(lens);
-  }
-  if (kind === 2) { // hearts
-    const hs = new THREE.Shape(); hs.moveTo(0, -0.5); hs.bezierCurveTo(-0.7, -0.05, -0.45, 0.55, 0, 0.22); hs.bezierCurveTo(0.45, 0.55, 0.7, -0.05, 0, -0.5);
+/** Everyday sunglasses: aviators, classic (wayfarer-style), round, a sport wrap, cat-eye. w is the face width at the
+ * eyes; the glasses face +z with the lenses' middle at the origin. */
+function lensShape(kind) {
+  const p = new THREE.Shape();
+  if (kind === 1) { p.moveTo(-0.48, 0.3); p.bezierCurveTo(-0.2, 0.38, 0.3, 0.38, 0.5, 0.3); p.bezierCurveTo(0.56, 0.0, 0.42, -0.42, 0.1, -0.47); p.bezierCurveTo(-0.22, -0.5, -0.5, -0.24, -0.5, 0.06); p.closePath(); }
+  else if (kind === 2) { p.moveTo(-0.5, 0.3); p.lineTo(0.53, 0.34); p.quadraticCurveTo(0.55, 0.34, 0.53, 0.25); p.lineTo(0.43, -0.28); p.quadraticCurveTo(0.4, -0.34, 0.32, -0.34); p.lineTo(-0.36, -0.32); p.quadraticCurveTo(-0.44, -0.31, -0.45, -0.24); p.lineTo(-0.52, 0.22); p.quadraticCurveTo(-0.53, 0.3, -0.5, 0.3); }
+  else if (kind === 3) p.absarc(0, 0, 0.4, 0, Math.PI * 2, false);
+  else if (kind === 5) { p.moveTo(-0.47, 0.16); p.bezierCurveTo(-0.2, 0.3, 0.3, 0.32, 0.58, 0.44); p.bezierCurveTo(0.56, 0.1, 0.46, -0.3, 0.2, -0.33); p.bezierCurveTo(-0.15, -0.36, -0.45, -0.25, -0.47, 0.16); }
+  return p;
+}
+function grow(shape, k) { const pts = shape.getPoints(24), c = pts.reduce((a, v) => a.add(v), new THREE.Vector2()).divideScalar(pts.length); const s = new THREE.Shape(pts.map(v => v.clone().sub(c).multiplyScalar(k).add(c))); return s; }
+function buildShades(kind, frameC, lensC, w) {
+  const g = new THREE.Group(), L = w * 0.36, frameM = toon({ color: frameC });
+  const mirror = lensC === LENSES[3];
+  const lensM = new THREE.MeshBasicMaterial({ color: lensC, transparent: true, opacity: mirror ? 0.95 : 0.88, side: THREE.DoubleSide });
+  const shineM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: mirror ? 0.55 : 0.3, side: THREE.DoubleSide });
+  const thick = { 1: 1.07, 2: 1.2, 3: 1.1, 5: 1.2 }[kind] || 1.1, depth = kind === 1 || kind === 3 ? 0.04 : 0.07;
+  const lensAt = x => { const grp = new THREE.Group(); grp.position.set(x * L * 0.58, 0, -Math.abs(x) * L * 0.06); grp.rotation.y = -x * 0.14; g.add(grp); return grp; };
+  if (kind === 4) { // sport: one curved shield across both eyes
+    const sh = new THREE.Shape(); sh.moveTo(-1.25, 0.18); sh.bezierCurveTo(-0.6, 0.36, 0.6, 0.36, 1.25, 0.18); sh.bezierCurveTo(1.3, -0.1, 1.05, -0.38, 0.6, -0.36); sh.bezierCurveTo(0.25, -0.34, 0.15, -0.12, 0, -0.12); sh.bezierCurveTo(-0.15, -0.12, -0.25, -0.34, -0.6, -0.36); sh.bezierCurveTo(-1.05, -0.38, -1.3, -0.1, -1.25, 0.18);
+    const geo = new THREE.ShapeGeometry(sh, 24), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setZ(i, -x * x * 0.22); } // wrap round the face
+    geo.computeVertexNormals();
+    const lens = new THREE.Mesh(geo, lensM); lens.scale.setScalar(L); lens.userData.noInk = true; g.add(lens);
+    const top = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 6, 40, Math.PI * 0.62), frameM); top.rotation.z = Math.PI * 0.19; top.scale.set(L * 1.32, L * 0.3, L); top.position.set(0, -L * 0.02, -L * 0.12); g.add(top);
+    const shine = new THREE.Mesh(new THREE.PlaneGeometry(L * 0.5, L * 0.06), shineM); shine.position.set(-L * 0.5, L * 0.12, L * 0.02); shine.rotation.z = 0.5; shine.userData.noInk = true; g.add(shine);
+  } else {
+    const lensSh = lensShape(kind);
     for (const x of [-1, 1]) {
-      const back = new THREE.Mesh(new THREE.ShapeGeometry(hs, 14), frameM); back.scale.setScalar(s * 0.8); back.position.set(x * s * 0.42, s * 0.04, -s * 0.01); g.add(back);
-      const lens = new THREE.Mesh(new THREE.ShapeGeometry(hs, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(0.55), transparent: true, opacity: 0.9 })); lens.scale.setScalar(s * 0.68); lens.position.set(x * s * 0.42, s * 0.04, s * 0.005); lens.userData.noInk = true; g.add(lens);
+      const grp = lensAt(x), sx = x > 0 ? 1 : -1; // mirror the left lens so the outer corners match
+      const rimSh = grow(lensSh, thick); rimSh.holes.push(new THREE.Path(lensSh.getPoints(24)));
+      const rim = new THREE.Mesh(new THREE.ExtrudeGeometry(rimSh, { depth, bevelEnabled: false, curveSegments: 12 }), frameM); rim.scale.set(sx * L, L, L); rim.position.z = -depth * L / 2; grp.add(rim);
+      const lens = new THREE.Mesh(new THREE.ShapeGeometry(lensSh, 16), lensM); lens.scale.set(sx * L, L, L); lens.userData.noInk = true; grp.add(lens);
+      const shine = new THREE.Mesh(new THREE.PlaneGeometry(L * 0.34, L * 0.06), shineM); shine.position.set(-sx * L * 0.12, L * 0.12, L * 0.01); shine.rotation.z = 0.55 * sx; shine.userData.noInk = true; grp.add(shine);
     }
+    const bridgeW = L * 0.36;
+    if (kind === 1) for (const y of [0.24, 0.31]) { const b = new THREE.Mesh(new THREE.BoxGeometry(bridgeW, L * 0.025, L * 0.025), frameM); b.position.set(0, y * L, 0); g.add(b); } // aviators: a double bridge
+    else { const b = new THREE.Mesh(new THREE.TorusGeometry(bridgeW / 2, L * (kind === 3 ? 0.025 : 0.05), 6, 12, Math.PI), frameM); b.position.set(0, L * 0.06, 0); g.add(b); }
   }
-  if (kind === 3 || kind === 4) { // shutter shades, or LED ones that cycle colours
-    const led = kind === 4, barM = led ? new THREE.MeshBasicMaterial({ color }) : frameM; if (led) glow.push(barM);
-    for (const x of [-1, 1]) {
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(s * 0.72, s * 0.46, s * 0.05), toon({ color: 0x1f1f2e })); frame.position.set(x * s * 0.42, 0, -s * 0.02); g.add(frame);
-      for (let i = 0; i < 4; i++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(s * 0.68, s * 0.065, s * 0.05), barM); bar.position.set(x * s * 0.42, -s * 0.17 + i * s * 0.112, s * 0.02); bar.userData.noInk = true; g.add(bar); }
-    }
-  }
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(s * 0.22, s * 0.05, s * 0.05), frameM); bridge.position.set(0, s * 0.08, 0); g.add(bridge);
-  for (const x of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(s * 0.04, s * 0.04, s * 1.0), frameM); arm.position.set(x * s * 0.84, s * 0.04, -s * 0.5); g.add(arm); }
-  g.userData.glow = glow;
+  // the arms, back to the ears
+  for (const x of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(L * 0.05, L * 0.07, w * 0.62), frameM); arm.position.set(x * w * 0.47, L * 0.18, -w * 0.31); arm.rotation.y = x * 0.06; g.add(arm); }
+  g.userData.glow = [];
   return g;
 }
 
 // ---------- tuning: how the hair pieces sit on the head (head-bone space, fractions of the head box) ----------
-const HAIR_FIT = { scale: 1.0, y: 0.16, z: -0.12, per: { spiky: {}, long: {}, buns: {}, curly: {}, locs: {}, undercut: {} } };
-export const _tune = { HAIR_FIT }; // for the dev viewer
+const HAIR_FIT = { scale: 1.0, y: 0.16, z: -0.12, per: { pony: { scale: 1.18, y: 0.12, z: -0.14 }, buns: { scale: 1.3, y: 0.06, z: -0.02 } } };
+const SHADE_FIT = { w: 0.8, y: 0.09, z: 0.46 }; // width share of the head box, height (head coords, from the brows), depth
+export const _tune = { HAIR_FIT, SHADE_FIT, FACE }; // for the dev viewer
 
 /**
- * An explorer about 1 unit tall, feet at y = 0, facing +z. L is a full look (see art.js lookOf): body (cut), style
- * (hairstyle), hairC, top, bottom, skinC, beard, hat, hatC, glasses, glassC. userData.update(dt, speed) walks or idles.
+ * An explorer about 1 unit tall, feet at y = 0, facing +z. L is a full look (see art.js lookOf): sex, shirt, legs,
+ * hairdo, hairC, top, bottom, skinC, beard, hat, hatC, glasses, glassC, lensC. userData.update(dt, speed) walks or idles.
  */
 export function makeExplorer3D(L, opts = {}) {
-  const src = bodies[L.body % CUTS.length];
+  const src = bodies[bodyKey(L)];
   const root = new THREE.Group(), model = cloneSkinned(src.gltf.scene);
   const k = 1 / src.height; model.scale.setScalar(k); model.position.y = -src.floor * k; root.add(model);
   let mesh = null; model.traverse(o => { if (o.isSkinnedMesh) mesh = o; });
@@ -273,10 +313,9 @@ export function makeExplorer3D(L, opts = {}) {
   };
   const headBone = mesh.skeleton.bones.find(b => b.name === 'Head');
   const hb = src.headBox, hc = hb.getCenter(new THREE.Vector3()), hs = hb.getSize(new THREE.Vector3());
-  const attach = new THREE.Group(); attach.position.copy(hc); headBone.add(attach); // the middle of the head
-  const glow = [];
+  const attach = new THREE.Group(); attach.quaternion.copy(src.headUpright); attach.position.copy(hc).applyQuaternion(src.headUpright); headBone.add(attach); // the middle of the head, upright
   // hair
-  const hairName = HAIR_FILE[L.style], hairSrc = hairName && hairs[L.style];
+  const hairName = HAIR_FILE[L.hairdo], hairSrc = hairName && hairs[L.hairdo];
   const r = hs.x * 0.5, brimY = hs.y * 0.1, crowned = [1, 2, 3, 4, 7].includes(L.hat); // hats whose crown hides the hair above their band
   const cloud = []; for (let i = 0; i < src.headPts.length; i += 3) cloud.push(src.headPts[i] - hc.x, src.headPts[i + 1] - hc.y, src.headPts[i + 2] - hc.z);
   const cut = brimY + hs.y * 0.02;
@@ -308,7 +347,7 @@ export function makeExplorer3D(L, opts = {}) {
     if (!opts.noInk) { const list = []; hat.traverse(o => { if (o.isMesh) list.push(o); }); list.forEach(o => inkFor(o, 0.004)); }
   }
   if (L.glasses) {
-    const sh = buildShades(L.glasses, L.glassC, hs.x * 0.86); sh.position.set(0, -hs.y * 0.02, hs.z * 0.47); attach.add(sh); glow.push(...sh.userData.glow);
+    const F = FACE[L.sex] || FACE[0], sh = buildShades(L.glasses, L.glassC, L.lensC ?? LENSES[0], hs.x * SHADE_FIT.w); sh.position.set(0, (F[0] + SHADE_FIT.y) * hs.y / 2, hs.z * SHADE_FIT.z); attach.add(sh);
     if (!opts.noInk) { const list = []; sh.traverse(o => { if (o.isMesh && !o.userData.noInk) list.push(o); }); list.forEach(o => inkFor(o, 0.003)); }
   }
   // a big beard also gets some volume: a soft tapered shape from the jaw down onto the chest
@@ -318,15 +357,6 @@ export function makeExplorer3D(L, opts = {}) {
     geo.computeVertexNormals();
     const bulk = new THREE.Mesh(geo, toon({ color: L.hairC })); bulk.scale.set(hs.x * 0.3, hs.y * 0.2, hs.z * 0.22); bulk.position.set(0, -hs.y * 0.42, hs.z * 0.22); attach.add(bulk);
     if (!opts.noInk) inkFor(bulk, 0.004);
-  }
-  // bald: the short hair above the hairline is hidden and a smooth scalp takes its place
-  if (L.style === 7 && !crowned) {
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (let i = 0; i < cloud.length; i += 3) { const y = cloud[i + 1]; if (Math.abs(y - brimY) > hs.y * 0.04) continue; x0 = Math.min(x0, cloud[i]); x1 = Math.max(x1, cloud[i]); z0 = Math.min(z0, cloud[i + 2]); z1 = Math.max(z1, cloud[i + 2]); }
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.25), toon({ color: opts.debug ? 0xff0000 : L.skinC }));
-    dome.scale.set((x1 - x0) / 2 * 0.93, hs.y * 0.3, (z1 - z0) / 2 * 0.95); dome.position.set((x0 + x1) / 2, brimY, (z0 + z1) / 2 - hs.z * 0.01); attach.add(dome);
-    hideHeadAbove(brimY);
-    if (!opts.noInk) inkFor(dome, 0.004);
   }
   // animation: the generated walk, and a calm standing pose made here (arms relaxed at the sides, breathing, a
   // look around now and then), cross-faded by speed
@@ -361,7 +391,6 @@ export function makeExplorer3D(L, opts = {}) {
         if (w === 0) { b.quaternion.copy(iq); if (i === 0 || b.name === 'Hips') b.position.copy(rp); }
         else { b.quaternion.slerpQuaternions(iq, qb.copy(b.quaternion), w); if (b.name === 'Hips') b.position.lerpVectors(rp, b.position, w); }
       }
-      for (let i = 0; i < glow.length; i++) glow[i].color.setHSL((t * 0.25 + i * 0.3) % 1, 1, 0.6);
     },
   };
   return root;
