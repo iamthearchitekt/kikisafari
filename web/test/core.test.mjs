@@ -407,5 +407,19 @@ test('more Kikis around, and a visitor near you every 5 minutes (even at home)',
   assert.equal(visitors.size, 12, 'a new visitor every 5 minutes');
   const caught = new Set([...visitors][0].split()); assert.ok(!C.nearby(me, t0, { caught }).some(x => caught.has(x.id)), 'a caught visitor stays caught');
 });
+// ---------- the 3D explorers' look ----------
+const A = await import('../js/art.js');
+test('older saved looks get the nearest 3D outfit and hairstyle, and nothing they never chose', () => {
+  const L = A.lookOf({ look: { hair: 8, pants: 1, skin: 3, hat: 0 } }); // dreads and flowy pants, saved before the 3D explorers
+  assert.equal(A.STYLES[L.style], 'Locs'); assert.equal(A.CUTS[L.body], 'Tank + wide cargos'); assert.equal(L.beard, 0); assert.equal(L.hat, 0);
+  assert.equal(A.STYLES[A.lookOf({ look: { hair: 11 } }).style], 'Bald');
+  assert.equal(A.STYLES[A.lookOf({ look: { hair: 6, style: 4 } }).style], 'Curly', 'a 3D choice wins over the old hairstyle');
+});
+test('looks round-trip through their short text key, old keys still decode', () => {
+  const L = A.lookOf({ look: { body: 1, style: 6, beard: 3, hat: 2, glasses: 4, top: 0xff5d8f } });
+  assert.deepEqual(A.lookOf({ look: A.decodeLook(A.encodeLook(L)) }), L);
+  const old = A.encodeLook(L).split('.').slice(0, 20).join('.'); // a friend on an older version sends no body/style
+  assert.equal(A.lookOf({ look: A.decodeLook(old) }).body, 0);
+});
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

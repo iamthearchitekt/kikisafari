@@ -7,7 +7,7 @@ import * as R from './rules.js';
 import { WorldView, Location, OsmLoader, drawRadar } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
-import { portrait, lookOf, encodeLook } from './art.js';
+import { portrait, lookOf, encodeLook, preloadExplorer, loadExplorerKit, forgetExplorerPortraits } from './art.js';
 import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm, openSettings } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
@@ -41,6 +41,12 @@ renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x00000
 app.world = new WorldView(app);
 app.map = new StreetMap(app);
 app.osm.listeners.push((cell, area) => app.map.addArea(cell, area));
+// The 3D anime explorer: yours loads first (the map avatar and portraits switch over as soon as it is in), then every
+// other outfit and hairstyle in the background for the look picker and friends' pictures.
+// Ranger Rue (the guide, outfit 4) comes along, since she greets new explorers straight away.
+const freshPortraits = () => { forgetExplorerPortraits(); document.querySelectorAll('img.who').forEach(im => { im.src = portrait('explorer-full:4:3', 384); }); };
+Promise.all([preloadExplorer(lookOf(app.progress.explorer)), preloadExplorer(lookOf({ outfit: 4 }))]).then(() => { freshPortraits(); app.map.setExplorer(); }).catch(() => {})
+  .finally(() => setTimeout(() => loadExplorerKit().then(freshPortraits).catch(() => {}), 2000));
 light(renderer, app.map.scene, 'day', 0.5); light(renderer, app.world.scene, 'day', 0.6); // soft reflections on Kikis, stones and circles
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);

@@ -165,10 +165,10 @@ export class StreetMap {
     this.setExplorer(g);
     return g;
   }
-  /** Your explorer, about 12 m tall on the map so you can see them at any zoom (things on the map are drawn big, like a board game). */
+  /** Your explorer, about 12 m tall on the map (17 m for the slimmer 3D one) so you can see them at any zoom (things on the map are drawn big, like a board game). */
   setExplorer(g = this.player) {
     if (this.avatar) g.remove(this.avatar);
-    this.avatar = makeExplorer(lookOf(this.app.progress.explorer)); this.avatar.scale.setScalar(12); g.add(this.avatar);
+    this.avatar = makeExplorer(lookOf(this.app.progress.explorer)); this.avatar.scale.setScalar(this.avatar.userData.is3D ? 17 : 12); g.add(this.avatar);
   }
 
   makeThing(t) {

@@ -421,3 +421,33 @@ exist in 3D … premium … that extra layer of care and dialing in."
   are now two non-overlapping bands (wall, then a lighter top edge); building outlines hidden behind their parts and
   floating upper parts are skipped; each footprint is pulled in 15 cm so neighbours never share a wall plane; each
   roof sits at its own height.
+
+## 28. Pro anime 3D explorers
+
+Owner: "the avatars have to look slightly anime … the whole look of them anatomically is crude and cheesy"; chose
+"Pro anime 3D characters"; "make them believable", "don't overdo stereotypes", "one size fits all but accurate rave
+references", "modern EDM festivals", "customize hair, facial hair, clothes colour, a few clothing options, hats and
+sunglasses, anime adventure-hero style".
+
+- **Made with Magnific** (project "KIKI SAFARI explorer"): one anime concept (short neat black hair, white chunky
+  trainers, a black hydration pack), three outfits on it: oversized tee and cargo shorts, open windbreaker over a
+  white tee with joggers, tank top and wide cargos. Each: a 2x2 view sheet, image-to-3D (Meshy 7.1), auto-rig
+  (Meshy), and the Casual Walk clip from Meshy's library. The catalog idles stretched, dabbed or held an arm out, so
+  standing still is posed in code (arms relaxed, breathing, a look around now and then) and cross-fades with the walk.
+- **Recolouring:** the outfits were generated with key colours (bright green tops, royal blue bottoms). A shader on the
+  cel-shaded material repaints those hues, the skin and the short base hair to the chosen colours, keeping every
+  painted fold and shadow. The head is found from the skin weights, so the eyes stay as painted.
+- **Hairstyles:** six more were generated as hair on a red mannequin head (spiky, long layered, space buns, curly,
+  locs, undercut); the build script cuts the red away, greys the texture so the game can tint it, and records the
+  mannequin's face so each piece is fitted onto the head bone. Bald hides the base hair and puts a smooth scalp on.
+- **Beards** are painted onto the face along the jaw (stubble, beard, mustache); a big beard adds a soft shape under
+  the chin. **Hats** (bucket, trucker, beanie, cowboy, flower crown, bandana, ranger) and **shades** (round, hearts,
+  shutter, LED) are built in code and sized to the head and hair where they sit; hair inside a hat's crown is hidden.
+- Everything gets ink outlines of a fixed screen width (smoothed normals, so they never crack at seams).
+- **Files:** web/assets/explorers/ (three bodies ~850 KB each, hair ~160 KB each, meshopt-compressed, 1024 px
+  textures). Your own outfit and hairstyle load first; the rest load in the background. They are not pre-cached by
+  the service worker (too big for the install); each is kept in its own cache ("kiki-models-1") once loaded. Until
+  they load (or if they cannot), the older chibi explorer is drawn. tools/build-explorers.mjs rebuilds them.
+- The look picker now offers: festival looks, outfit, top and bottoms colours, skin, hairstyle and colour, facial
+  hair, hat and colour, shades and colour. Saved looks from before keep their colours and get the nearest outfit and
+  hairstyle; friends on older versions still decode.
