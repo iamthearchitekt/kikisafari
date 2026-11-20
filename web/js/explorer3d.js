@@ -159,8 +159,9 @@ function bodyMaterial(src, L, debug = 0) {
         if (uBeard > 0.5) {
           float ax = abs(q.x), front = smoothstep(-0.15, 0.1, q.z);
           float jawTop = mix(-0.6, -0.34, smoothstep(0.22, 0.75, ax)); // under the mouth in the middle, up the cheeks at the sides
-          float jaw = (1.0 - smoothstep(jawTop - 0.03, jawTop + 0.03, q.y)) * smoothstep(-0.86, -0.8, q.y) * front;
-          float side = smoothstep(0.66, 0.74, ax) * (1.0 - smoothstep(-0.16, -0.1, q.y)) * smoothstep(-0.12, -0.05, q.z) * (1.0 - smoothstep(0.42, 0.5, q.z));
+          float onHead = 1.0 - smoothstep(1.0, 1.08, ax); // (not the shoulders, arms or legs)
+          float jaw = (1.0 - smoothstep(jawTop - 0.03, jawTop + 0.03, q.y)) * smoothstep(-0.86, -0.8, q.y) * front * onHead;
+          float side = smoothstep(0.66, 0.74, ax) * (1.0 - smoothstep(-0.16, -0.1, q.y)) * smoothstep(-0.8, -0.74, q.y) * smoothstep(-0.12, -0.05, q.z) * (1.0 - smoothstep(0.42, 0.5, q.z)) * onHead;
           float lip = (1.0 - smoothstep(0.17, 0.22, ax)) * smoothstep(-0.61, -0.59, q.y) * (1.0 - smoothstep(-0.53, -0.51, q.y)) * step(0.55, q.z);
           float mus = (1.0 - smoothstep(0.3, 0.37, ax)) * smoothstep(-0.55, -0.525, q.y) * (1.0 - smoothstep(-0.46, -0.44, q.y)) * step(0.55, q.z);
           float full = max(max(jaw, side) * (1.0 - lip), mus);
