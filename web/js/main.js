@@ -291,7 +291,8 @@ function frame(now) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
 setInterval(() => {
   if (!window.kikiUpdateReady) return;
-  const quiet = !$('title').hidden || (!app.encounter && !app.inBattle && !$('overlay').children.length);
+  // (never in the middle of the opening on the title screen: that made it start over)
+  const quiet = (!$('title').hidden && !window.kikiIntroPlaying) || ($('title').hidden && !app.encounter && !app.inBattle && !$('overlay').children.length);
   if (quiet) { window.kikiUpdateReady = false; app.save(); toast('Updating KIKI SAFARI…', 1500); setTimeout(() => location.reload(), 900); }
 }, 2000);
 if (window.caches) caches.keys().then(k => { const v = k.find(x => x.startsWith('kiki-safari-')); if (v) window.KIKI_VERSION = v.slice(12, 18); }).catch(() => {});

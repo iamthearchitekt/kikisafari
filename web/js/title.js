@@ -167,7 +167,11 @@ export function startTitle(host) {
     };
     // Kiki pops out of the portal and lands in the clearing, then waves and dances.
     const k = makeKiki('meadow', 1.35), m = new KikiMotion(k, reducedMotion), base = k.scale.x, home = new THREE.Vector3(0, -1.06, -0.2);
-    k.visible = false; scene.add(k); const born = 0.7; let landed = false, fly = 0;
+    // The fly-out plays once (owner: "the opening sequence restarts and plays again every time I open the app. It
+    // should play through once"): after that, the title opens with Kiki already in the clearing.
+    let seen = false; try { seen = localStorage.getItem('kiki-intro-seen') === '1'; } catch (e) {}
+    k.visible = false; scene.add(k); const born = seen ? -10 : 0.7; let landed = false, fly = 0;
+    window.kikiIntroPlaying = !seen; if (seen) portal.userData.open = 1; // the portal is already open too
     return { update(dt, t) {
       if (cam.aspect !== aspect) fit();
       portal.userData.update(dt, t, cam); glow.intensity = 26 + Math.sin(t * 2) * 6;
@@ -184,7 +188,7 @@ export function startTitle(host) {
           k.scale.setScalar(base * Math.min(1, 0.15 + e * 1.2)); k.rotation.y = (1 - e) * Math.PI * 4;
           if (age - dt < 0) sparkles.burst(from.clone(), 26, 0xd9a8ff, 0.14, 1.6, 0.9);
         } else {
-          if (!landed) { landed = true; k.position.copy(home); k.scale.setScalar(base); k.rotation.y = 0; m.play(m.wave()); sparkles.burst(home.clone().setY(-1.2), 18, 0xfff27a, 0.1, 1.0, 0.7); }
+          if (!landed) { landed = true; k.position.copy(home); k.scale.setScalar(base); k.rotation.y = 0; m.play(m.wave()); if (!seen) { sparkles.burst(home.clone().setY(-1.2), 18, 0xfff27a, 0.1, 1.0, 0.7); try { localStorage.setItem('kiki-intro-seen', '1'); } catch (e) {} } window.kikiIntroPlaying = false; }
           k.rotation.y = Math.sin(t * 0.4) * 0.25;
           m.update(dt);
           if (!m.busy && Math.random() < dt * 0.18) m.play(Math.random() < 0.5 ? m.wave() : m.randomDance());

@@ -505,3 +505,12 @@ mouth height (stored as the _OFFSET attribute). In the game the beard is placed 
 moved to that same distance off our own head's skin along its line (a map of the head and neck seen from that point),
 so it hugs every jaw (male and female, every body) without sinking into the face or floating off it. Per-style size
 is set about the mouth point. Stubble stays painted on.
+
+## 33. The opening plays once (owner)
+
+Owner: "figure out why the opening video sequence restarts and plays again every time I open the app. It should play
+through once." Two causes: the title scene always started from the beginning (portal opening, Kiki flying out), and
+the auto-update reloaded the page at the first "quiet" moment, which included the title screen, so with a new
+version waiting the opening started over a second or two in. Now the opening plays the first time only (remembered
+on the phone); after that the title opens with the portal open and Kiki already in the clearing. And an update never
+reloads the page while the opening is playing.
