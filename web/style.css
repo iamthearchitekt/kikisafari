@@ -402,3 +402,46 @@ body:has(#enc-hud:not([hidden])) #toasts { bottom: auto; top: calc(var(--sat) + 
 .look-chips button { border: 3px solid var(--navy); border-radius: 999px; background: #fff; color: var(--navy); font: inherit; font-weight: 700; font-size: 14px; padding: 4px 12px; cursor: pointer; }
 .look-chips button.on { background: #fff27a; }
 body:has(.battle) .pop { top: auto; bottom: calc(var(--sab) + 150px); font-size: 32px; }
+
+/* ---------- the supply stop: a rune medallion under a night sky (owner: "cooler and more mystical") ---------- */
+.screen-sheet.stop-screen { background: radial-gradient(120% 70% at 50% 34%, #5a2fb3 0%, #2c1673 38%, #140a3a 72%, #0b0624 100%); color: #f3ecff; }
+.stop-screen .sky { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.stop-screen .sky::before { content: ''; position: absolute; left: 50%; top: 34%; width: 150vmin; height: 150vmin; transform: translate(-50%, -50%); background: conic-gradient(from 0deg, transparent 0 8%, rgba(255,120,220,.10) 12%, transparent 20% 40%, rgba(90,220,255,.10) 46%, transparent 55% 72%, rgba(255,214,90,.08) 78%, transparent 86%); border-radius: 50%; filter: blur(18px); animation: stopTurn 40s linear infinite; }
+.stop-screen .sky i { position: absolute; width: var(--s); height: var(--s); border-radius: 50%; background: #fff; box-shadow: 0 0 6px 2px rgba(200,170,255,.7); opacity: .2; animation: twinkle 3.2s ease-in-out var(--d) infinite; }
+.stop-screen .sheet-head, .stop-screen .sheet-body { position: relative; z-index: 1; }
+.stop-screen .sheet-body { overflow: visible; }
+.stop-tag { display: inline-block; margin: 6px 0 2px; padding: 4px 16px; border-radius: 999px; font-family: 'Lilita One'; font-size: 17px; letter-spacing: .5px; color: #fff3c4; background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,230,160,.55); box-shadow: 0 0 14px rgba(255,214,120,.35), inset 0 0 10px rgba(255,214,120,.2); text-shadow: 0 0 8px rgba(255,214,120,.8); }
+.stop-screen .hint-line { color: #e6dcff; text-shadow: 0 0 10px rgba(170,130,255,.8); }
+.stop-screen .disc { position: relative; width: min(72vw, 300px); border: none; box-shadow: none; background: none; margin: 14px auto 10px; }
+.stop-screen .disc::before { content: ''; position: absolute; inset: -14%; border-radius: 50%; background: radial-gradient(circle, rgba(190,140,255,.55) 0%, rgba(120,80,255,.25) 42%, transparent 68%); animation: auraPulse 3.4s ease-in-out infinite; pointer-events: none; }
+.stop-screen .disc::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; opacity: 0; box-shadow: 0 0 0 4px rgba(255,240,200,.9), 0 0 40px 18px rgba(255,214,120,.7); }
+.stop-screen .disc.burst::after { animation: discBurst .9s ease-out; }
+.stop-screen .ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.stop-screen .ring.outer { animation: stopTurn 60s linear infinite; }
+.stop-screen .ring.inner { animation: stopTurn 34s linear infinite reverse; }
+.stop-screen .ring .stone { fill: #241446; stroke: #0b0624; stroke-width: 3; }
+.stop-screen .ring .edge { fill: none; stroke: #b48cff; stroke-width: 1.4; opacity: .85; filter: drop-shadow(0 0 3px #b48cff); }
+.stop-screen .ring .ticks line { stroke: #8d6bd6; stroke-width: 1.2; }
+.stop-screen .ring .well { fill: #170c33; stroke: #6a48c4; stroke-width: 1; }
+.stop-screen .ring .dash { fill: none; stroke: #7fe3ff; stroke-width: 1; stroke-dasharray: 3 5; opacity: .7; }
+.stop-screen .ring .star { fill: none; stroke: rgba(255,214,120,.55); stroke-width: 1; filter: drop-shadow(0 0 3px rgba(255,214,120,.8)); }
+.stop-screen .rune { fill: none; stroke: #efe2ff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2.5px #c49bff); animation: runeGlow 3.2s ease-in-out calc(var(--i) * .2s) infinite; }
+.stop-screen .rune.small { stroke: #bff3ff; filter: drop-shadow(0 0 2px #6fdcff); animation-duration: 2.4s; }
+.stop-screen .core { position: absolute; inset: 22%; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgba(255,240,210,.45), rgba(180,120,255,.15) 55%, transparent 72%); }
+.stop-screen .core img { width: 92%; filter: drop-shadow(0 0 14px rgba(200,150,255,.9)); animation: coreBob 3s ease-in-out infinite; }
+.stop-screen .orbit { position: absolute; inset: 0; pointer-events: none; animation: stopTurn calc(7s + var(--i) * 1.3s) linear calc(var(--i) * -1.7s) infinite; }
+.stop-screen .orbit:nth-child(odd) { animation-direction: reverse; }
+.stop-screen .orbit b { position: absolute; left: 50%; top: calc(16% + var(--i) * 2%); width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px 3px rgba(255,200,255,.9), 0 0 18px 6px rgba(140,110,255,.6); }
+.stop-screen .disc.used { filter: saturate(.25) brightness(.7); }
+.stop-screen .disc.used::before { opacity: .35; animation: none; }
+.stop-screen .disc.used .ring.outer, .stop-screen .disc.used .ring.inner, .stop-screen .disc.used .orbit { animation-duration: 120s; }
+.stop-screen .disc.used .rune { animation: none; opacity: .35; filter: none; }
+.stop-screen .loot .sticker { color: var(--navy); box-shadow: 0 6px 0 var(--navy), 0 0 30px rgba(190,140,255,.45); }
+@keyframes stopTurn { to { transform: rotate(360deg); } }
+@keyframes twinkle { 50% { opacity: .9; } }
+@keyframes auraPulse { 50% { transform: scale(1.06); opacity: .75; } }
+@keyframes runeGlow { 0%, 100% { opacity: .55; } 40% { opacity: 1; stroke: #fff6d6; } }
+@keyframes coreBob { 50% { transform: translateY(-4%) scale(1.03); } }
+@keyframes discBurst { 0% { opacity: 1; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.5); } }
+.stop-screen .sky::before, .stop-screen .ring, .stop-screen .orbit { will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .stop-screen .sky::before, .stop-screen .sky i, .stop-screen .ring, .stop-screen .orbit, .stop-screen .rune, .stop-screen .core img, .stop-screen .disc::before { animation: none !important; } }

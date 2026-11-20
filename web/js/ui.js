@@ -402,13 +402,32 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
 }
 
 // ---------- supply stops ----------
+// Owner: "make the circle supply stop screen look cooler and more mystical": a night sky, and the stop as a glowing
+// rune medallion: an engraved outer ring and an inner ring turning opposite ways, runes that shimmer one after
+// another, motes of light orbiting the stone, and a flash that rolls out when you spin it.
+const RUNES = ['M0 0V14M0 3L7 0M0 7L7 4', 'M0 14V0L7 5V14', 'M0 0V14M0 4L6 7L0 10', 'M3 0V14M3 3L8 6M3 7L8 10', 'M0 0L8 14M8 0L0 14',
+  'M4 0V14M0 4L4 0L8 4', 'M0 14V0L6 4L0 8L6 14', 'M7 0L0 7L7 14', 'M4 0V14M0 5L8 9', 'M0 14V0L8 14V0', 'M4 0L8 7L4 14L0 7Z', 'M0 0L4 5L8 0M4 5V14'];
+function runeMedallion() {
+  const ring = (r, n, size, cls) => Array.from({ length: n }, (_, i) => {
+    const a = i / n * 360, d = RUNES[(i * 5 + n) % RUNES.length];
+    return `<g transform="rotate(${a} 100 100) translate(100 ${100 - r}) scale(${size}) translate(-4 -7)"><path class="${cls}" style="--i:${i}" d="${d}"/></g>`;
+  }).join('');
+  const ticks = Array.from({ length: 48 }, (_, i) => `<line x1="100" y1="${i % 4 ? 8 : 5}" x2="100" y2="11" transform="rotate(${i * 7.5} 100 100)"/>`).join('');
+  return `<svg class="ring outer" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="96" class="stone"/><circle cx="100" cy="100" r="94" class="edge"/><g class="ticks">${ticks}</g>
+      <circle cx="100" cy="100" r="70" class="edge"/>${ring(82, 16, 0.95, 'rune')}</svg>
+    <svg class="ring inner" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="66" class="well"/><circle cx="100" cy="100" r="62" class="dash"/>${ring(54, 10, 0.7, 'rune small')}
+      <polygon class="star" points="${Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2, r = i % 2 ? 22 : 46; return `${(100 + Math.sin(a) * r).toFixed(1)},${(100 - Math.cos(a) * r).toFixed(1)}`; }).join(' ')}"/></svg>`;
+}
+const motes = n => Array.from({ length: n }, (_, i) => `<i style="left:${(i * 37 % 100)}%;top:${(i * 61 % 100)}%;--d:${(i % 7) * 0.6}s;--s:${1 + (i % 3)}px"></i>`).join('');
+
 export function stopPanel(app, t) {
   const p = app.progress, t0 = now(), since = p.stops[t.id] ? t0 - p.stops[t.id] : Infinity, used = since < R.STOP_COOLDOWN;
-  const s = screen(`<div class="sheet-head"><button class="pill small cream" data-x>Close</button><h2 style="font-size:24px">${esc(t.name)}</h2></div>
-    <div class="sheet-body" style="text-align:center;touch-action:none"><p class="sticker" style="display:inline-block;padding:4px 14px;margin:6px 0">${used ? 'Restocking…' : p.visited[t.id] ? 'Supply Stop' : 'New Supply Stop!'}</p>
-      <div class="disc${used ? ' used' : ''}">${img('item:rune', '', 256)}</div>
+  const s = screen(`<div class="sky" aria-hidden="true">${motes(26)}</div><div class="sheet-head"><button class="pill small cream" data-x>Close</button><h2 style="font-size:24px">${esc(t.name)}</h2></div>
+    <div class="sheet-body" style="text-align:center;touch-action:none"><p class="stop-tag">${used ? 'Restocking…' : p.visited[t.id] ? 'Supply Stop' : 'New Supply Stop!'}</p>
+      <div class="disc${used ? ' used' : ''}">${runeMedallion()}<div class="core">${img('item:rune', '', 256)}</div>${[0, 1, 2, 3, 4, 5].map(i => `<i class="orbit" style="--i:${i}"><b></b></i>`).join('')}</div>
       <p class="hint-line" style="font-size:18px">${used ? `This stop restocks in ${Math.floor((R.STOP_COOLDOWN - since) / 60)}:${String((R.STOP_COOLDOWN - since) % 60).padStart(2, '0')}` : 'Swipe across the stone to spin it!'}</p>
       <div class="loot"></div></div>`);
+  s.root.classList.add('stop-screen');
   const disc = s.q('.disc'); let x0 = null, spun = false, angle = 0;
   const close = () => { s.close(); app.world.nextPlan = 0; if (s.after) s.after(); };
   s.q('[data-x]').onclick = () => { sfx('button', 0.3); close(); };
@@ -416,7 +435,8 @@ export function stopPanel(app, t) {
   disc.onpointerup = e => {
     if (!x0) return; const dx = e.clientX - x0[0], dy = e.clientY - x0[1]; x0 = null;
     if (Math.hypot(dx, dy) < 40) return;
-    angle += (dx >= 0 ? 1 : -1) * 1080; disc.style.transition = 'transform 1.1s cubic-bezier(.15,.8,.3,1), filter .3s'; disc.style.transform = `rotate(${angle}deg)`;
+    angle += (dx >= 0 ? 1 : -1) * 1080; disc.style.transition = 'transform 1.1s cubic-bezier(.15,.8,.3,1), filter 1.6s'; disc.style.transform = `rotate(${angle}deg)`;
+    disc.classList.remove('burst'); void disc.offsetWidth; disc.classList.add('burst'); // a flash of light rolls out from the stone
     sfx('throw', 0.4); hx.medium();
     if (used || spun) return; spun = true; spin();
   };
@@ -432,7 +452,7 @@ export function stopPanel(app, t) {
     if (egg) lines.push(`A ${egg.km} km egg! Put it in a nest from the menu.`);
     if (task) lines.push(`New task from Ranger Rue: ${task.text}`);
     const ups = R.giveXp(p, xp); app.save(); app.refreshHud();
-    await wait(450); sfx('pickup', 0.55); hx.success(); disc.classList.add('used');
+    await wait(450); sfx('pickup', 0.55); hx.success(); setTimeout(() => disc.classList.add('used'), 2600); // glows a moment, then rests
     const full = Object.values(got).reduce((a, n) => a + n, 0) < Object.values(roll).reduce((a, n) => a + n, 0);
     const r = disc.getBoundingClientRect();
     for (const [id, n] of Object.entries(got)) for (let i = 0; i < Math.min(n, 3); i++) {

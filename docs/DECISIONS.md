@@ -451,3 +451,11 @@ sunglasses, anime adventure-hero style".
 - The look picker now offers: festival looks, outfit, top and bottoms colours, skin, hairstyle and colour, facial
   hair, hat and colour, shades and colour. Saved looks from before keep their colours and get the nearest outfit and
   hairstyle; friends on older versions still decode.
+
+## 29. A more mystical supply stop (owner)
+
+Owner: "make the circle supply stop screen look cooler and more mystical". The stop screen is now a night sky (a
+slowly turning nebula, twinkling motes) with the stop as a rune medallion: an engraved stone ring of glowing runes
+and an inner ring turning the other way, runes shimmering one after another, a gold eight-point star, motes of light
+orbiting the floating rune stone, and a soft violet aura. Spinning it rolls a flash of light outwards; it glows a
+moment, then rests (dim and slow) while it restocks. All CSS and inline SVG, no images; still for reduced motion.
