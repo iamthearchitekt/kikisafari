@@ -8,29 +8,16 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { makeKiki, KikiMotion, makePortal, Sparkles, leafGeometry, plush } from './art.js';
 import { liveStage } from './ui.js';
+import { realTree, realFern, realBush, leafMass, taperedTube, barkMaterial } from './foliage.js';
+import { light } from './lux.js';
 import { reducedMotion } from './services.js';
 
 const C = h => new THREE.Color(h);
-const LEAF = plush({ color: 0xffffff, vertexColors: true, roughness: 0.55, side: THREE.DoubleSide }, 0.35);
+const LEAF = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); // grass and leaves: matte, cheap
 function vgrad(geo, a, b, y0, y1) {
   const p = geo.attributes.position, cols = [];
   for (let i = 0; i < p.count; i++) { const t = Math.max(0, Math.min(1, (p.getY(i) - y0) / (y1 - y0))); const c = C(a).lerp(C(b), t); cols.push(c.r, c.g, c.b); }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); return geo;
-}
-const leafy = (r, dark = 0x0f3d2a, light = 0x3f9a4a) => new THREE.Mesh(vgrad(new THREE.IcosahedronGeometry(r, 2), dark, light, -r, r), plush({ vertexColors: true, roughness: 0.8 }, 0.3));
-/** A fern: long fronds fanning up and out. */
-function fern(size, dark = 0x165c2e, tip = 0x7fd65a) {
-  const g = new THREE.Group();
-  for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(leafGeometry(0.28, 0.7, dark, tip, true), LEAF); m.rotation.set(-(0.35 + (i % 3) * 0.28), i / 9 * Math.PI * 2, 0, 'YXZ'); m.scale.setScalar(size * (0.8 + (i % 2) * 0.35)); g.add(m); }
-  return g;
-}
-/** A round bush with a few flowers. */
-function bush(r, flowers = 0xff8fc8) {
-  const g = new THREE.Group();
-  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, b = leafy(r * (0.45 + (i % 3) * 0.12)); b.position.set(Math.cos(a) * r * 0.55, r * (0.2 + (i % 2) * 0.25), Math.sin(a) * r * 0.35); g.add(b); }
-  const top = leafy(r * 0.6); top.position.y = r * 0.55; g.add(top);
-  for (let i = 0; i < 5; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(r * 0.07, 8, 6), new THREE.MeshBasicMaterial({ color: i % 2 ? flowers : 0xfff27a })); const a = i * 1.7; f.position.set(Math.cos(a) * r * 0.6, r * (0.45 + (i % 3) * 0.2), r * 0.45); g.add(f); }
-  return g;
 }
 /** A tuft of grass blades. */
 function grass(h, dark = 0x123f26, light = 0x6fd65a) {
@@ -91,33 +78,32 @@ function radial(stops, size = 128) {
   for (const [o, col] of stops) g.addColorStop(o, col); x.fillStyle = g; x.fillRect(0, 0, size, size);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; radials.set(key, t); return t;
 }
-/** A tree trunk leaning in from the side, with a leafy crown and a hanging vine. */
-function tree(h, side) {
-  const g = new THREE.Group();
-  const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new THREE.Vector3(side * -0.6 * Math.sin(t * 1.4) , t * h, 0)); }
-  const trunk = new THREE.Mesh(vgrad(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.42, 10), 0x2a1a12, 0x5a3a26, 0, h), plush({ vertexColors: true, roughness: 0.9 }, 0.25));
-  g.add(trunk);
-  for (let i = 0; i < 7; i++) { const b = leafy(0.9 + (i % 3) * 0.3); b.position.set(side * (-0.5 - i * 0.28) + (i % 2) * 0.3, h - 0.3 + (i % 3) * 0.45, (i % 2) * 0.4); g.add(b); }
-  // vines drape from the canopy, sag, and swing out past the side of the screen
+/** A real tree leaning in from the side of the screen: bark, roots, forked branches, a full crown of leaves, and two
+ * vines (with leaves along them) draping from the crown and swinging off the side of the screen. */
+function tree(h, side, seed, keep) {
+  // branches reach outwards and a little towards you; leaves stay off the portal and Kiki (keep)
+  const { group: g } = realTree({ h, r0: 0.5, lean: -side * 0.75, seed, crownWidth: 3.0, leaves: 1, aim: side > 0 ? 0.45 : Math.PI - 0.45, spread: 1.0, keep });
   for (let v = 0; v < 2; v++) {
     const drop = 2.4 + v * 1.6, inward = 1.5 + v * 0.5, vine = [];
     for (let i = 0; i <= 24; i++) { const t = i / 24; vine.push(new THREE.Vector3(side * (-inward * (1 - t) + 1.2 * t), h - 0.3 - t * drop - Math.sin(t * Math.PI) * 0.7, 0.6 + v * 0.2)); }
     const curve = new THREE.CatmullRomCurve3(vine);
-    g.add(new THREE.Mesh(vgrad(new THREE.TubeGeometry(curve, 48, 0.04, 6), 0x1f5a2a, 0x3f8a3a, h - drop - 1, h), plush({ vertexColors: true }, 0.2)));
-    for (let i = 1; i < 8; i++) { const p = curve.getPointAt(i / 8), l = new THREE.Mesh(leafGeometry(0.4, 0.8, 0x1f6a30, 0x8fe05a, true), LEAF); l.position.copy(p); l.rotation.set(0.7, (i % 2 ? 1 : -1) * 1.2, 0, 'YXZ'); l.scale.setScalar(0.42); g.add(l); }
+    g.add(new THREE.Mesh(taperedTube(curve, 0.05, 0.03, 48, 6, 0.1, seed + v), new THREE.MeshStandardMaterial({ color: 0x2f5a2a, roughness: 0.85 })));
+    const clusters = []; for (let i = 1; i < 12; i++) { const p = curve.getPointAt(i / 12); clusters.push({ c: p, r: [0.16, 0.12, 0.16], n: 7, size: 0.2 }); }
+    g.add(leafMass(clusters, { seed: seed * 3 + v, dark: 0x1d5a2a, light: 0x8fd65a }));
   }
   return g;
 }
-/** Big leaves hanging down from the canopy across the top. */
+/** The canopy across the top: leafy clusters overlapping into one ceiling of leaves. */
 function canopy(width) {
-  const g = new THREE.Group();
-  for (let i = 0; i < 9; i++) { const b = leafy(0.9 + (i % 3) * 0.3); b.position.set((i / 8 - 0.5) * width, (i % 2) * 0.35, (i % 3) * 0.2); g.add(b); }
-  for (let i = 0; i < 14; i++) { const l = new THREE.Mesh(leafGeometry(0.45, 0.8, 0x175a2c, 0x7fd65a, true), LEAF); l.position.set((i / 13 - 0.5) * width * 1.05, -0.5, 0.6); l.rotation.set(-(Math.PI / 2 + 0.35 + (i % 3) * 0.2), (i % 2 ? 0.4 : -0.4), 0, 'YXZ'); l.scale.setScalar(0.9 + (i % 3) * 0.3); g.add(l); }
-  return g;
+  const clusters = [];
+  for (let i = 0; i < 9; i++) clusters.push({ c: new THREE.Vector3((i / 8 - 0.5) * width, (i % 2) * 0.3, (i % 3) * 0.2), r: [0.95, 0.55, 0.6], n: 120, size: 0.36 });
+  for (let i = 0; i < 12; i++) clusters.push({ c: new THREE.Vector3((i / 11 - 0.5) * width * 1.05, -0.55 - (i % 3) * 0.12, 0.55), r: [0.35, 0.3, 0.25], n: 28, size: 0.32 }); // leaves hanging lower at the front edge
+  return leafMass(clusters, { seed: 99, dark: 0x163f22, light: 0x86d05a });
 }
 
 export function startTitle(host) {
-  return liveStage(host, (scene, cam) => {
+  return liveStage(host, (scene, cam, renderer) => {
+    light(renderer, scene, 'cosmic', 0.55); // the portal's purple in every reflection
     cam.fov = 55; cam.position.set(0, 0.2, 8); cam.lookAt(0, 0.1, 0); cam.updateProjectionMatrix();
     scene.add(new THREE.HemisphereLight(0xb89aff, 0x160b33, 0.75));
     const glow = new THREE.PointLight(0xa24dff, 30, 14, 1.6); glow.position.set(0, 0.5, -1.2); scene.add(glow);
@@ -164,12 +150,12 @@ export function startTitle(host) {
     const fit = () => {
       aspect = cam.aspect; frame.clear(); parts = [];
       const at = z => { const d = cam.position.z - z, hh = Math.tan(cam.fov * Math.PI / 360) * d; return { hh, hw: hh * cam.aspect }; };
-      { const { hh, hw } = at(1); for (const s of [-1, 1]) { const t = tree(hh * 2.4, s); t.position.set(s * (hw + 0.15), -hh - 1.2, 1); frame.add(t); parts.push(t); } }
+      { const { hh, hw } = at(1); for (const s of [-1, 1]) { const px = s * (hw + 0.15), py = -hh - 1.2, t = tree(hh * 2.4, s, s > 0 ? 3 : 8, c => !(Math.abs(c.x + px) < 1.7 && c.y + py < hh * 0.62)); t.position.set(px, py, 1); frame.add(t); parts.push(t); } }
       { const { hh, hw } = at(1.8); const c = canopy(hw * 2.4); c.position.set(0, hh * 0.98, 1.8); frame.add(c); }
       { const { hh, hw } = at(3.2), n = Math.max(5, Math.round(hw * 2.2));
-        for (let i = 0; i <= n; i++) { const x = (i / n - 0.5) * hw * 2.3, corner = Math.abs(x) > hw * 0.6, f = i % 2 ? fern(corner ? 0.95 : 0.6) : bush(corner ? 0.8 : 0.5, ['#ff8fc8', '#fff27a', '#9fd8ff'][i % 3]);
+        for (let i = 0; i <= n; i++) { const x = (i / n - 0.5) * hw * 2.3, corner = Math.abs(x) > hw * 0.6, f = i % 2 ? realFern(corner ? 1.05 : 0.7, i + 1) : realBush(corner ? 0.8 : 0.5, [0xff8fc8, 0xfff27a, 0x9fd8ff][i % 3], i + 2);
           f.position.set(x, cam.position.y - hh - 0.15 + (corner ? 0.3 : 0), 3.2 + (i % 2) * 0.3); f.rotation.y = i * 0.7; frame.add(f); parts.push(f); }
-        for (const s of [-1, 1]) { const f = fern(1.0); f.position.set(s * hw * 1.02, cam.position.y - hh * 0.45, 2.8); f.rotation.z = s * 0.9; frame.add(f); } }
+        for (const s of [-1, 1]) { const f = realFern(1.1, s > 0 ? 21 : 22); f.position.set(s * hw * 1.02, cam.position.y - hh * 0.45, 2.8); f.rotation.z = s * 0.9; frame.add(f); } }
       // the clearing round Kiki: grass, wildflowers and glowing mushrooms (leaving Kiki's spot clear)
       { const { hw } = at(0.5), y = -1.08, caps = [0x4fd8ff, 0xff4fd8, 0xb46bff, 0x6dffb0];
         const spots = [[-1.0, 1.2], [1.15, 1.0], [-1.9, 0.2], [2.0, 0.4], [-2.6, -0.8], [2.5, -1.0], [-1.6, -1.6], [1.5, -1.7], [-0.7, 2.0], [0.8, 2.1], [-2.3, 1.7], [2.2, 1.9], [-3.2, 0.9], [3.1, 0.7]];
@@ -207,7 +193,7 @@ export function startTitle(host) {
       if (cam.aspect !== aspect) fit();
       portal.userData.update(dt, t, cam); glow.intensity = 26 + Math.sin(t * 2) * 6;
       const calm = reducedMotion() ? 0.25 : 1;
-      halo.rotation.z += dt * 0.05 * calm; halo.material.opacity = 0.8 + Math.sin(t * 1.3) * 0.15; back.intensity = 2.4 + Math.sin(t * 1.1) * 0.5;
+      halo.rotation.z += dt * 0.05 * calm; halo.material.opacity = 0.6 + Math.sin(t * 1.3) * 0.12; back.intensity = 2.4 + Math.sin(t * 1.1) * 0.5;
       for (const m of mists) { m.position.x += m.userData.v * dt * calm; if (m.position.x > 6) m.position.x = -6; }
       for (let i = 0; i < N; i++) { dustPos[i * 3 + 1] += dustV[i] * dt * calm; dustPos[i * 3] += Math.sin(t * 0.7 + i) * 0.05 * dt; if (dustPos[i * 3 + 1] > 3.6) reseed(i, false); }
       dustGeo.attributes.position.needsUpdate = true;

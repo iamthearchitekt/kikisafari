@@ -3,6 +3,7 @@
 // six variants' crowns, markings and glow. Kikis are little creatures, not stuffed toys (owner): smooth skin, no seams. Plus the Rune Stone, the portal, Rune Circles and sparkles.
 import * as THREE from '../vendor/three.module.min.js';
 import { rng, hash, variant } from './core.js';
+import { premium, light } from './lux.js';
 
 export const EGG_H = 1.15, GROUND = EGG_H + 0.12, BODY_H = GROUND + EGG_H;
 const C = h => new THREE.Color(h);
@@ -480,7 +481,7 @@ function crownGeometry(id, look, key = id) {
 // ---------- materials ----------
 /** Soft, matte skin with a gentle rim light (roughness ~0.4, metalness 0, never shiny). Used for Kikis and props. */
 export function plush(params, rim = 0.4) {
-  const m = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0, ...params });
+  const m = new THREE.MeshStandardMaterial({ roughness: 0.38, metalness: 0, ...params }); // a soft satin skin
   m.onBeforeCompile = sh => {
     sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       totalEmissiveRadiance += diffuseColor.rgb * pow(1. - clamp(dot(normal, normalize(vViewPosition)), 0., 1.), 2.4) * ${rim.toFixed(2)};`);
@@ -1174,9 +1175,9 @@ let pr = null; const portraits = new Map();
 function portraitRenderer() {
   if (pr) return pr;
   const canvas = document.createElement('canvas'), r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
-  r.outputColorSpace = THREE.SRGBColorSpace; r.setClearColor(0x000000, 0);
-  const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8fd0, 1.7));
-  const key = new THREE.DirectionalLight(0xfff2e0, 2.2); key.position.set(-1.2, 2, 2.4); scene.add(key);
+  r.outputColorSpace = THREE.SRGBColorSpace; r.setClearColor(0x000000, 0); premium(r);
+  const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8fd0, 1.2));
+  const key = new THREE.DirectionalLight(0xfff2e0, 2.0); key.position.set(-1.2, 2, 2.4); scene.add(key); light(r, scene, 'day', 0.55);
   return pr = { r, scene, cam: new THREE.PerspectiveCamera(28, 1, 0.01, 50) };
 }
 /** A PNG data URL of a Kiki ('kiki:meadow'), an item ('item:moon') or the explorer ('explorer:' + encodeLook(look)). */

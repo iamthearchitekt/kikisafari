@@ -376,3 +376,18 @@ more random encounters."
   you), low drifting mist and rising magic dust.
 - The clearing is carpeted with grass (one instanced mesh of simple blades), with wildflowers and glowing mushrooms
   down both sides and big leaves in the bottom corners; Kiki's spot stays clear.
+
+## 25. Premium 3D, part 1: real foliage and film lighting (owner)
+
+"The trees look dumb and fake … add leaves, make it look a bit more real … elevate all elements of the game that
+exist in 3D … premium … that extra layer of care and dialing in."
+
+- `web/js/foliage.js`: tapered, knobbly trunks with a painted bark texture (also its bump map), root flares, forked
+  branches and twigs, and thousands of individual leaves (a folded leaf shape, one instanced mesh per tree, each leaf
+  its own green, lighter on top and outside where the light reaches). Ferns have real fronds (paired leaflets along a
+  curving stem); bushes are clusters of leaves with flowers. The title screen's trees, canopy, bushes and ferns use it,
+  with the foliage kept off the portal and Kiki. Leaves and grass use matte shading to stay light on phones.
+- `web/js/lux.js`: every renderer uses film-style tone mapping (Khronos PBR Neutral: highlights roll off, brand
+  colours stay true) and a soft light environment (a sky gradient and studio softboxes, made in code) for gentle
+  reflections and sheen on Kikis, stones, circles and props: day light for the map, catches, menus and stages, purple
+  "cosmic" light on the title screen. Kiki skin is a touch more satin.

@@ -7,6 +7,7 @@ import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer,
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
+import { premium, light } from './lux.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -37,13 +38,14 @@ let LS = null;
 export function liveStage(container, build) {
   if (!LS) {
     const canvas = document.createElement('canvas'), r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    r.outputColorSpace = THREE.SRGBColorSpace; r.setClearColor(0x000000, 0); LS = { r, canvas, stop: null };
+    r.outputColorSpace = THREE.SRGBColorSpace; r.setClearColor(0x000000, 0); premium(r); LS = { r, canvas, stop: null };
   }
   if (LS.stop) LS.stop();
   const { r, canvas } = LS; container.appendChild(canvas);
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.05, 30);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8fd0, 1.7)); const key = new THREE.DirectionalLight(0xfff2e0, 2.3); key.position.set(-1.5, 2.5, 3); scene.add(key);
-  const api = build(scene, cam) || {};
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8fd0, 1.2)); const key = new THREE.DirectionalLight(0xfff2e0, 2.1); key.position.set(-1.5, 2.5, 3); scene.add(key);
+  light(r, scene, 'day', 0.55); // soft studio reflections (lux.js)
+  const api = build(scene, cam, r) || {};
   let alive = true, last = performance.now(), t = 0, w = 0, h = 0;
   const loop = now => {
     if (!alive) return;

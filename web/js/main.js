@@ -16,6 +16,7 @@ import { startTitle } from './title.js';
 import { initOnline, connect, checkIn, syncProfile, openFriends, openLeagues, openAccount } from './social.js';
 import { cosmicCanvas } from './art.js';
 import { playMusic, musicName, setMusic } from './music.js';
+import { premium, light } from './lux.js';
 import { $, toast, panel, hx, sfx, unlockAudio, audioRunning, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
 
 const app = {
@@ -36,10 +37,11 @@ app.osm = new OsmLoader();
 
 // ---------- rendering ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), alpha: true, antialias: true });
-renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0); premium(renderer);
 app.world = new WorldView(app);
 app.map = new StreetMap(app);
 app.osm.listeners.push((cell, area) => app.map.addArea(cell, area));
+light(renderer, app.map.scene, 'day', 0.5); light(renderer, app.world.scene, 'day', 0.6); // soft reflections on Kikis, stones and circles
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   for (const cam of [app.world.camera, app.map.camera]) { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
