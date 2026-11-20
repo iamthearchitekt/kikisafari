@@ -480,3 +480,17 @@ short sleeve and long sleeve t-shirt, jeans, shorts, skirt. Male and female, bas
 - Files are ~450 KB per body and ~150 KB per hairstyle. Your own body and hairstyle load first; the look picker loads
   your body's outfits and the hairstyles in the background, and shows "Loading…" if you pick one that is not in yet.
   A friend's look loads when their picture is first drawn.
+
+## 31. Real beards; hair that always covers (owner)
+
+Owner: "the beards suck. Make sure hair and beards cover correctly."
+
+- **3D beards grown from the face:** a beard is now a shell built from the head's own surface (every face triangle
+  in the beard's area, pushed out along its normal, thickest in the middle and tapering to nothing at the edge),
+  skinned to the same bones, so it sits flush on the jaw of every body and moves with the head. Its outline is cut
+  per pixel from a smooth shape (not along the mesh's triangles), it has fine downward strands, and the same shape is
+  painted on the skin beneath so the edges blend. Styles: stubble (painted only), short beard, full beard (hangs a
+  little below the chin), mustache, goatee. Beards run up the sideburns in front of the ears to meet the hair.
+- **Hair covers:** under every hairstyle the scalp is painted in the hair colour, down to the hairline at the ears and
+  nape (a little higher at the forehead, which the hair covers itself), so no bald patch shows through gaps between
+  locks. Undercut sides read as shaved hair. Locs have no outline (it showed through their gaps).

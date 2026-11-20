@@ -889,7 +889,7 @@ export function makeTreat(id, size = 0.06) {
 // lookOf() turns those into a full look.
 export const SKINS = [0xffe6cf, 0xffd3ae, 0xf1bd8e, 0xdba06e, 0xbf8452, 0x9b6339, 0x744626, 0x50301a];
 export const HAIR_STYLES = ['Short', 'Bob', 'Long', 'Ponytail', 'Space buns', 'Curly', 'Spiky', 'Buzz', 'Dreads', 'Mohawk', 'Braids', 'Bald'];
-export const BEARDS = ['No beard', 'Stubble', 'Beard', 'Big beard', 'Mustache'];
+export const BEARDS = ['No beard', 'Stubble', 'Short beard', 'Full beard', 'Mustache', 'Goatee'];
 export const HATS = ['No hat', 'Bucket', 'Trucker', 'Beanie', 'Cowboy', 'Flower crown', 'Bandana', 'Ranger'];
 export const GLASSES = ['No shades', 'Round', 'Hearts', 'Shutter', 'LED'];
 export const BAGS = ['Backpack', 'Hydration pack', 'Fanny pack', 'No bag'];
