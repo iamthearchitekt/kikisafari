@@ -137,7 +137,7 @@ function beardW(x, y, z, style) {
   const jaw = (1 - ss(top - 0.04, top + 0.03, y)) * ss(-0.95, -0.82, y) * ss(-0.22, -0.04, z) * (1 - ear) * onHead;
   const side = 0;
   const lip = (1 - ss(0.15, 0.24, ax)) * ss(-0.64, -0.6, y) * (1 - ss(-0.53, -0.49, y)) * (z > 0.45 ? 1 : 0);
-  const mus = (1 - ss(0.26, 0.38, ax)) * ss(-0.575 - 0.05 * ax, -0.55 - 0.05 * ax, y) * (1 - ss(-0.47 - 0.03 * ax, -0.44 - 0.03 * ax, y)) * (z > 0.45 ? 1 : 0);
+  const mus = (1 - ss(0.28, 0.4, ax)) * ss(-0.6 - 0.06 * ax, -0.57 - 0.06 * ax, y) * (1 - ss(-0.46 - 0.03 * ax, -0.425 - 0.03 * ax, y)) * (z > 0.4 ? 1 : 0);
   const chin = (1 - ss(0.2, 0.34, ax)) * ss(-0.95, -0.82, y) * (1 - ss(-0.64, -0.58, y)) * front;
   if (style === 4) return mus;
   if (style === 5) return Math.max(chin * (1 - lip), mus);
@@ -150,14 +150,14 @@ const BEARD_GLSL = `float beardW(vec3 q, float style) {
         float jaw = (1.0 - smoothstep(top - 0.04, top + 0.03, q.y)) * smoothstep(-0.95, -0.82, q.y) * smoothstep(-0.22, -0.04, q.z) * (1.0 - ear) * onHead;
         float side = 0.0;
         float lip = (1.0 - smoothstep(0.15, 0.24, ax)) * smoothstep(-0.64, -0.6, q.y) * (1.0 - smoothstep(-0.53, -0.49, q.y)) * step(0.45, q.z);
-        float mus = (1.0 - smoothstep(0.26, 0.38, ax)) * smoothstep(-0.575 - 0.05 * ax, -0.55 - 0.05 * ax, q.y) * (1.0 - smoothstep(-0.47 - 0.03 * ax, -0.44 - 0.03 * ax, q.y)) * step(0.45, q.z);
+        float mus = (1.0 - smoothstep(0.28, 0.4, ax)) * smoothstep(-0.6 - 0.06 * ax, -0.57 - 0.06 * ax, q.y) * (1.0 - smoothstep(-0.46 - 0.03 * ax, -0.425 - 0.03 * ax, q.y)) * step(0.4, q.z);
         float chin = (1.0 - smoothstep(0.2, 0.34, ax)) * smoothstep(-0.95, -0.82, q.y) * (1.0 - smoothstep(-0.64, -0.58, q.y)) * front;
         if (style > 3.5 && style < 4.5) return mus;
         if (style > 4.5) return max(chin * (1.0 - lip), mus);
         return max(max(jaw, side) * (1.0 - lip), mus);
       }`;
 // how thick each beard grows (share of the head's height), and how far a full beard hangs below the chin
-const BEARD_DEPTH = { 2: 0.022, 3: 0.04, 4: 0.014, 5: 0.028 };
+const BEARD_DEPTH = { 2: 0.022, 3: 0.04, 4: 0.02, 5: 0.028 };
 /** A beard as a shell grown out of the face's own surface (bind pose, the body's vertex space), skinned like it. */
 function beardShell(src, style, sex) {
   src.beards ||= {}; const key = style + ':' + sex; if (src.beards[key]) return src.beards[key];
