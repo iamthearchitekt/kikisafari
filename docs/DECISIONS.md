@@ -514,3 +514,20 @@ the auto-update reloaded the page at the first "quiet" moment, which included th
 version waiting the opening started over a second or two in. Now the opening plays the first time only (remembered
 on the phone); after that the title opens with the portal open and Kiki already in the clearing. And an update never
 reloads the page while the opening is playing.
+
+## 34. No face or scalp paint; more hairstyles; a baseball cap (owner)
+
+Owner: "no scalp or face paint, it looks dumb"; "not a buzz cut, just no hair at all"; "add a baseball cap";
+"short shoulder length with bangs, long hair, long hair with bangs, a ponytail and pigtails for female options".
+
+- Nothing is painted on the face or scalp any more (no colour under hairstyles, no painted buzz cut or stubble, no
+  brow tint). Bald is the head with no hair. Stubble and the buzz cut are retired (saved looks become no beard and
+  bald).
+- Hair pieces are fitted to each head: any part that dips into the skull (where a head is fuller than the mannequin
+  it was made on) is pushed back out over it, so the head never pokes through. Hair is two-sided, so a parting shows
+  hair. Per-body seats for the styles first made on the male head. The ponytail and space buns were regenerated to
+  cover the whole back of the head.
+- Each body has its own hair list. Female: shoulder-length with bangs, bob, long, long with bangs, ponytail,
+  pigtails, space buns, curly, locs, bald. Male: bald, short, spiky, undercut, long, ponytail, curly, locs.
+- Baseball cap: a generated six-panel cap (any colour), seated on the head; hair above its rim is pressed in under
+  it, so hair shows below the rim like a real cap, and a ponytail comes out the back.

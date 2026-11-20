@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
+import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -348,7 +348,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
   const e = app.progress.explorer, look = lookOf(e);
   const hex = c => '#' + c.toString(16).padStart(6, '0');
   const sw = (key, colors, label) => `<div class="look-row"><div class="look-label">${label}</div><div class="look-swatches">${colors.map(c => `<button data-c="${key}" data-v="${c}" style="background:${hex(c)}" aria-label="${label} ${hex(c)}"></button>`).join('')}</div></div>`;
-  const chips = (key, names, label) => `<div class="look-row"><div class="look-label">${label}</div><div class="look-chips">${names.map((n, i) => `<button data-s="${key}" data-v="${i}">${n}</button>`).join('')}</div></div>`;
+  const chips = (key, names, label, skip = [], order = null, attr = '') => `<div class="look-row"${attr}><div class="look-label">${label}</div><div class="look-chips">${(order || names.map((_, i) => i)).map(i => skip.includes(i) ? '' : `<button data-s="${key}" data-v="${i}">${names[i]}</button>`).join('')}</div></div>`;
   const presetImg = i => portrait(`explorer:${encodeLook({ ...lookOf({ outfit: i }), skin: look.skin })}`, 160);
   const s = screen(`<div class="sheet-head"><h2>${first ? 'Make your explorer' : 'Change look'}</h2></div>
     <div class="look-stage"></div>
@@ -361,9 +361,9 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
       ${sw('top', CLOTHES, 'T-shirt colour')}
       ${chips('legs', LEGWEAR, 'Bottoms')}
       ${sw('bottom', BOTTOMS, 'Bottoms colour')}
-      ${chips('hairdo', HAIRDOS, 'Hair')}
+      ${chips('hairdo', HAIRDOS, 'Hair', [], HAIR_FOR[0], ' data-sex="0"')}${chips('hairdo', HAIRDOS, 'Hair', [], HAIR_FOR[1], ' data-sex="1"')}
       <div class="look-if" data-if="hairC">${sw('hairC', HAIR_COLORS, 'Hair colour')}</div>
-      ${chips('beard', BEARDS, 'Facial hair')}
+      ${chips('beard', BEARDS, 'Facial hair', [1])}
       ${chips('hat', HATS, 'Hat')}
       <div class="look-if" data-if="hat">${sw('hatC', CLOTHES, 'Hat colour')}</div>
       ${chips('glasses', SHADES, 'Sunglasses')}
@@ -381,7 +381,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
   stage.addEventListener('pointermove', ev => { if (drag == null) return; spin += (ev.clientX - drag) * 0.012; drag = ev.clientX; });
   const endDrag = () => { drag = null; }; stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
   // keep the older chibi fields in step, for the moments before the 3D explorers have loaded
-  const OLD_HAIR = [11, 7, 0, 6, 9, 1, 2, 3, 4, 5, 8];
+  const OLD_HAIR = [11, 11, 0, 6, 9, 1, 2, 3, 4, 5, 8, 1, 2, 2, 3];
   const sync = () => { look.hair = OLD_HAIR[look.hairdo] ?? 0; look.pants = look.legs === 0 ? 1 : 0; if (!look.sex && look.legs === 2) look.legs = 1; };
   const showAvatar = () => {
     const sig = encodeLook(look); if (sig === shown && avatar) return; shown = sig;
@@ -394,6 +394,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
     s.root.querySelectorAll('[data-c]').forEach(b => { const k = b.dataset.c, list = BY_INDEX[k]; b.classList.toggle('on', list ? list[look[k]] === +b.dataset.v : look[k] === +b.dataset.v); });
     s.root.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', look[b.dataset.s] === +b.dataset.v));
     s.root.querySelector('[data-s="legs"][data-v="2"]').hidden = !look.sex; // the skirt is on the female body
+    s.root.querySelectorAll('[data-sex]').forEach(r => { r.hidden = +r.dataset.sex !== look.sex; }); // each body's own hairstyles
     s.root.querySelectorAll('.look-if').forEach(d => { d.hidden = d.dataset.if === 'hairC' ? HAIRDOS[look.hairdo] === 'Bald' && !look.beard : !look[d.dataset.if]; });
   };
   s.root.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c, v = +b.dataset.v; look[k] = BY_INDEX[k] ? BY_INDEX[k].indexOf(v) : v; sfx('button', 0.25); hx.light(); render(); });
