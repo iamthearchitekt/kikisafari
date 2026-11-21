@@ -6,6 +6,7 @@ import { OsmArea, WorldData, placeLandmarks, overpassQuery, DATA_CELL } from './
 import { tilesFor } from './tiles.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
 import { meadow } from './meadow.js';
+import { VisualLock } from './vtrack.js';
 import { $, toast, hx, sfx, debug, reducedMotion, fmtDist } from './services.js';
 import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
 
@@ -71,10 +72,10 @@ export class Location {
 // phone upright) at start and whenever the camera turns on; after that the alignment is held still. Before, it was
 // nudged towards the live compass sixty times a second (iPhone), or the view ran on the compass itself (Android),
 // which is what made everything slide sideways.
-const zee = new THREE.Vector3(0, 0, 1), q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+const Y_UP = new THREE.Vector3(0, 1, 0), zee = new THREE.Vector3(0, 0, 1), q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 const screenAngle = () => ((screen.orientation && screen.orientation.angle) || window.orientation || 0);
 /** The camera's orientation from a deviceorientation event (three.js convention). */
-function eventQuat(e, out) {
+export function eventQuat(e, out) {
   const eu = new THREE.Euler(e.beta * Math.PI / 180, e.alpha * Math.PI / 180, -e.gamma * Math.PI / 180, 'YXZ');
   return out.setFromEuler(eu).multiply(q1).multiply(new THREE.Quaternion().setFromAxisAngle(zee, -screenAngle() * Math.PI / 180));
 }
@@ -86,6 +87,7 @@ export class Orientation {
     this.locked = false; // AR off: a fixed view, the phone's motion is ignored
     this.relQ = new THREE.Quaternion(); this.absQ = new THREE.Quaternion(); this.haveRel = false; this.firstAbsAt = 0;
     this.samples = []; this.calibrating = true;
+    this.corr = 0; this.qc = new THREE.Quaternion(); // sideways correction from the camera picture (vtrack.js), radians
     this.onEvent = e => {
       if (e.alpha == null) return;
       const isAbs = e.type === 'deviceorientationabsolute' || e.absolute === true;
@@ -127,7 +129,8 @@ export class Orientation {
   /** True compass heading of the camera. */
   get heading() { return norm(this.rawHeading(this.camera.quaternion) + this.offset); }
   update(dt) {
-    if (this.have && !this.locked) this.camera.quaternion.slerp(this.target, 1 - Math.exp(-dt * 18));
+    // no smoothing: any lag makes objects trail behind the picture while you turn (the sensors are already smooth)
+    if (this.have && !this.locked) this.camera.quaternion.copy(this.qc.setFromAxisAngle(Y_UP, this.corr).multiply(this.target));
     else this.camera.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
   }
   drag(dx, dy) { if (this.have && !this.locked) return; this.yaw -= dx * 0.005; this.pitch = Math.max(-1.2, Math.min(0.8, this.pitch - dy * 0.005)); }
@@ -237,6 +240,7 @@ export class WorldView {
     this.root = new THREE.Group(); this.scene.add(this.root);
     this.sparkles = new Sparkles(this.scene);
     this.orient = new Orientation(this.camera);
+    this.vlock = new VisualLock(this.orient, this.camera); // AR: pins the view to the camera picture (no drift)
     this.views = new Map(); this.things = []; this.nextPlan = 0; this.labels = new Map();
     this.ground = null; this.time = 0;
   }

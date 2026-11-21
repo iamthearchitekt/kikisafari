@@ -275,6 +275,9 @@ function frame(now) {
   if (!$('game').hidden && app.loc.fix) {
     app.loc.simWalk(keys, app.mapMode ? (app.map.yaw || 0) : app.world.orient.heading, dt);
     app.world.update(dt);
+    // AR with the camera live: pin the view to the camera picture so nothing drifts (vtrack.js)
+    const o = app.world.orient, v = $('cam');
+    if (stream && cameraWanted() && o.have && !o.locked && v.readyState >= 2) app.world.vlock.update(v, innerWidth, innerHeight); else if (app.world.vlock.on) app.world.vlock.stop();
     if (app.encounter && app.encounter.update) app.encounter.update(dt, time);
     if (app.mapMode && !app.encounter) { app.map.update(dt, time, app.loc.fix, app.world.orient.facing, app.world.things); renderer.render(app.map.scene, app.map.camera); }
     else renderer.render(app.world.scene, app.world.camera);

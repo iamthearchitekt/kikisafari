@@ -543,3 +543,18 @@ line its zero up with north: an average over about half a second with the phone 
 camera turns on, then held still. A phone with no gyroscope-only orientation falls back to the compass one. A
 simulated test (phone held still, compass wandering ±25°) moved objects ~25° (iPhone) and ~32° (Android) before;
 now 0°, and still within ~1° of north.
+
+## 36. AR: locked to the camera picture (owner)
+
+Owner: "no drifting at all". A phone's gyroscope always wanders slowly, and the 3D camera's field of view never
+exactly matches the lens (it was a fixed 62°; phone lenses in portrait are nearer 69°), so objects crept and slid
+against the real scene. vtrack.js now pins the view to the camera picture, the way real AR does: it keeps a small map
+of textured patches of the room (anchors, each with the view it was first seen from), finds the ones in view in each
+frame around where the gyroscope says they should be (normalised cross-correlation on a small grey copy of the
+picture), and turns the view by the median gap, cancelling the gyroscope's drift. It measures the lens from how far
+the picture moves per degree of turn and sets the 3D camera's field of view to match (remembered on the phone).
+Anchors that leave the screen are kept and found again when they come back. The view also has no smoothing lag any
+more (that made objects trail while turning). With nothing to lock to (a blank wall, darkness) the gyroscope alone
+carries on. Simulated test (a textured room filmed by a 69° camera; a gyroscope drifting 0.5°/s; the 3D camera
+starting at 62°; the phone sweeping ±25° for 30 s): gyroscope only, a placed object ends up 55→194 px off and
+growing; with the lock it settles to 2–5 px and stays there. With a realistic gyroscope: 1–4 px.
