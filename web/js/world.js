@@ -64,31 +64,62 @@ export class Location {
 }
 
 // ---------- orientation (motion sensors + compass, or drag to look) ----------
+// Owner: "the AR objects won't stay in place when I turn my camera on, they keep drifting off to the left or right."
+// The view follows the gyroscope only (the phone's relative orientation): it is smooth and does not wander. The
+// compass is far noisier (and the camera's own hardware disturbs it once it switches on), so it is used once, to line
+// the gyroscope's arbitrary zero up with north: a short calibration (an average over about half a second, with the
+// phone upright) at start and whenever the camera turns on; after that the alignment is held still. Before, it was
+// nudged towards the live compass sixty times a second (iPhone), or the view ran on the compass itself (Android),
+// which is what made everything slide sideways.
 const zee = new THREE.Vector3(0, 0, 1), q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+const screenAngle = () => ((screen.orientation && screen.orientation.angle) || window.orientation || 0);
+/** The camera's orientation from a deviceorientation event (three.js convention). */
+function eventQuat(e, out) {
+  const eu = new THREE.Euler(e.beta * Math.PI / 180, e.alpha * Math.PI / 180, -e.gamma * Math.PI / 180, 'YXZ');
+  return out.setFromEuler(eu).multiply(q1).multiply(new THREE.Quaternion().setFromAxisAngle(zee, -screenAngle() * Math.PI / 180));
+}
+const CALIB_SAMPLES = 30;
 export class Orientation {
   constructor(camera) {
-    this.camera = camera; this.target = new THREE.Quaternion(); this.have = false; this.offset = 0; this.offsetSet = false; this.absolute = false;
+    this.camera = camera; this.target = new THREE.Quaternion(); this.have = false; this.offset = 0; this.offsetSet = false;
     this.yaw = 0; this.pitch = -0.12; // drag-to-look fallback
     this.locked = false; // AR off: a fixed view, the phone's motion is ignored
+    this.relQ = new THREE.Quaternion(); this.absQ = new THREE.Quaternion(); this.haveRel = false; this.firstAbsAt = 0;
+    this.samples = []; this.calibrating = true;
     this.onEvent = e => {
       if (e.alpha == null) return;
-      if (e.type === 'deviceorientationabsolute') this.absolute = true; else if (this.absolute) return;
-      // Compass heading of the phone's top edge (for the map, where the phone is held flat).
-      if (typeof e.webkitCompassHeading === 'number') this.compass = e.webkitCompassHeading;
-      else if (this.absolute || e.absolute) this.compass = norm(360 - e.alpha - (((screen.orientation && screen.orientation.angle) || 0)));
-      const orient = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
-      const eu = new THREE.Euler(e.beta * Math.PI / 180, e.alpha * Math.PI / 180, -e.gamma * Math.PI / 180, 'YXZ');
-      this.target.setFromEuler(eu).multiply(q1).multiply(new THREE.Quaternion().setFromAxisAngle(zee, -orient));
-      this.have = true;
-      // iPhone: alpha has an arbitrary zero, so line it up with the compass (camera heading) whenever the phone is upright.
-      if (typeof e.webkitCompassHeading === 'number' && Math.abs(e.beta) > 40) {
-        const sample = norm(e.webkitCompassHeading - this.rawHeading(this.target));
-        this.offset = this.offsetSet ? lerpAngle(this.offset, sample, 0.04) : sample; this.offsetSet = true;
+      const isAbs = e.type === 'deviceorientationabsolute' || e.absolute === true;
+      if (isAbs) {
+        eventQuat(e, this.absQ);
+        if (typeof e.webkitCompassHeading !== 'number') this.compass = norm(360 - e.alpha - screenAngle()); // the map's compass
+        if (this.haveRel) this.sample(norm(this.rawHeading(this.absQ) - this.rawHeading(this.relQ)), e.beta);
+        else {
+          // a phone with no gyroscope-only orientation: use the compass one (its frame is north already)
+          this.firstAbsAt ||= performance.now();
+          if (performance.now() - this.firstAbsAt > 500) { this.target.copy(this.absQ); this.have = true; this.offset = 0; this.offsetSet = true; this.calibrating = false; }
+        }
+      } else {
+        eventQuat(e, this.relQ); this.target.copy(this.relQ); this.have = this.haveRel = true;
+        if (typeof e.webkitCompassHeading === 'number') { // iPhone: the compass comes with the gyroscope's event
+          this.compass = e.webkitCompassHeading;
+          const acc = e.webkitCompassAccuracy;
+          if (acc == null || (acc >= 0 && acc <= 30)) this.sample(norm(e.webkitCompassHeading - this.rawHeading(this.relQ)), e.beta);
+        }
       }
     };
     addEventListener('deviceorientationabsolute', this.onEvent);
     addEventListener('deviceorientation', this.onEvent);
   }
+  /** One reading of how far the gyroscope's zero is from north; while calibrating, the average of the readings so far. */
+  sample(deg, beta) {
+    if (!this.calibrating || Math.abs(beta) < 40) return; // only with the phone held up (the compass is poor lying flat)
+    this.samples.push(deg * Math.PI / 180);
+    let x = 0, y = 0; for (const a of this.samples) { x += Math.cos(a); y += Math.sin(a); }
+    this.offset = norm(Math.atan2(y, x) * 180 / Math.PI); this.offsetSet = true;
+    if (this.samples.length >= CALIB_SAMPLES) { this.calibrating = false; this.samples = []; }
+  }
+  /** Line up with north again (when the camera turns on); held still afterwards. */
+  recalibrate() { if (this.haveRel) { this.calibrating = true; this.samples = []; } }
   /** Heading of a camera orientation in the sensor frame (degrees clockwise from the frame's -Z). */
   rawHeading(q) { const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q); return norm(Math.atan2(f.x, -f.z) * 180 / Math.PI); }
   /** Which way you're facing for the map: the compass if there is one, else the camera's heading. */
@@ -102,7 +133,6 @@ export class Orientation {
   drag(dx, dy) { if (this.have && !this.locked) return; this.yaw -= dx * 0.005; this.pitch = Math.max(-1.2, Math.min(0.8, this.pitch - dy * 0.005)); }
 }
 const norm = d => ((d % 360) + 360) % 360;
-const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
 
 // ---------- map data (OpenStreetMap via Overpass, cached on the phone) ----------
 // Overpass is a free public service, and its servers get busy. The game asks the main one first and moves on to the

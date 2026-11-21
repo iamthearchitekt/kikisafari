@@ -92,6 +92,7 @@ function camOn() {
     if (!camWanted) { for (const t of s.getTracks()) t.stop(); return null; } // switched off while it was starting
     camOff(); camWanted = true;
     stream = s; const v = $('cam'); v.srcObject = s; v.play().catch(() => {});
+    app.world.orient.recalibrate(); // line up with north once, then hold still (see Orientation in world.js)
     return s;
   }).catch(() => null);
 }

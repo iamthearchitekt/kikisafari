@@ -531,3 +531,15 @@ Owner: "no scalp or face paint, it looks dumb"; "not a buzz cut, just no hair at
   pigtails, space buns, curly, locs, bald. Male: bald, short, spiky, undercut, long, ponytail, curly, locs.
 - Baseball cap: a generated six-panel cap (any colour), seated on the head; hair above its rim is pressed in under
   it, so hair shows below the rim like a real cap, and a ponytail comes out the back.
+
+## 35. AR objects stay put (owner)
+
+Owner: "the AR objects won't stay in place when I turn my camera on, they keep drifting off to the left or right."
+Two causes. iPhone: the alignment with north was pulled towards the live compass on every sensor event (60 a
+second); the compass wanders (more so with the camera running), so everything placed in the world slid sideways with
+it. Android: once the compass-based orientation event was seen, the view ran on it alone, and that one swings with
+magnetic noise. Now the view always follows the gyroscope-only orientation (steady), and the compass is used just to
+line its zero up with north: an average over about half a second with the phone upright, at start and when the
+camera turns on, then held still. A phone with no gyroscope-only orientation falls back to the compass one. A
+simulated test (phone held still, compass wandering ±25°) moved objects ~25° (iPhone) and ~32° (Android) before;
+now 0°, and still within ~1° of north.
