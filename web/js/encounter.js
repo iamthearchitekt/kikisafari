@@ -54,11 +54,102 @@ export class Encounter {
     this.portal = makePortal(0.62); this.group.add(this.portal);
     this.stone = makeRuneStone(STONE_R, this.stoneId); this.group.add(this.stone);
     this.recolor();
-    // pop in
     this.kiki.scale.setScalar(0.0001);
+    if (this.liveAR()) this.seek(); else this.popIn();
+  }
+  /** AR with the real camera and motion sensors: the only time there is a real surface to find. */
+  liveAR() { const o = this.app.world.orient; return !!(this.app.arOn && o.have && !o.locked); }
+  popIn() {
+    this.kiki.visible = true; this.kiki.scale.setScalar(0.0001);
     this.anim(0.45, k => this.kiki.scale.setScalar(this.scale * easeOutBack(k, 2.2)));
     sfx('pickup', 0.4); hx.light();
     if (this.rec.sparkle) setTimeout(() => { this.sparkles.burst(this.center, 26, 0xffe680, 0.05, 0.8, 1.0); this.sparkles.burst(this.center, 14, 0xffffff, 0.04, 0.6, 0.8); sfx('burst', 0.4); hx.success(); pop('✦ Sparkle! ✦', '#ffcf2e'); }, 500);
+  }
+
+  // ---------- finding a surface (owner: "the Kikis don't search for a surface in a room well enough … they need to find the
+  // nearest surface and remain there during the capture") ----------
+  // In live AR, Kiki waits until you point at a real surface: a ring shows where it will stand (the floor ahead, low in
+  // the view), and only where the camera picture there has texture that can be found again (a real floor, rug or table,
+  // not empty air or a blank wall) and the phone is held steady does Kiki pop out onto it. Tapping a spot works too.
+  seek() {
+    this.state = 'seek'; this.kiki.visible = false; this.seekT = 0; this.spotsHere = null; this.steadyT = 0; this.seekQ = this.camera.quaternion.clone();
+    if (!this.reticle) {
+      const g = new THREE.Group(), ringM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.2, 48), ringM); ring.rotation.x = -Math.PI / 2; g.add(ring);
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(0.17, 48), new THREE.MeshBasicMaterial({ color: 0x7a00ff, transparent: true, opacity: 0.18, depthTest: false })); fill.rotation.x = -Math.PI / 2; g.add(fill);
+      const prog = new THREE.Mesh(new THREE.RingGeometry(0.205, 0.235, 48, 1, 0, 0.001), new THREE.MeshBasicMaterial({ color: 0xffcf2e, transparent: true, depthTest: false, side: THREE.DoubleSide })); prog.rotation.x = -Math.PI / 2; g.add(prog);
+      g.renderOrder = 10; g.userData = { ringM, prog }; this.reticle = g; this.group.add(g);
+    }
+    this.reticle.visible = false; this.app.world.vlock.clearSurface(); this.surfaceN = 0; this.lastHint = null; $('enc-tap').disabled = true; $('enc-tray').hidden = true;
+    this.hint('Point at the floor (or a table) where Kiki can stand');
+  }
+  /** The floor point under a screen spot, or null if it's not a sensible place to stand (too far, too near, or not downwards). */
+  floorAt(x, y, near = 0.55, far = 3.2) {
+    const ndc = new THREE.Vector3(x / view.w * 2 - 1, -(y / view.h) * 2 + 1, 0.5).unproject(this.camera), dir = ndc.sub(this.camera.position).normalize();
+    if (dir.y > -0.12) return null;
+    const t = (-EYE - this.camera.position.y) / dir.y, to = this.camera.position.clone().addScaledVector(dir, t), d = Math.hypot(to.x, to.z);
+    return d > far || d < near ? null : to;
+  }
+  seekUpdate(dt) {
+    if (!this.liveAR()) { this.lastHint = null; this.replace(); return; } // the camera went off: Kiki stands in front of you
+    this.seekT += dt;
+    const sx = view.w / 2, sy = view.h * 0.6, at = this.floorAt(sx, sy), vl = this.app.world.vlock;
+    // held steady: turning slower than about 30° a second (a hand holding still, not sweeping the room)
+    const turned = this.camera.quaternion.angleTo(this.seekQ); this.seekQ.copy(this.camera.quaternion);
+    // can this spot be kept? (enough findable little spots on it: checked a few times a second)
+    this.seekN = (this.seekN || 0) + 1; if (this.seekN % 5 === 0 || this.spotsHere == null) this.spotsHere = vl.on ? vl.surfaceSpots(sx, sy) : 0;
+    const good = !!at && (this.spotsHere >= 3 || this.seekT > 7);
+    this.steadyT = good && turned < dt * 0.6 ? this.steadyT + dt : Math.max(0, this.steadyT - dt * 2);
+    const R = this.reticle; R.visible = !!at;
+    if (at) {
+      R.position.copy(at); R.position.y += 0.005; const s = Math.min(1.3, Math.max(0.6, Math.hypot(at.x, at.z) / 1.6)); R.scale.setScalar(s);
+      R.userData.ringM.color.set(good ? 0xffffff : 0xff8fb0); R.rotation.y += dt * 0.8;
+      const k = Math.min(1, this.steadyT / 0.7); R.userData.prog.geometry.dispose(); R.userData.prog.geometry = new THREE.RingGeometry(0.205, 0.235, 48, 1, 0, Math.max(0.001, k * Math.PI * 2));
+    }
+    const want = !at ? 'Point at the floor (or a table) where Kiki can stand' : !good ? 'Aim at a spot with some pattern or detail…' : 'Hold steady…';
+    if (want !== this.lastHint) { this.lastHint = want; this.hint(want); }
+    if (at && this.steadyT >= 0.7) this.appear(at, sx, sy);
+    else if (this.seekT > 14) { const p = this.floorAt(sx, sy); this.appear(p || this.home, p ? sx : null, sy); } // never stuck
+  }
+  /** Kiki pops out onto the surface found at screen spot (sx, sy), and remembers it. */
+  appear(at, sx, sy) {
+    this.home.copy(at); this.kiki.position.copy(at); this.kiki.rotation.y = Math.atan2(-at.x, -at.z);
+    this.reticle.visible = false; this.state = 'ready'; this.lastHint = null;
+    this.surfaceN = sx == null ? 0 : this.app.world.vlock.setSurface(sx, sy);
+    this.sparkles.burst(at.clone().setY(at.y + 0.15), 16, 0xd9a8ff, 0.03, 0.6, 0.6);
+    this.popIn(); hx.success();
+  }
+  /** Each frame in live AR: keep Kiki's feet on the remembered surface as the view moves. */
+  followSurface() {
+    if (!this.liveAR()) return;
+    const vl = this.app.world.vlock;
+    if (!this.surfaceN || (vl.surf && vl.surf.lost > 60)) { this.reanchor(); if (!this.surfaceN) return; }
+    const r = vl.trackSurface(); if (!r) return;
+    const at = this.floorAt(r.x, r.y, 0.25, 6); if (!at) return; // (you may walk right up to Kiki, or back off)
+    // where Kiki's feet are now in the world (the whole scene may be carried along during the capture, see below)
+    const d = at.sub(this.home).sub(this.group.position); d.y = 0;
+    if (d.length() > 0.8) return; // a jump that big is a mismatch, not you moving
+    d.multiplyScalar(0.7);
+    // During the capture (stone, portal, wobbles on the ground) everything moves together with the surface: carry the
+    // whole scene. Otherwise only Kiki's spot moves (the stone in your hand stays in your hand).
+    if (this.state === 'resolving') { this.group.position.add(d); return; }
+    this.home.add(d);
+    if (this.state !== 'moving') { this.kiki.position.x = this.home.x; this.kiki.position.z = this.home.z; }
+  }
+  /** Kiki's spot isn't remembered (the camera was still starting) or hasn't been found for a while although it's in
+   *  view: remember it again from where Kiki's feet are on screen now, if the picture there can be found again. */
+  reanchor() {
+    const vl = this.app.world.vlock;
+    if (!vl.on || (this.state !== 'ready' && this.state !== 'out') || (this.reanchorN = (this.reanchorN || 0) + 1) % 15) return;
+    const p = this.home.clone().project(this.camera); if (p.z > 1 || Math.abs(p.x) > 0.8 || Math.abs(p.y) > 0.8) return;
+    const sx = (p.x + 1) / 2 * view.w, sy = (1 - p.y) / 2 * view.h;
+    if (vl.surfaceSpots(sx, sy) < 3) return;
+    this.surfaceN = vl.setSurface(sx, sy);
+  }
+  /** After the capture: fold the carried scene back into Kiki's spot. */
+  settle() {
+    const g = this.group.position; if (!g.x && !g.z) return;
+    this.home.add(g); this.kiki.position.add(g); this.portal.position.add(g); g.set(0, 0, 0);
   }
 
   /** Tap the floor (or a table top) and Kiki hops there. Its feet land right where you tapped. */
@@ -66,17 +157,19 @@ export class Encounter {
     if (!this.app.arOn) return;
     const ndc = new THREE.Vector3(x / view.w * 2 - 1, -(y / view.h) * 2 + 1, 0.5).unproject(this.camera), dir = ndc.sub(this.camera.position).normalize();
     if (dir.y > -0.08) return toast('Tap the floor (or a table) where you want Kiki.', 2400);
-    const t = (-EYE - this.camera.position.y) / dir.y, to = this.camera.position.clone().addScaledVector(dir, t);
-    if (Math.hypot(to.x, to.z) > 4) return toast("That's too far away. Tap somewhere closer.", 2400);
-    if (Math.hypot(to.x, to.z) < 0.7) return toast('Too close! Tap a bit further away.', 2400);
+    const to = this.floorAt(x, y); if (!to) return toast('Tap the floor (or a table) a little closer.', 2400);
     const from = this.kiki.position.clone(); this.home = to.clone(); hx.light(); sfx('button', 0.3);
+    this.surfaceN = 0; this.app.world.vlock.clearSurface();
     this.state = 'moving'; this.motion.stop(); this.motion.idling = false;
     this.anim(0.4, k => { this.kiki.position.lerpVectors(from, to, k); this.motion.hop(Math.sin(k * Math.PI) * 0.7); })
-      .then(() => { this.motion.hop(0); this.motion.idling = true; if (this.state === 'moving') this.state = 'ready'; });
+      .then(() => { this.motion.hop(0); this.motion.idling = true; if (this.state === 'moving') this.state = 'ready'; if (this.liveAR()) this.surfaceN = this.app.world.vlock.setSurface(x, y); });
   }
   /** AR switched on or off: put Kiki where you're looking now. */
   replace() {
-    if (this.state !== 'ready' && this.state !== 'out') return;
+    if (this.state !== 'ready' && this.state !== 'out' && this.state !== 'seek') return;
+    if (this.liveAR()) { this.seek(); return; }
+    if (this.state === 'seek') { this.state = 'ready'; this.reticle.visible = false; this.popIn(); }
+    this.surfaceN = 0; this.app.world.vlock.clearSurface();
     const o = this.app.world.orient, h = o.rawHeading(this.camera.quaternion) * Math.PI / 180, d = 1.6;
     if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) - 0.06; // Kiki a little above the middle, clear of the stone in your hand
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d); this.kiki.position.copy(this.home);
@@ -146,6 +239,7 @@ export class Encounter {
   bind() {
     const gl = $('gl');
     this.onDown = e => {
+      if (this.state === 'seek') { this.placeTap = [e.clientX, e.clientY, performance.now()]; return; }
       if (this.state !== 'ready') return;
       if (!$('enc-tray').hidden) { $('enc-tray').hidden = true; return; }
       const near = this.stoneScreen().distanceTo(new THREE.Vector2(e.clientX, e.clientY)) < view.h * 0.12;
@@ -166,15 +260,18 @@ export class Encounter {
     this.onUp = e => {
       if (this.state === 'drag') return this.release(e.clientX, e.clientY);
       const t = this.placeTap; this.placeTap = null;
-      if (t && this.state === 'ready' && performance.now() - t[2] < 450 && Math.hypot(e.clientX - t[0], e.clientY - t[1]) < 14) this.placeAt(e.clientX, e.clientY);
+      if (t && performance.now() - t[2] < 450 && Math.hypot(e.clientX - t[0], e.clientY - t[1]) < 14) {
+        if (this.state === 'ready') this.placeAt(e.clientX, e.clientY);
+        else if (this.state === 'seek') { const at = this.floorAt(e.clientX, e.clientY); if (at) this.appear(at, e.clientX, e.clientY); else toast('Tap the floor (or a table) a little closer.', 2200); }
+      }
     };
     gl.addEventListener('pointerdown', this.onDown); addEventListener('pointermove', this.onMove); addEventListener('pointerup', this.onUp);
     $('enc-tap').onclick = () => this.tapThrow();
-    $('enc-back').onclick = () => { if (this.state === 'ready' || this.state === 'drag' || this.state === 'out') this.finish('left'); };
+    $('enc-back').onclick = () => { if (this.state === 'ready' || this.state === 'drag' || this.state === 'out' || this.state === 'seek') this.finish('left'); };
     $('enc-stone').onclick = () => this.tray('stone');
     $('enc-food').onclick = () => this.tray('treat');
     $('enc-ar').onclick = async () => {
-      if (this.state !== 'ready' && this.state !== 'out') return;
+      if (this.state !== 'ready' && this.state !== 'out' && this.state !== 'seek') return;
       await this.app.setEncounterAR(!this.app.arOn); $('enc-ar').textContent = this.app.arOn ? 'AR on' : 'AR off'; this.replace(); sfx('button', 0.3);
     };
   }
@@ -228,6 +325,8 @@ export class Encounter {
 
   update(dt, time) {
     this.clock += dt;
+    if (this.state === 'seek') { this.seekUpdate(dt); this.portal.userData.update(dt, time, this.camera); this.stone.visible = false; return; }
+    if (this.state !== 'reveal' && this.state !== 'done' && this.state !== 'moving') this.followSurface();
     this.motion.update(dt);
     this.portal.userData.update(dt, time, this.camera);
     this.stone.userData.update(dt, time);
@@ -299,7 +398,7 @@ export class Encounter {
     }
     if (o.result === 'caught') { this.state = 'reveal'; this.reveal(o, rw, first, steps); return; }
     if (o.result === 'fled') { this.finish('fled'); return; }
-    this.kiki.visible = true; this.motion.idling = true;
+    this.settle(); this.kiki.visible = true; this.motion.idling = true;
     this.state = 'ready'; this.stone.scale.setScalar(1); this.stone.userData.body.rotation.set(0, 0, 0); this.recolor(); this.stones();
     if (this.raid ? this.raidStones <= 0 : !(app.progress.items[this.stoneId] > 0)) this.outOfStones();
   }

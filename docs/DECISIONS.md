@@ -570,3 +570,30 @@ isn't full screen. iPhone 17".
 - Full screen: the camera picture, sky and 3D layers are fixed to the whole physical screen (100lvh), and the 3D
   canvas, touch mapping, labels and the AR lock all use the size measured from the canvas. Before, they used the
   window's inner height, which on iOS 26 Safari stops short of the screen under the floating toolbar, leaving a band.
+
+## 38. Kikis find a real surface and stay on it (owner)
+
+Owner: "the Kikis don't search for a surface in a room well enough. I hate when they float. They need to find the
+nearest surface and remain there during the capture process." Phone browsers have no AR depth or plane finding (iOS
+Safari has no WebXR), and motion sensors only know turning, so a Kiki placed on an assumed floor slid and floated as
+soon as you leaned, stepped or crouched. Now the camera picture itself decides:
+- Find a surface first. In live AR (camera and motion sensors), a catch starts with a ring on the floor where you're
+  aiming, low in the view. Kiki only pops out where the picture has enough findable little spots (specks, corners,
+  pattern: a rug, tiles, wood, a table top; not a blank wall or empty air) and the phone is held steady, shown by the
+  ring filling up. Tapping a spot puts Kiki there straight away. After 7 s any floor spot is accepted, after 14 s Kiki
+  appears anyway (never stuck). AR off or no sensors: as before.
+- Stay glued to it. When Kiki appears, the most findable spots around its feet are remembered (vtrack.js). Every new
+  camera frame they're found again; a match only counts if it's clearly the one place that patch could be (no
+  look-alike nearby: stripes, repeats) and it agrees with the others. From where they are against where turning alone
+  would have put them, a small local fit gives the feet's spot, measured afresh from the first sighting each frame,
+  so small errors never add up. Kiki's feet are put there. During the capture (stone, portal, wobbles on the ground)
+  the whole scene moves with the surface. Patches that leave the screen are found again when they come back, across
+  most of the picture if you walked meanwhile; if the spot is lost for 2 s while in view, Kiki's current spot is
+  remembered afresh. Tap-to-move remembers the new spot.
+- The picture is shrunk smoothly (high-quality filtering) so fine detail like wood grain doesn't shimmer, and only new
+  camera frames are looked at (the camera gives ~30 a second, the screen 60).
+Simulated test (a textured room; the phone held at a floor spot ~2 m away, swaying ±12°, leaning ±10 cm, crouching
+12 cm and stepping 15 cm closer): gyroscope only, Kiki's feet were 18–21 px off the spot on average (worst 47 px);
+with the surface lock 1 px on average (worst 2 px on a rug, 3 px carpet, 5 px wood), shake under 0.5 px per frame. A
+blank floor gets no lock and behaves as before. Walking half a metre while Kiki is out of view and coming back:
+found again on a rug; on harder floors Kiki is glued to the spot its feet are on when it comes back.

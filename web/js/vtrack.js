@@ -14,7 +14,13 @@ import * as THREE from '../vendor/three.module.min.js';
 
 const SW = 128;          // width of the small grey copy of the picture that is searched
 const T = 15, H = 7;     // template size (pixels of the small copy) and its half
-const R = 10;            // search radius around the predicted spot
+const RAD = 10;          // search radius around the predicted spot
+const SURF_R = 12;       // the surface under Kiki is searched further (it moves when you move, not only when you turn)
+const WIDE = 72;         // and once lost (you walked while it was out of view), across most of the picture
+const SPOT_X = 15, SPOT_Y = 12; // how far around Kiki's feet findable spots are picked
+const NSURF = 7;         // patches remembered for the surface
+const MINC = 250;        // how findable a spot must be (see corner())
+const AMBIG = 0.06;      // a match counts only if no other place looks nearly as alike
 const WANT = 7;          // anchors to keep in view
 const KEEP = 48;         // anchors remembered in all (a small map of the room: they are found again when back in view)
 const GOOD = 0.72;       // correlation needed to trust a match
@@ -29,15 +35,24 @@ export class VisualLock {
     this.q = new THREE.Quaternion(); this.qi = new THREE.Quaternion(); this.v = new THREE.Vector3();
     this.stats = { matched: 0, anchors: 0 };
   }
+  watch(video) {
+    if (this.watched === video) return;
+    this.watched = video; this.newFrame = true; this.staleN = 0;
+    const on = () => { this.newFrame = true; if (this.watched === video) video.requestVideoFrameCallback(on); };
+    video.requestVideoFrameCallback(on);
+  }
   /** Stop and forget the anchors (camera off, AR off). The drift correction is kept. */
   stop() { this.on = false; this.anchors = []; }
   focal() { return (this.h / 2) / Math.tan(this.camera.fov * Math.PI / 360); }
   /** Grab the part of the camera picture that is on screen (as shown with object-fit: cover), small and grey. */
   grab(src, screenW, screenH) {
     const vw = src.videoWidth || src.width, vh = src.videoHeight || src.height; if (!vw || !vh) return false;
-    const w = SW, h = Math.round(SW * screenH / screenW);
+    const w = SW, h = Math.round(SW * screenH / screenW); this.sw = screenW; this.sh = screenH;
     if (w !== this.w || h !== this.h) { this.w = w; this.h = h; this.canvas.width = w; this.canvas.height = h; this.gray = new Float32Array(w * h); this.anchors = []; }
     const s = Math.max(screenW / vw, screenH / vh), cw = screenW / s, ch = screenH / s;
+    // a smooth shrink: plain sampling turns fine detail (wood grain, carpet) into shimmer that can't be tracked
+    // (set each time: resizing the canvas resets it)
+    this.ctx.imageSmoothingEnabled = true; this.ctx.imageSmoothingQuality = 'high';
     this.ctx.drawImage(src, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, w, h);
     const d = this.ctx.getImageData(0, 0, w, h).data, g = this.gray;
     for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
@@ -49,18 +64,18 @@ export class VisualLock {
     const f = this.focal(); out.x = this.w / 2 + f * v.x / -v.z; out.y = this.h / 2 - f * v.y / -v.z; return out;
   }
   unproject(x, y) { const f = this.focal(); return new THREE.Vector3((x - this.w / 2) / f, -(y - this.h / 2) / f, -1).normalize().applyQuaternion(this.q); }
-  template(cx, cy) {
+  template(cx, cy, min = 36) {
     const g = this.gray, w = this.w, t = new Float32Array(T * T); let m = 0;
     for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { const v = g[(cy - H + y) * w + cx - H + x]; t[y * T + x] = v; m += v; }
     m /= T * T; let s = 0; for (let i = 0; i < t.length; i++) { t[i] -= m; s += t[i] * t[i]; }
-    if (s < T * T * 36) return null; // too flat to find again (std below ~6 grey levels)
+    if (s < T * T * min) return null; // too flat to find again (std below ~6 grey levels; 3 for the surface's picked spots)
     s = Math.sqrt(s); for (let i = 0; i < t.length; i++) t[i] /= s; return t;
   }
   /** Best match of a template within R of (px, py): sub-pixel spot and its correlation. */
-  search(t, px, py) {
+  search(t, px, py, R = RAD, step = 1) {
     const g = this.gray, w = this.w, h = this.h, n = T * T, x0 = Math.round(px), y0 = Math.round(py);
-    let best = -2, bx = 0, by = 0; const scores = new Float32Array((2 * R + 1) * (2 * R + 1));
-    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    let best = -2, bx = 0, by = 0; const scores = new Float32Array((2 * R + 1) * (2 * R + 1)).fill(-2);
+    for (let dy = -R; dy <= R; dy += step) for (let dx = -R; dx <= R; dx += step) {
       const cx = x0 + dx, cy = y0 + dy; let sc = -2;
       if (cx - H >= 0 && cy - H >= 0 && cx + H < w && cy + H < h) {
         let si = 0, sii = 0, sit = 0;
@@ -71,14 +86,18 @@ export class VisualLock {
       if (sc > best) { best = sc; bx = dx; by = dy; }
     }
     // sub-pixel: a parabola through the neighbours
+    // the best score away from the peak: nearly as high means the patch could be in more than one place (stripes, repeats)
+    let second = -2; const ex = step > 1 ? 4 : 3;
+    for (let dy = -R; dy <= R; dy += step) for (let dx = -R; dx <= R; dx += step) if (Math.abs(dx - bx) > ex || Math.abs(dy - by) > ex) { const v = scores[(dy + R) * (2 * R + 1) + dx + R]; if (v > second) second = v; }
+    if (step > 1) return { x: x0 + bx, y: y0 + by, score: best, second, edge: Math.abs(bx) >= R - step + 1 || Math.abs(by) >= R - step + 1 };
     const at = (dx, dy) => (Math.abs(dx) > R || Math.abs(dy) > R) ? best : scores[(dy + R) * (2 * R + 1) + dx + R];
     const sub = (a, b, c) => { const d = a - 2 * b + c; return d < 0 ? 0.5 * (a - c) / d : 0; };
     const ox = sub(at(bx - 1, by), best, at(bx + 1, by)), oy = sub(at(bx, by - 1), best, at(bx, by + 1));
-    return { x: x0 + bx + Math.max(-0.5, Math.min(0.5, ox)), y: y0 + by + Math.max(-0.5, Math.min(0.5, oy)), score: best, edge: Math.abs(bx) === R || Math.abs(by) === R };
+    return { x: x0 + bx + Math.max(-0.5, Math.min(0.5, ox)), y: y0 + by + Math.max(-0.5, Math.min(0.5, oy)), score: best, second, edge: Math.abs(bx) === R || Math.abs(by) === R };
   }
   /** New anchors at the most textured spots not already used (Shi-Tomasi corner strength on a grid). */
   replenish() {
-    const g = this.gray, w = this.w, h = this.h, m = R + H + 2, cands = [];
+    const g = this.gray, w = this.w, h = this.h, m = RAD + H + 2, cands = [];
     for (let cy = m; cy < h - m; cy += 5) for (let cx = m; cx < w - m; cx += 5) {
       let xx = 0, yy = 0, xy = 0;
       for (let y = -H; y <= H; y += 2) for (let x = -H; x <= H; x += 2) { const i = (cy + y) * w + cx + x, gx = g[i + 1] - g[i - 1], gy = g[i + w] - g[i - w]; xx += gx * gx; yy += gy * gy; xy += gx * gy; }
@@ -97,8 +116,15 @@ export class VisualLock {
   }
   /** One frame: find the anchors, correct the view's sideways drift and the field of view. */
   update(src, screenW, screenH) {
+    // Only new camera frames (the camera gives about 30 a second, the screen draws 60): an old frame looked at again
+    // after the phone turned would read as drift, and it's wasted work. (If the browser stops saying, carry on anyway.)
+    if (src.requestVideoFrameCallback) {
+      this.watch(src);
+      if (!this.newFrame && ++this.staleN < 12) return;
+      this.newFrame = false; this.staleN = 0;
+    }
     if (!this.grab(src, screenW, screenH)) return;
-    this.on = true; this.frame++;
+    this.on = true; this.frame++; this.fresh = true;
     this.q.copy(this.camera.quaternion); this.qi.copy(this.q).invert();
     const p = { x: 0, y: 0 }, ms = [], fs = [], cx = this.w / 2;
     // how far the phone turned since the last frame
@@ -141,4 +167,136 @@ export class VisualLock {
     // more anchors where the view has too few (only while the view is locked, so new ones start out right)
     if (this.visible < WANT && this.frame % 6 === 0 && (ms.length >= 2 || this.visible === 0)) { this.q.copy(this.camera.quaternion); this.replenish(); }
   }
+
+  // ---------- the surface under Kiki (owner: "they need to find the nearest surface and remain there during the capture") ----------
+  // The most findable little spots of the real surface around Kiki's feet (specks, corners, pattern: never plain areas
+  // or stripes such as wood grain, which a patch could slide along) are remembered. Every frame they are found again in
+  // the camera picture and Kiki's feet follow them, so Kiki stays standing on that spot of floor (or table) when you
+  // turn, lean, step or crouch: the gyroscope can only follow turning, the picture shows everything. A match only counts
+  // if it's clearly the one place that patch could be (not one of several look-alikes) and it moved the same way as the
+  // others. If the spot isn't found where it should be (you walked while it was out of view), it's searched for across
+  // most of the picture until the patches turn up again together.
+  /** How findable the small copy is at (x, y): the weaker of the two gradient directions (Shi-Tomasi). 0 for plain
+   *  areas and for stripes; high for specks and corners. */
+  corner(x, y) {
+    const g = this.gray, w = this.w; x = Math.round(x); y = Math.round(y);
+    if (x < H + 2 || y < H + 2 || x > this.w - H - 3 || y > this.h - H - 3) return 0;
+    let xx = 0, yy = 0, xy = 0;
+    for (let j = -H; j <= H; j++) for (let i = -H; i <= H; i++) { const k = (y + j) * w + x + i, gx = g[k + 1] - g[k - 1], gy = g[k + w] - g[k - w]; xx += gx * gx; yy += gy * gy; xy += gx * gy; }
+    const tr = xx + yy, det = xx * yy - xy * xy; return (tr / 2 - Math.sqrt(Math.max(0, tr * tr / 4 - det))) / 4;
+  }
+  /** The most findable spots near (x, y) of the small copy, well apart, nearer the feet first among equals. */
+  spots(x, y) {
+    const c = [];
+    for (let dy = -SPOT_Y; dy <= SPOT_Y; dy += 3) for (let dx = -SPOT_X; dx <= SPOT_X; dx += 3) {
+      const cx = Math.round(x + dx), cy = Math.round(y + dy), v = this.corner(cx, cy);
+      if (v >= MINC) c.push({ cx, cy, v: v / (1 + (dx * dx + dy * dy) / 300) });
+    }
+    c.sort((a, b) => b.v - a.v);
+    const out = [];
+    for (const s of c) { if (out.every(o => Math.hypot(o.cx - s.cx, o.cy - s.cy) >= 6)) out.push(s); if (out.length >= NSURF) break; }
+    return out;
+  }
+  /** How many findable spots the surface at a screen spot has (3 or more: Kiki can be kept on it). */
+  surfaceSpots(sx, sy) { return this.gray ? this.spots(sx * this.w / this.sw, sy * this.h / this.sh).length : 0; }
+  /** Remember the surface around a screen spot (Kiki's feet). Returns how many patches were remembered (0: none fit). */
+  setSurface(sx, sy) {
+    this.surf = null; if (!this.gray) return 0;
+    this.q.copy(this.camera.quaternion); this.qi.copy(this.q).invert();
+    const x = sx * this.w / this.sw, y = sy * this.h / this.sh, list = [];
+    for (const s of this.spots(x, y)) {
+      const t = this.template(s.cx, s.cy, 9); if (!t) continue;
+      const u = this.unproject(s.cx, s.cy); list.push({ u, dir: u.clone(), t0: t, t, ox: 0, oy: 0, hits: 0 });
+    }
+    if (list.length < 2) return 0; // one patch alone can't be checked against anything
+    this.surf = { patches: list, u: this.unproject(x, y), lost: 0 };
+    return list.length;
+  }
+  clearSurface() { this.surf = null; }
+  /** One patch near (px, py): by its first look while that still matches (so nothing creeps), else by its latest look. */
+  findPatch(a, px, py, R) {
+    let r = this.search(a.t0, px, py, R);
+    if ((r.score < 0.8 || r.second > r.score - AMBIG) && a.t !== a.t0) { const r2 = this.search(a.t, px, py, R); if (r2.score > r.score && r2.second <= r2.score - AMBIG) { r = r2; r.x -= a.ox; r.y -= a.oy; } }
+    return r;
+  }
+  /** This frame's spot of the remembered surface (screen px), or null if it can't be seen. */
+  trackSurface() {
+    const S = this.surf; if (!S || !this.fresh) return null;
+    this.fresh = false; this.qi.copy(this.camera.quaternion).invert(); this.q.copy(this.camera.quaternion);
+    const p = { x: 0, y: 0 }, ds = []; let seen = 0;
+    for (const a of S.patches) {
+      if (!this.project(a.dir, p) || p.x < H + 1 || p.y < H + 1 || p.x > this.w - H - 2 || p.y > this.h - H - 2) continue;
+      seen++;
+      const r = this.findPatch(a, p.x, p.y, SURF_R);
+      if (r.score < 0.7 || r.edge || r.second > r.score - AMBIG) continue;
+      ds.push([r.x - p.x, r.y - p.y, a, r]);
+    }
+    // enough patches must agree for a good fit: three if three or more can be seen (two alone can mislead a little)
+    const need = Math.min(3, Math.max(2, seen));
+    let m = ds.length >= 2 ? agree(ds) : null;
+    if (!m || m.length < need) {
+      if (m && m.length >= 2) return null; // nearly: just skip this frame
+      // Not found where expected. Only counts as lost while it should be in view (looking away and back is fine).
+      if (seen < 2) return null;
+      S.lost++;
+      m = this.reacquire(S); if (!m) return null;
+    }
+    S.lost = 0;
+    for (const [, , a, r] of m) {
+      a.dir = this.unproject(r.x, r.y); a.hits++;
+      // the surface looks a little different as you move: keep a fresh look too (the first look stays the reference)
+      if (a.hits % 15 === 0 && r.score < 0.9) { const cx = Math.round(r.x), cy = Math.round(r.y), t = this.template(cx, cy, 9); if (t) { a.t = t; a.ox = cx - r.x; a.oy = cy - r.y; } }
+    }
+    // Where the patches are now, against where turning alone would have put them: a small local fit (shift, plus the
+    // stretch and skew of seeing the floor from a new spot), read at the feet. Measured afresh each frame from the
+    // first sighting, so small errors never add up.
+    if (!this.project(S.u, p)) return null;
+    const fx = p.x, fy = p.y, pts = [];
+    for (const [, , a, r] of m) if (this.project(a.u, p)) pts.push([p.x - fx, p.y - fy, r.x, r.y]);
+    if (pts.length < 2) return null;
+    const A = fitAffine(pts);
+    // the patches that weren't found move along with the rest (the surface moves as one)
+    for (const a of S.patches) if (!m.some(e => e[2] === a) && this.project(a.u, p)) { const dx = p.x - fx, dy = p.y - fy; a.dir = this.unproject(A[0] * dx + A[1] * dy + A[2], A[3] * dx + A[4] * dy + A[5]); }
+    return { x: A[2] * this.sw / this.w, y: A[5] * this.sh / this.h, n: m.length };
+  }
+  /** The surface wasn't where it should be: search most of the picture (coarse, then fine) for the strongest patches,
+   *  and trust what's found only if they agree. */
+  reacquire(S) {
+    if (S.lost % 3 !== 1) return null; // a wide search costs more: every third frame is plenty
+    const p = { x: 0, y: 0 }, c = [];
+    for (const a of S.patches.slice(0, 4)) {
+      if (!this.project(a.dir, p) || p.x < 0 || p.y < 0 || p.x > this.w || p.y > this.h) continue;
+      let r0 = this.search(a.t0, p.x, p.y, WIDE, 2);
+      if (r0.score < 0.75 && a.t !== a.t0) { const r1 = this.search(a.t, p.x, p.y, WIDE, 2); if (r1.score > r0.score) r0 = r1; }
+      // (looser than frame to frame: after walking, the surface is seen from a new spot and looks a bit different;
+      // the patches having to agree with each other is what makes this safe)
+      if (r0.score < 0.62 || r0.edge || r0.second > r0.score - AMBIG / 2) continue;
+      const r = this.findPatch(a, r0.x, r0.y, 3); if (r.score >= 0.7) c.push([r.x - p.x, r.y - p.y, a, r, p.x, p.y]);
+    }
+    // agreeing allows for the stretch of seeing the surface from closer or further: more for patches further apart
+    const m = c.length >= 2 ? agree(c, (u, v) => 2.5 + 0.25 * Math.hypot(u[4] - v[4], u[5] - v[5])) : null;
+    return m && m.length >= Math.min(3, S.patches.length) ? m : null;
+  }
+}
+
+/** The biggest group of matches that moved the same way (within 2.5 px of each other, or what tol allows). */
+function agree(ds, tol = () => 2.5) {
+  let best = [];
+  for (const u of ds) { const g = ds.filter(v => Math.hypot(v[0] - u[0], v[1] - u[1]) < tol(u, v)); if (g.length > best.length) best = g; }
+  return best;
+}
+/** Least-squares X = a·dx + b·dy + c, Y = d·dx + e·dy + f, gently held to a plain shift (a = e = 1, b = d = 0) so two
+ *  patches, or patches in a line, still give a steady answer. Returns [a, b, c, d, e, f]. */
+function fitAffine(pts, lam = 40) {
+  const one = k => {
+    const M = [[lam, 0, 0], [0, lam, 0], [0, 0, 1e-6]], v = [k ? 0 : lam, k ? lam : 0, 0];
+    for (const [dx, dy, X, Y] of pts) { const r = [dx, dy, 1], z = k ? Y : X; for (let i = 0; i < 3; i++) { v[i] += r[i] * z; for (let j = 0; j < 3; j++) M[i][j] += r[i] * r[j]; } }
+    return solve3(M, v);
+  };
+  return [...one(0), ...one(1)];
+}
+function solve3(M, v) {
+  const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D = det(M);
+  return [0, 1, 2].map(c => det(M.map((row, i) => row.map((x, j) => j === c ? v[i] : x))) / D);
 }
