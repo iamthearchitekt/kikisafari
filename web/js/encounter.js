@@ -10,7 +10,7 @@ import * as C from './core.js';
 import * as R from './rules.js';
 import { makeKiki, KikiMotion, makeRuneStone, makePortal, vortexify, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
 import { EYE } from './world.js';
-import { $, hx, sfx, voice, pop, shake, toast, tuning, reducedMotion, settings } from './services.js';
+import { $, hx, sfx, voice, pop, shake, toast, tuning, reducedMotion, settings, view } from './services.js';
 import { liveStage } from './ui.js';
 
 const HAND = new THREE.Vector3(0, -0.12, -0.46), STONE_R = 0.04;
@@ -64,7 +64,7 @@ export class Encounter {
   /** Tap the floor (or a table top) and Kiki hops there. Its feet land right where you tapped. */
   placeAt(x, y) {
     if (!this.app.arOn) return;
-    const ndc = new THREE.Vector3(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1, 0.5).unproject(this.camera), dir = ndc.sub(this.camera.position).normalize();
+    const ndc = new THREE.Vector3(x / view.w * 2 - 1, -(y / view.h) * 2 + 1, 0.5).unproject(this.camera), dir = ndc.sub(this.camera.position).normalize();
     if (dir.y > -0.08) return toast('Tap the floor (or a table) where you want Kiki.', 2400);
     const t = (-EYE - this.camera.position.y) / dir.y, to = this.camera.position.clone().addScaledVector(dir, t);
     if (Math.hypot(to.x, to.z) > 4) return toast("That's too far away. Tap somewhere closer.", 2400);
@@ -148,8 +148,8 @@ export class Encounter {
     this.onDown = e => {
       if (this.state !== 'ready') return;
       if (!$('enc-tray').hidden) { $('enc-tray').hidden = true; return; }
-      const near = this.stoneScreen().distanceTo(new THREE.Vector2(e.clientX, e.clientY)) < innerHeight * 0.12;
-      if (!near && e.clientY < innerHeight * 0.65) { this.placeTap = [e.clientX, e.clientY, performance.now()]; return; }
+      const near = this.stoneScreen().distanceTo(new THREE.Vector2(e.clientX, e.clientY)) < view.h * 0.12;
+      if (!near && e.clientY < view.h * 0.65) { this.placeTap = [e.clientX, e.clientY, performance.now()]; return; }
       this.state = 'drag'; this.samples = [[e.clientX, e.clientY, performance.now() / 1000]]; this.spin = 0; this.lastDir = null; this.spinning = false;
       hx.tick(); gl.setPointerCapture && gl.setPointerCapture(e.pointerId);
     };
@@ -184,12 +184,12 @@ export class Encounter {
     $('enc-tray').hidden = true; $('enc-treat').hidden = true;
   }
 
-  stoneScreen() { const p = this.camera.localToWorld(HAND.clone()).project(this.camera); return new THREE.Vector2((p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight); }
+  stoneScreen() { const p = this.camera.localToWorld(HAND.clone()).project(this.camera); return new THREE.Vector2((p.x + 1) / 2 * view.w, (1 - p.y) / 2 * view.h); }
 
   release(x, y) {
     const now = performance.now() / 1000; let first = this.samples[0];
     for (let i = this.samples.length - 1; i >= 0; i--) if (now - this.samples[i][2] > 0.1) { first = this.samples[i]; break; }
-    const dt = Math.max(0.016, now - first[2]), vy = -(y - first[1]) / dt / innerHeight, vx = (x - first[0]) / dt / innerHeight;
+    const dt = Math.max(0.016, now - first[2]), vy = -(y - first[1]) / dt / view.h, vx = (x - first[0]) / dt / view.h;
     if (vy < 0.55) { this.state = 'ready'; return; } // too gentle: back to the hand
     const speed = Math.min(11, Math.max(1.5, vy * 2.4)) * tuning.strength;
     const q = this.camera.quaternion, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
@@ -248,7 +248,7 @@ export class Encounter {
       this.stone.userData.body.rotation.set(0, time * 0.7, 0);
       $('enc-tap').disabled = this.state !== 'ready';
     } else if (this.state === 'drag' && this.dragPos) {
-      const ndc = new THREE.Vector3(this.dragPos[0] / innerWidth * 2 - 1, -(this.dragPos[1] / innerHeight) * 2 + 1, 0.5).unproject(this.camera);
+      const ndc = new THREE.Vector3(this.dragPos[0] / view.w * 2 - 1, -(this.dragPos[1] / view.h) * 2 + 1, 0.5).unproject(this.camera);
       const dir = ndc.sub(this.camera.position).normalize(), fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
       this.stone.position.copy(this.camera.position).addScaledVector(dir, 0.46 / Math.max(0.3, dir.dot(fwd)));
       this.stone.userData.body.rotation.y = time * (this.spinning ? 16 : 0.7);
@@ -414,7 +414,7 @@ export class Encounter {
         motion.update(dt);
         // Frame Kiki in the clear space: the camera backs off so Kiki fills about 60% of it, and the picture is shifted
         // so Kiki stands in its middle (the whole screen is still drawn, so jumps can go up over the title).
-        const W = innerWidth, H = innerHeight, r = space.getBoundingClientRect(), sig = [W, H, Math.round(r.top), Math.round(r.height)].join();
+        const W = view.w, H = view.h, r = space.getBoundingClientRect(), sig = [W, H, Math.round(r.top), Math.round(r.height)].join();
         if (sig === fit || r.height < 10) return; fit = sig;
         const viewH = 0.85 * H / r.height, d = Math.max(1.2, viewH / (2 * Math.tan(15 * Math.PI / 180)));
         cam.fov = 30; cam.position.set(0, 0.3, d); cam.lookAt(0, 0.25, 0);

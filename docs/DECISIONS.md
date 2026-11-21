@@ -558,3 +558,15 @@ more (that made objects trail while turning). With nothing to lock to (a blank w
 carries on. Simulated test (a textured room filmed by a 69° camera; a gyroscope drifting 0.5°/s; the 3D camera
 starting at 62°; the phone sweeping ±25° for 30 s): gyroscope only, a placed object ends up 55→194 px off and
 growing; with the lock it settles to 2–5 px and stays there. With a realistic gyroscope: 1–4 px.
+
+## 37. Shoes; full-screen AR on iOS 26 (owner)
+
+Owner: "allow people to change between shoes, sneakers, boots, and the colour of them"; "my friend's iPhone's AR mode
+isn't full screen. iPhone 17".
+- Shoes: sneakers or boots, in any of twelve colours. Sneakers are the bodies' own, repainted (the white upper takes
+  the colour; the chunky sole stays white). Boots are a generated lace-up ankle boot: each one is sized to that
+  foot's sneaker (which is hidden, outline too), mirrored for the right foot, and carried by the foot bone so it walks
+  with the foot; jeans tuck in. Switching to boots from white shoes picks brown.
+- Full screen: the camera picture, sky and 3D layers are fixed to the whole physical screen (100lvh), and the 3D
+  canvas, touch mapping, labels and the AR lock all use the size measured from the canvas. Before, they used the
+  window's inner height, which on iOS 26 Safari stops short of the screen under the floating toolbar, leaving a band.

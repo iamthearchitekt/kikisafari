@@ -23,6 +23,8 @@ export const HAIR_FOR = [[0, 2, 3, 4, 6, 7, 9, 10], [11, 5, 12, 13, 7, 14, 8, 9,
 const HAIR_FILE = [null, null, 'short', 'spiky', 'undercut', 'bob', 'long', 'pony', 'buns', 'curly', 'locs', 'shoulder', 'longstraight', 'longbangs', 'pigtails'];
 const BEARD_FILE = [null, null, 'short', 'full', 'mustache', 'goatee']; // (1 was painted stubble: retired)
 const HAT_FILE = { 8: 'cap' }; // generated hats (the rest are built in code)
+export const SHOES = ['Sneakers', 'Boots'];
+export const SHOE_COLORS = [0xffffff, 0x1d1d22, 0x8a8f99, 0xe9dcc3, 0xc79a5b, 0x6b4a2a, 0x3e2a1c, 0xb8322a, 0x2b3a8f, 0x36b6ff, 0xff5d8f, 0x3f7a3a];
 export const SHADES = ['No shades', 'Aviators', 'Classic', 'Round', 'Sport', 'Cat-eye'];
 export const FRAMES = [0x1d1d22, 0x6b3f22, 0xc9a24a, 0xb9bdc6, 0xf4f1ea, 0xb8322a, 0x2b3a8f];
 export const LENSES = [0x23272e, 0x4a3020, 0x2c4632, 0x2763c9, 0xc9577f, 0xd59a2a];
@@ -31,21 +33,21 @@ export const bodyKey = L => `${L.sex ? 'f' : 'm'}-${L.shirt ? 'lt' : 'st'}-${'js
 const ALL_BODIES = ['m-st-j', 'm-st-s', 'm-lt-j', 'm-lt-s', 'f-st-j', 'f-st-s', 'f-st-k', 'f-lt-j', 'f-lt-s', 'f-lt-k'];
 
 // ---------- loading: each body and hairstyle on demand (yours first, the rest when they are needed) ----------
-const BASE = 'assets/explorers/', bodies = {}, hairs = [], beards = [], hats = [], pending = new Map();
+const BASE = 'assets/explorers/', bodies = {}, hairs = [], beards = [], hats = [], boots = [], pending = new Map();
 let loader = null;
 function fetchPart(kind, id) {
   const key = kind + id; if (pending.has(key)) return pending.get(key);
   loader ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const file = kind === 'body' ? `body-${id}.glb` : kind === 'beard' ? `beard-${BEARD_FILE[id]}.glb` : kind === 'hat' ? `hat-${HAT_FILE[id]}.glb` : `hair-${HAIR_FILE[id]}.glb`;
-  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[id] = prepBody(g); else if (kind === 'beard') beards[id] = prepHair(g); else if (kind === 'hat') hats[id] = prepHair(g); else hairs[id] = prepHair(g); });
+  const file = kind === 'body' ? `body-${id}.glb` : kind === 'beard' ? `beard-${BEARD_FILE[id]}.glb` : kind === 'hat' ? `hat-${HAT_FILE[id]}.glb` : kind === 'boots' ? 'shoe-boot.glb' : `hair-${HAIR_FILE[id]}.glb`;
+  const p = loader.loadAsync(BASE + file).then(g => { if (kind === 'body') bodies[id] = prepBody(g); else if (kind === 'beard') beards[id] = prepHair(g); else if (kind === 'hat') hats[id] = prepHair(g); else if (kind === 'boots') boots[0] = prepHair(g); else hairs[id] = prepHair(g); });
   p.catch(() => pending.delete(key)); pending.set(key, p); return p;
 }
 /** Loads what one look needs (its body and hairstyle). */
-export function preloadExplorer(L) { return Promise.all([fetchPart('body', bodyKey(L)), HAIR_FILE[L.hairdo] ? fetchPart('hair', L.hairdo) : null, BEARD_FILE[L.beard] ? fetchPart('beard', L.beard) : null, HAT_FILE[L.hat] ? fetchPart('hat', L.hat) : null]); }
+export function preloadExplorer(L) { return Promise.all([fetchPart('body', bodyKey(L)), HAIR_FILE[L.hairdo] ? fetchPart('hair', L.hairdo) : null, BEARD_FILE[L.beard] ? fetchPart('beard', L.beard) : null, HAT_FILE[L.hat] ? fetchPart('hat', L.hat) : null, L.boots ? fetchPart('boots', 0) : null]); }
 /** Loads every hairstyle and the bodies for one sex (or all), for the look picker. */
-export function loadExplorerKit(sex) { return Promise.all([...ALL_BODIES.filter(k => sex == null || k[0] === 'mf'[sex]).map(k => fetchPart('body', k)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null), ...BEARD_FILE.map((b, i) => b ? fetchPart('beard', i) : null), ...Object.keys(HAT_FILE).map(i => fetchPart('hat', +i))]); }
+export function loadExplorerKit(sex) { return Promise.all([...ALL_BODIES.filter(k => sex == null || k[0] === 'mf'[sex]).map(k => fetchPart('body', k)), ...HAIR_FILE.map((h, i) => h ? fetchPart('hair', i) : null), ...BEARD_FILE.map((b, i) => b ? fetchPart('beard', i) : null), ...Object.keys(HAT_FILE).map(i => fetchPart('hat', +i)), fetchPart('boots', 0)]); }
 /** True when makeExplorer3D(L) can build this look right now. */
-export const explorerReady = L => !!bodies[bodyKey(L)] && (!HAIR_FILE[L.hairdo] || !!hairs[L.hairdo]) && (!BEARD_FILE[L.beard] || !!beards[L.beard]) && (!HAT_FILE[L.hat] || !!hats[L.hat]);
+export const explorerReady = L => !!bodies[bodyKey(L)] && (!HAIR_FILE[L.hairdo] || !!hairs[L.hairdo]) && (!BEARD_FILE[L.beard] || !!beards[L.beard]) && (!HAT_FILE[L.hat] || !!hats[L.hat]) && (!L.boots || !!boots[0]);
 
 // ---------- cel shading and ink ----------
 const TOON = (() => { const t = new THREE.DataTexture(new Uint8Array([150, 205, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; return t; })();
@@ -118,10 +120,13 @@ function prepBody(g) {
   // some rigs give the head bone a turned rest pose: hair, hats and shades use an upright frame at the head instead
   const R = headBone.getWorldQuaternion(new THREE.Quaternion());
   let yMin = Infinity, yMax = -Infinity; const pts = [], neckPts = [];
+  const footJ = {}; for (const [i, b] of mesh.skeleton.bones.entries()) if (/^(Left|Right)(Foot|ToeBase)$/.test(b.name)) footJ[i] = b.name.startsWith('Left') ? 'L' : 'R';
+  let shoeTop = -Infinity, shoeMin = Infinity; const feet = { L: new THREE.Box3(), R: new THREE.Box3() }, fv = new THREE.Vector3();
   const nj = mesh.skeleton.bones.findIndex(b => b.name === 'neck');
   for (let i = 0; i < P.count; i++) {
     const y = P.getY(i); if (y < yMin) yMin = y; if (y > yMax) yMax = y;
     let dom = -1, best = -1; for (let k = 0; k < 4; k++) { const w = SW.getComponent(i, k); if (w > best) { best = w; dom = SI.getComponent(i, k); } }
+    if (footJ[dom]) { const y0 = P.getY(i); shoeTop = Math.max(shoeTop, y0); shoeMin = Math.min(shoeMin, y0); fv.fromBufferAttribute(P, i); mesh.applyBoneTransform(i, fv); fv.applyMatrix4(mesh.matrixWorld); feet[footJ[dom]].expandByPoint(fv); }
     if (dom !== hj) { if (dom === nj && i % 2 === 0) { v.fromBufferAttribute(P, i); mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(R); neckPts.push(v.x, v.y, v.z); } continue; }
     v.fromBufferAttribute(P, i); attr.expandByPoint(v);
     mesh.applyBoneTransform(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv).applyQuaternion(R); bone.expandByPoint(v);
@@ -132,12 +137,13 @@ function prepBody(g) {
   const clips = Object.fromEntries(g.animations.map(a => [a.name, a]));
   const parentWorld = {}; for (const b of mesh.skeleton.bones) parentWorld[b.name] = b.parent.getWorldQuaternion(new THREE.Quaternion());
   const boneToAttrY = y => attr.min.y + (y - bone.min.y) * (attr.max.y - attr.min.y) / (bone.max.y - bone.min.y);
-  return { gltf: g, mesh, parentWorld, headPts: new Float32Array(pts), neckPts: new Float32Array(neckPts), boneToAttrY, headBox: bone, headUpright: R.clone().invert(), attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
+  return { gltf: g, mesh, parentWorld, shoeTop, shoeMin, feet, headPts: new Float32Array(pts), neckPts: new Float32Array(neckPts), boneToAttrY, headBox: bone, headUpright: R.clone().invert(), attrHead: attr, attrY: [yMin, yMax], height: whole.max.y - whole.min.y, floor: whole.min.y, clips };
 }
 function prepHair(g) {
   const meshes = []; g.scene.traverse(o => { if (o.isMesh) { meshes.push(o); addInkNormals(o.geometry); } });
   const m = g.scene.userData.mannequin || g.userData?.mannequin;
-  return { gltf: g, meshes, box: m ? new THREE.Box3(new THREE.Vector3(...m.min), new THREE.Vector3(...m.max)) : new THREE.Box3().setFromObject(g.scene) };
+  const box = m && m.min[0] <= m.max[0] ? new THREE.Box3(new THREE.Vector3(...m.min), new THREE.Vector3(...m.max)) : new THREE.Box3().setFromObject(g.scene, true); // (no mannequin, e.g. a boot: its own size)
+  return { gltf: g, meshes, box };
 }
 
 // ---------- generated beards, rebuilt on each face ----------
@@ -218,14 +224,14 @@ function bodyMaterial(src, L, debug = 0) {
   const U = {
     uTop: { value: hex3(L.top) }, uBot: { value: hex3(L.bottom) }, uSkin: { value: hex3(L.skinC) }, uHair: { value: hex3(L.hairC) },
     uHeadC: { value: hc }, uHeadH: { value: hh }, uTopMin: { value: at(0.45) }, uBotMax: { value: at(0.6) },
-    uFace: { value: new THREE.Vector4(...(FACE[L.sex] || FACE[0])) }, uHatCut: { value: 1e9 }, uBeard: { value: L.beard || 0 }, uDebug: { value: debug },
+    uFace: { value: new THREE.Vector4(...(FACE[L.sex] || FACE[0])) }, uHatCut: { value: 1e9 }, uFootCut: { value: L.boots ? src.shoeTop + (src.shoeTop - src.shoeMin) * 0.02 : -1e9 }, uShoe: { value: hex3(L.shoeC ?? 0xffffff) }, uShoeTop: { value: src.shoeTop }, uSoleTop: { value: src.shoeMin + (src.shoeTop - src.shoeMin) * 0.25 }, uBeard: { value: L.beard || 0 }, uDebug: { value: debug },
   };
   m.userData.uniforms = U;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vKPos;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvKPos = position;');
     sh.fragmentShader = `varying vec3 vKPos;
-      uniform vec3 uTop, uBot, uSkin, uHair, uHeadC, uHeadH; uniform vec4 uFace; uniform float uTopMin, uBotMax, uBeard, uDebug, uHatCut;
+      uniform vec3 uTop, uBot, uSkin, uHair, uHeadC, uHeadH; uniform vec4 uFace; uniform float uTopMin, uBotMax, uBeard, uDebug, uHatCut, uFootCut, uShoeTop, uSoleTop; uniform vec3 uShoe;
       vec3 kHsv(vec3 c) { vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0); vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
         vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r)); float d = q.x - min(q.w, q.y); return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x); }
       float kHue(float h, float c, float w) { float d = abs(h - c); d = min(d, 1.0 - d); return 1.0 - smoothstep(w * 0.55, w, d); }
@@ -234,7 +240,7 @@ function bodyMaterial(src, L, debug = 0) {
     ` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
       {
         vec3 sc = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.0 / 2.2)), hsv = kHsv(sc);
-        if (vKPos.y > uHatCut) discard; // inside a hat
+        if (vKPos.y > uHatCut || vKPos.y < uFootCut) discard; // inside a hat, or a boot
         vec3 q = (vKPos - uHeadC) / uHeadH; // -1..1 across the head
         float sat = smoothstep(0.30, 0.46, hsv.y);
         float wTop = kHue(hsv.x, 0.27, 0.10) * sat * step(uTopMin, vKPos.y);
@@ -244,6 +250,9 @@ function bodyMaterial(src, L, debug = 0) {
         col = mix(col, uTop * clamp(hsv.z / 0.86, 0.0, 1.25), wTop);
         col = mix(col, uBot * clamp(hsv.z / 0.70, 0.0, 1.35), wBot);
         col = mix(col, uSkin * clamp(hsv.z / 0.93, 0.0, 1.15), wSkin);
+        // the sneakers in the chosen colour (the white upper; the sole stays white)
+        float wShoe = (1.0 - step(uShoeTop, vKPos.y)) * step(uSoleTop, vKPos.y) * (1.0 - smoothstep(0.16, 0.28, hsv.y)) * smoothstep(0.42, 0.6, hsv.z);
+        col = mix(col, uShoe * clamp(hsv.z / 0.9, 0.0, 1.12), wShoe);
         // (no paint on the face or scalp: hair and beards are all real 3D pieces)
         if (uDebug > 2.5) { float b = floor((q.y + 0.4) * 20.0); col = mod(b, 2.0) < 0.5 ? vec3(1.0, 0.2, 0.2) : vec3(0.2, 0.4, 1.0); if (abs(q.y) < 0.012) col = vec3(1.0); if (abs(q.y - 0.2) < 0.012) col = vec3(1.0, 1.0, 0.0); if (abs(q.y + 0.2) < 0.012) col = vec3(0.0, 1.0, 0.0); col = mix(sc, col, 0.55); }
         else if (uDebug > 1.5) { float b = floor(-q.y * 10.0); col = b == 3.0 ? vec3(1,0,1) : b == 4.0 ? vec3(1,1,0) : b == 5.0 ? vec3(1,0,0) : b == 6.0 ? vec3(0,1,0) : b == 7.0 ? vec3(0,0,1) : b == 8.0 ? vec3(0,1,1) : b == 9.0 ? vec3(1,0.5,0) : sc;
@@ -345,8 +354,9 @@ const HAIR_FIT = { scale: 1.0, y: 0.16, z: -0.12,
   // on the female head (a little rounder at the back), the styles first made for the male one sit lower and larger
   perF: { short: { scale: 1.06, y: 0.04 }, curly: { scale: 1.06, y: 0.04 }, spiky: { scale: 1.06, y: 0.04 }, locs: { scale: 1.06, y: 0.04 }, undercut: { scale: 1.06, y: 0.04 } } };
 const CAP_FIT = { scale: 1.03, y: -0.035, z: 0.0 };
+const BOOT_FIT = { len: 0.9, wide: 0.98, z: 0.0 };
 const SHADE_FIT = { w: 0.8, y: 0.09, z: 0.46 }; // width share of the head box, height (head coords, from the brows), depth
-export const _tune = { HAIR_FIT, SHADE_FIT, FACE, BEARD_FIT, CAP_FIT }; // for the dev viewer
+export const _tune = { HAIR_FIT, SHADE_FIT, FACE, BEARD_FIT, CAP_FIT, BOOT_FIT }; // for the dev viewer
 
 /**
  * An explorer about 1 unit tall, feet at y = 0, facing +z. L is a full look (see art.js lookOf): sex, shirt, legs,
@@ -359,16 +369,16 @@ export function makeExplorer3D(L, opts = {}) {
   let mesh = null; model.traverse(o => { if (o.isSkinnedMesh) mesh = o; });
   mesh.material = bodyMaterial(src, L, opts.debug); mesh.frustumCulled = false; mesh.castShadow = false;
   const bodyInk = opts.noInk ? null : inkFor(mesh);
-  /** Hides the body's head above y (head space), outline included: under a hat, or for a bald scalp. */
-  const hideHeadAbove = y => {
-    const U = mesh.material.userData.uniforms.uHatCut; U.value = src.boneToAttrY(y + hc.y);
-    if (!bodyInk) return;
-    const m = bodyInk.material.clone(), prev = m.onBeforeCompile;
-    m.onBeforeCompile = (sh, r) => { prev(sh, r); sh.uniforms.uHatCut = U;
+  // the outline follows the same cuts as the body (inside a hat, inside a boot)
+  if (bodyInk) {
+    const U = mesh.material.userData.uniforms, m = bodyInk.material.clone(), prev = m.onBeforeCompile;
+    m.onBeforeCompile = (sh, r) => { prev(sh, r); sh.uniforms.uHatCut = U.uHatCut; sh.uniforms.uFootCut = U.uFootCut;
       sh.vertexShader = 'varying float vKY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvKY = position.y;');
-      sh.fragmentShader = 'uniform float uHatCut; varying float vKY;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n  if (vKY > uHatCut) discard;'); };
+      sh.fragmentShader = 'uniform float uHatCut, uFootCut; varying float vKY;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n  if (vKY > uHatCut || vKY < uFootCut) discard;'); };
     m.customProgramCacheKey = () => 'ink-body-cut'; bodyInk.material = m;
-  };
+  }
+  /** Hides the body's head above y (head space), outline included: under a hat. */
+  const hideHeadAbove = y => { mesh.material.userData.uniforms.uHatCut.value = src.boneToAttrY(y + hc.y); };
   const headBone = mesh.skeleton.bones.find(b => b.name === 'Head');
   const hb = src.headBox, hc = hb.getCenter(new THREE.Vector3()), hs = hb.getSize(new THREE.Vector3());
   const attach = new THREE.Group(); attach.quaternion.copy(src.headUpright); attach.position.copy(hc).applyQuaternion(src.headUpright); headBone.add(attach); // the middle of the head, upright
@@ -430,6 +440,22 @@ export function makeExplorer3D(L, opts = {}) {
   if (L.glasses) {
     const F = FACE[L.sex] || FACE[0], sh = buildShades(L.glasses, L.glassC, L.lensC ?? LENSES[0], hs.x * SHADE_FIT.w); sh.position.set(0, (F[0] + SHADE_FIT.y) * hs.y / 2, hs.z * SHADE_FIT.z); attach.add(sh);
     if (!opts.noInk) { const list = []; sh.traverse(o => { if (o.isMesh && !o.userData.noInk) list.push(o); }); list.forEach(o => inkFor(o, 0.003)); }
+  }
+  // boots: the generated boot, sized to each foot's sneaker (which is hidden) and carried by the foot bone
+  if (L.boots && boots[0]) {
+    model.updateMatrixWorld(true);
+    const B = boots[0], bb = B.box, bc = bb.getCenter(new THREE.Vector3()), bs = bb.getSize(new THREE.Vector3());
+    for (const side of ['L', 'R']) {
+      const fb = src.feet[side].clone().applyMatrix4(model.matrixWorld), fc = fb.getCenter(new THREE.Vector3()), fs = fb.getSize(new THREE.Vector3());
+      if (fb.isEmpty()) continue;
+      const sz = fs.z * BOOT_FIT.len / bs.z, sx = fs.x * BOOT_FIT.wide / bs.x;
+      const boot = B.gltf.scene.clone(true); boot.scale.set(side === 'L' ? sx : -sx, sz, sz); // the right boot is the left one mirrored
+      boot.position.set(fc.x - bc.x * (side === 'L' ? sx : -sx), fb.min.y - bb.min.y * sz, fc.z - bc.z * sz + fs.z * BOOT_FIT.z);
+      root.add(boot); boot.updateMatrixWorld(true);
+      const bm = toon({ color: L.shoeC ?? 0x6b4a2a, side: THREE.DoubleSide });
+      boot.traverse(o => { if (o.isMesh) { const m = bm.clone(); m.map = o.material.map; o.material = m; if (!opts.noInk) inkFor(o, 0.003); } });
+      mesh.skeleton.bones.find(b => b.name === (side === 'L' ? 'LeftFoot' : 'RightFoot')).attach(boot);
+    }
   }
   // facial hair: a generated beard rebuilt on this face
   if (BEARD_FILE[L.beard] && beards[L.beard]) for (const part of fittedBeard(src, L.beard)) {

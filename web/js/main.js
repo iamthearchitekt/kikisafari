@@ -17,7 +17,7 @@ import { initOnline, connect, checkIn, syncProfile, openFriends, openLeagues, op
 import { cosmicCanvas } from './art.js';
 import { playMusic, musicName, setMusic } from './music.js';
 import { premium, light } from './lux.js';
-import { $, toast, panel, hx, sfx, unlockAudio, audioRunning, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist } from './services.js';
+import { $, toast, panel, hx, sfx, unlockAudio, audioRunning, setSound, settings, loadProgress, saveProgress, tuning, saveTuning, debug, saveDebug, fmtDist, view } from './services.js';
 
 const app = {
   progress: loadProgress(), progressApi: C.progressApi, caught: new Set(), mapMode: true, tasks: new Set(), encounter: null,
@@ -48,11 +48,17 @@ const freshPortraits = () => { forgetExplorerPortraits(); document.querySelector
 Promise.all([preloadExplorer(lookOf(app.progress.explorer)), preloadExplorer(lookOf({ outfit: 4 }))]).then(() => { freshPortraits(); app.map.setExplorer(); }).catch(() => {})
   .finally(() => setTimeout(() => loadExplorerKit(lookOf(app.progress.explorer).sex).then(freshPortraits).catch(() => {}), 2000));
 light(renderer, app.map.scene, 'day', 0.5); light(renderer, app.world.scene, 'day', 0.6); // soft reflections on Kikis, stones and circles
+// The camera picture, sky and 3D layers cover the whole screen (CSS: 100lvh). Their real size is measured from the
+// canvas: on iOS 26 Safari, innerHeight stops short of the screen under the floating toolbar (owner's friend, iPhone 17:
+// "AR mode isn't full screen").
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
-  for (const cam of [app.world.camera, app.map.camera]) { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
+  const c = $('gl'); view.w = c.clientWidth || innerWidth; view.h = c.clientHeight || innerHeight;
+  renderer.setSize(view.w, view.h, false);
+  for (const cam of [app.world.camera, app.map.camera]) { cam.aspect = view.w / view.h; cam.updateProjectionMatrix(); }
 }
 addEventListener('resize', resize);
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe($('gl'));
 /** Battery saver (Settings): a lighter picture (1× pixels) and 30 frames a second on the map. Catches stay smooth. */
 app.applyBattery = () => { renderer.setPixelRatio(settings.get('battery', false) ? 1 : Math.min(2, devicePixelRatio || 1)); resize(); };
 app.applyBattery();
@@ -277,7 +283,7 @@ function frame(now) {
     app.world.update(dt);
     // AR with the camera live: pin the view to the camera picture so nothing drifts (vtrack.js)
     const o = app.world.orient, v = $('cam');
-    if (stream && cameraWanted() && o.have && !o.locked && v.readyState >= 2) app.world.vlock.update(v, innerWidth, innerHeight); else if (app.world.vlock.on) app.world.vlock.stop();
+    if (stream && cameraWanted() && o.have && !o.locked && v.readyState >= 2) app.world.vlock.update(v, view.w, view.h); else if (app.world.vlock.on) app.world.vlock.stop();
     if (app.encounter && app.encounter.update) app.encounter.update(dt, time);
     if (app.mapMode && !app.encounter) { app.map.update(dt, time, app.loc.fix, app.world.orient.facing, app.world.things); renderer.render(app.map.scene, app.map.camera); }
     else renderer.render(app.world.scene, app.world.camera);

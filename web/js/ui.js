@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
+import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHOES, SHOE_COLORS, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -361,6 +361,8 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
       ${sw('top', CLOTHES, 'T-shirt colour')}
       ${chips('legs', LEGWEAR, 'Bottoms')}
       ${sw('bottom', BOTTOMS, 'Bottoms colour')}
+      ${chips('boots', SHOES, 'Shoes')}
+      ${sw('shoeC', SHOE_COLORS, 'Shoe colour')}
       ${chips('hairdo', HAIRDOS, 'Hair', [], HAIR_FOR[0], ' data-sex="0"')}${chips('hairdo', HAIRDOS, 'Hair', [], HAIR_FOR[1], ' data-sex="1"')}
       <div class="look-if" data-if="hairC">${sw('hairC', HAIR_COLORS, 'Hair colour')}</div>
       ${chips('beard', BEARDS, 'Facial hair', [1])}
@@ -398,7 +400,7 @@ export function outfitPicker(app, { first = false, onDone = () => {} } = {}) {
     s.root.querySelectorAll('.look-if').forEach(d => { d.hidden = d.dataset.if === 'hairC' ? HAIRDOS[look.hairdo] === 'Bald' && !look.beard : !look[d.dataset.if]; });
   };
   s.root.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = b.dataset.c, v = +b.dataset.v; look[k] = BY_INDEX[k] ? BY_INDEX[k].indexOf(v) : v; sfx('button', 0.25); hx.light(); render(); });
-  s.root.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { look[b.dataset.s] = +b.dataset.v; sync(); sfx('button', 0.25); hx.light(); render(); });
+  s.root.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { look[b.dataset.s] = +b.dataset.v; if (b.dataset.s === 'boots' && look.boots && look.shoeC === 0xffffff) look.shoeC = 0x6b4a2a; sync(); sfx('button', 0.25); hx.light(); render(); });
   s.root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { Object.assign(look, { ...lookOf({ outfit: +b.dataset.o }), skin: look.skin }); sfx('button', 0.3); hx.light(); render(); });
   s.q('[data-ok]').onclick = () => {
     if (first) { const n = cleanName(s.q('.name-input').value); if (!n) { hx.warning(); s.q('.name-input').focus(); return toast('Give your explorer a name!'); } e.name = n; }

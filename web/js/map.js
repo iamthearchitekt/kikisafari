@@ -6,7 +6,7 @@ import * as C from './core.js';
 import { roadHalf, insideShape } from './osm.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle, lookOf } from './art.js';
 import { STOP_COOLDOWN } from './rules.js';
-import { reducedMotion } from './services.js';
+import { reducedMotion, view } from './services.js';
 
 const DAY = { park: 0x8fd45e, woods: 0x4fa046, grass: 0xa6dc74, water: 0x45d6e6, casing: 0xb9bedd, road: 0xffffff, main: 0xffe58a, path: 0xf3dfa8, rail: 0x6b6f8c, roof: 0xf4ecff, wall: 0xcfc4ea, land: 0xe9f3d6 };
 const NIGHT = { park: 0x2e5a63, woods: 0x22434f, grass: 0x34636b, water: 0x2e4c8c, casing: 0x1c2350, road: 0x5a5f9a, main: 0x8b6fd8, path: 0x4a4f7a, rail: 0x14183a, roof: 0x6b5fa8, wall: 0x463d7a, land: 0x22304f };
@@ -110,7 +110,7 @@ function parkTrees(area, o, pal, avoid, night) {
 
 export class StreetMap {
   constructor(app) {
-    this.app = app; this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 2, 4000);
+    this.app = app; this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(38, view.w / view.h, 2, 4000);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xb0a8d8, 1.8)); const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(-200, 400, 150); this.scene.add(sun);
     this.layers = new THREE.Group(); this.scene.add(this.layers); this.things = new THREE.Group(); this.scene.add(this.things);
     this.origin = null; this.built = new Set(); this.waiting = []; this.views = new Map(); this.dist = 230; this.yaw = null; this.night = false; this.player = this.makePlayer(); this.scene.add(this.player); this.walkSpeed = 0; this.facing = 0;
@@ -229,7 +229,7 @@ export class StreetMap {
   }
 
   tap(x, y) {
-    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / view.w * 2 - 1, -(y / view.h) * 2 + 1), this.camera);
     const hits = ray.intersectObjects([...this.views.values()].map(v => v.userData.hit), false);
     if (!hits.length) return;
     // Kikis win over stops, stops over Rune Circles (their tap areas overlap when they're close together).
@@ -313,6 +313,6 @@ export class StreetMap {
     for (let i = 0; i < a.count; i++) { let y = a.getY(i) - fall; if (y < 0) y += 160; a.setY(i, y); if (this.fxKind === 'snow') a.setX(i, a.getX(i) + Math.sin(y * 0.1 + i) * 0.05); }
     a.needsUpdate = true; this.fx.position.set(this.player.position.x, 0, this.player.position.z);
   }
-  rotate(dxPx) { this.yaw = (this.yaw || 0) + dxPx / innerWidth * 180; }
+  rotate(dxPx) { this.yaw = (this.yaw || 0) + dxPx / view.w * 180; }
   zoom(f) { this.dist = Math.max(160, Math.min(1100, this.dist * f)); }
 }

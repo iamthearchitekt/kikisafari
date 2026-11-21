@@ -7,7 +7,7 @@ import { tilesFor } from './tiles.js';
 import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeBeam, Sparkles } from './art.js';
 import { meadow } from './meadow.js';
 import { VisualLock } from './vtrack.js';
-import { $, toast, hx, sfx, debug, reducedMotion, fmtDist } from './services.js';
+import { $, toast, hx, sfx, debug, reducedMotion, fmtDist, view } from './services.js';
 import { goneSet, STOP_COOLDOWN, keeperTeam, raidAt, levelOf, FACTIONS } from './rules.js';
 
 export const EYE = 1.4; // the camera is about 1.4 m above the ground
@@ -233,7 +233,7 @@ export class OsmLoader {
 
 export class WorldView {
   constructor(app) {
-    this.app = app; this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.05, 1500);
+    this.app = app; this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(62, view.w / view.h, 0.05, 1500);
     this.scene.add(this.camera);
     this.scene.add(new THREE.HemisphereLight(0xfff5e0, 0x8a80c0, 1.6));
     const sun = new THREE.DirectionalLight(0xfff5e0, 2.0); sun.position.set(-3, 6, 4); this.scene.add(sun);
@@ -359,7 +359,7 @@ export class WorldView {
   }
 
   updateLabels() {
-    const el = $('labels'), used = new Set(), w = innerWidth, h = innerHeight, v3 = new THREE.Vector3();
+    const el = $('labels'), used = new Set(), w = view.w, h = view.h, v3 = new THREE.Vector3();
     if (this.app.mapMode) { el.hidden = true; return; } el.hidden = false;
     for (const [id, v] of this.views) {
       const t = v.userData.thing, lift = t.kind === 'circle' ? 3.9 : t.kind === 'stop' ? 2.8 : 1.15 * v.scale.y;
@@ -380,7 +380,7 @@ export class WorldView {
   }
 
   tap(x, y) {
-    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(x / view.w * 2 - 1, -(y / view.h) * 2 + 1), this.camera);
     const hits = ray.intersectObjects([...this.views.values()].map(v => v.userData.hit), false);
     const rank = h => ({ kiki: 0, stop: 1, circle: 2 }[h.object.userData.hitFor.userData.thing.kind] ?? 3);
     hits.sort((a, b) => rank(a) - rank(b) || a.distance - b.distance);

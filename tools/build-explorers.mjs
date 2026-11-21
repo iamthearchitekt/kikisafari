@@ -62,11 +62,11 @@ for (const X of fs.readdirSync(rawDir).filter(f => f.endsWith('-walk.glb')).map(
 
 // ---------- hairstyles ----------
 const YAW = { spiky: 0, goatee: 90 }; // degrees about y; the rest are -90 (the goatee came out facing the other way)
-for (const f of fs.readdirSync(rawDir).filter(f => /^(hair|beard|hat)-.*\.glb$/.test(f))) {
+for (const f of fs.readdirSync(rawDir).filter(f => /^(hair|beard|hat|shoe)-.*\.glb$/.test(f))) {
   const isBeard = f.startsWith('beard-'), skin = []; // beards: the mannequin's skin, to measure how far each tuft stands off it
   const doc = await io.read(path.join(rawDir, f)), root = doc.getRoot();
   // turn the piece to face +z (Tripo's models face +x)
-  const yaw = (YAW[f.replace(/^(hair|beard|hat)-/, '').slice(0, -4)] ?? -90) * Math.PI / 180, qy = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
+  const yaw = (YAW[f.replace(/^(hair|beard|hat|shoe)-/, '').slice(0, -4)] ?? -90) * Math.PI / 180, qy = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
   const qmul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
   if (yaw) for (const n of root.listScenes()[0].listChildren()) { const t = n.getTranslation(), c = Math.cos(yaw), sn = Math.sin(yaw); n.setTranslation([t[0] * c + t[2] * sn, t[1], -t[0] * sn + t[2] * c]); n.setRotation(qmul(qy, n.getRotation())); }
   const tex = root.listTextures()[0], img = await decode(tex), at = sampler(img);

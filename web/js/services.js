@@ -19,6 +19,9 @@ export function reducedMotion() {
 }
 export const tuning = Object.assign({ strength: 1, ringPeriod: 2.4, aimAssist: 0.35, odds: 1, gravity: 9.81, hitRadius: 0.26 }, settings.get('tuning', {}));
 export const saveTuning = () => settings.set('tuning', tuning);
+/** The size of the 3D view on screen (the whole screen, measured from the canvas; main.js keeps it current). Use this,
+ * not innerWidth/innerHeight, which on iOS 26 Safari stop short of the screen under the floating toolbar. */
+export const view = { w: typeof innerWidth === 'number' ? innerWidth : 390, h: typeof innerHeight === 'number' ? innerHeight : 844 };
 export const debug = Object.assign({ night: false, surge: false, home: true }, settings.get('debug', {}));
 export const saveDebug = () => settings.set('debug', debug);
 

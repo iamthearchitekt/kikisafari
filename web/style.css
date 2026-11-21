@@ -49,10 +49,12 @@ button { font: inherit; color: inherit; }
 .perm-status { color: var(--muted); font-size: 15px !important; min-height: 1.2em; margin-top: 14px !important; }
 
 /* Game */
-#cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
-#sky { position: absolute; inset: 0; background: linear-gradient(#36b6ff, #d9f1ff 55%, #8fd45e 55.2%, #6cbf45); }
+/* the camera picture, sky and 3D cover the whole physical screen (100lvh reaches under iOS 26 Safari's floating toolbar) */
+#cam, #sky, #gl { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100lvh; }
+#cam { object-fit: cover; background: #000; }
+#sky { background: linear-gradient(#36b6ff, #d9f1ff 55%, #8fd45e 55.2%, #6cbf45); }
 #sky.night { background: linear-gradient(#1f0c52, #52298c 55%, #26325a 55.2%, #1c2546); }
-#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#gl { display: block; }
 #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .label { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-family: 'Lilita One'; font-weight: 400; font-size: 15px; padding: 3px 10px 4px; border-radius: 12px; box-shadow: 0 3px 0 var(--navy); border-width: 2px; }
 .label.tap { background: #fff27a; }

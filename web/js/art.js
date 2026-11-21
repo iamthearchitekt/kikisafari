@@ -4,8 +4,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { rng, hash, variant } from './core.js';
 import { premium, light } from './lux.js';
-import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES } from './explorer3d.js';
-export { preloadExplorer, loadExplorerKit, explorerReady, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES };
+import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, SHOES, SHOE_COLORS } from './explorer3d.js';
+export { preloadExplorer, loadExplorerKit, explorerReady, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, SHOES, SHOE_COLORS };
 
 export const EGG_H = 1.15, GROUND = EGG_H + 0.12, BODY_H = GROUND + EGG_H;
 const C = h => new THREE.Color(h);
@@ -912,8 +912,8 @@ export const OUTFITS = [
   ['Flower Child', { sex: 1, shirt: 1, legs: 0, hairdo: 12, body: 2, style: 2, hair: 2, hairC: 0xf2cf6b, hat: 5, hatC: 0xff5d8f, top: 0xfff2c4, topPat: 7, bottom: 0x36b6ff, botPat: 0, pants: 1, shoes: 0xc79a5b, pack: 0xff8a00, bag: 3, glasses: 3, glassC: 0xc9a24a, lens: 5, eyes: 0x2f8f3a, kandi: 1 }],
   ['Ranger Rue', { sex: 1, shirt: 1, legs: 0, hairdo: 7, body: 1, style: 2, hair: 2, hairC: 0x9b3d22, hat: 7, hatC: 0x7a5a2a, top: 0xffcf2e, bottom: 0x2f6b3a, shoes: 0x3a2a1a, pack: 0x3fae2a, bag: 0, eyes: 0x2f8f3a, kandi: 1 }],
 ];
-export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem', 'beard', 'body', 'style', 'sex', 'shirt', 'legs', 'hairdo', 'lens'];
-const LIMITS = { body: 3, style: 8, sex: 2, shirt: 2, legs: 3, hairdo: HAIRDOS.length, lens: LENSES.length, beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: SHADES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
+export const LOOK_KEYS = ['skin', 'hair', 'hat', 'hairC', 'hatC', 'top', 'bottom', 'shoes', 'pack', 'eyes', 'topPat', 'botPat', 'pants', 'glasses', 'glassC', 'bag', 'kandi', 'gloves', 'totem', 'beard', 'body', 'style', 'sex', 'shirt', 'legs', 'hairdo', 'lens', 'boots', 'shoeC'];
+const LIMITS = { boots: 2, body: 3, style: 8, sex: 2, shirt: 2, legs: 3, hairdo: HAIRDOS.length, lens: LENSES.length, beard: BEARDS.length, skin: SKINS.length, hair: HAIR_STYLES.length, hat: HATS.length, glasses: SHADES.length, bag: BAGS.length, topPat: PATTERNS.length, botPat: PATTERNS.length, pants: LEGS.length, kandi: 2, gloves: 2, totem: 2 };
 /** A full look from a saved explorer (or a friend's avatar): { look } or the old { outfit, skin }. */
 export function lookOf(e = {}) {
   // A saved look keeps what it has, and anything added to the game later (beards, shades…) starts as "none"; only
@@ -923,6 +923,7 @@ export function lookOf(e = {}) {
   const base = e.look ? { ...none, ...preset, beard: 0, glasses: 0, kandi: 0, gloves: 0, totem: 0, topPat: 0, botPat: 0, pants: 0, bag: 0 } : { ...none, ...preset };
   if (e.skin != null) base.skin = OLD_SKIN[e.skin] ?? 2;
   const out = { ...base, ...(e.look || {}) };
+  if (out.boots == null) out.boots = 0; if (out.shoeC == null) out.shoeC = 0xffffff;
   // looks saved before the 3D explorers: pick the nearest cut and hairstyle
   if (e.look && e.look.body == null) out.body = out.pants ? 2 : 0;
   if (e.look && e.look.style == null) out.style = OLD_HAIR_TO_STYLE[out.hair] ?? 0;
