@@ -3,7 +3,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHOES, SHOE_COLORS, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
+import { makeKiki, KikiMotion, dropShapes, portrait, OUTFITS, SKINS, Sparkles, makeExplorer, lookOf, encodeLook, BEARDS, HATS, HAIR_COLORS, CLOTHES, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHOES, SHOE_COLORS, SHADES, FRAMES, LENSES, loadExplorerKit, preloadExplorer, explorerReady, forgetExplorerPortraits } from './art.js';
 import { $, toast, panel, hx, sfx, voice, settings, reducedMotion, wait, fmtDist, fmtKm } from './services.js';
 import { openShop, openPrivacy } from './shop.js';
 import { setMusic } from './music.js';
@@ -62,7 +62,12 @@ export function liveStage(container, build) {
 /** A Kiki on a little stand that you can spin with a finger. */
 function kikiStage(container, sp, sparkle = false) {
   return liveStage(container, (scene, cam) => {
-    cam.position.set(0, 0.95, 4.4); cam.lookAt(0, 0.68, 0);
+    // framed for the biggest Kiki of its family, so you see it's smaller than what it evolves into (and when it
+    // evolves, it grows in front of you), and nothing in the family is ever cut off
+    const fam = C.variant(sp).family || sp; let top = 1;
+    for (const v of C.VARIANTS) if ((v.family || v.id) === fam) { const t = makeKiki(v.id, 1); t.remove(t.userData.shadow); top = Math.max(top, new THREE.Box3().setFromObject(t).max.y); dropShapes(t); }
+    const mid = (top - 0.12) / 2, dist = Math.max(3.2, (top + 0.4) / 2 / Math.tan(cam.fov * Math.PI / 360) * 1.06);
+    cam.position.set(0, mid + 0.28, dist); cam.lookAt(0, mid, 0);
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.82, 0.08, 40), new THREE.MeshStandardMaterial({ color: 0xfff8de, roughness: 0.8 })); pad.position.y = -0.04; scene.add(pad);
     const holder = new THREE.Group(); scene.add(holder); const sparkles = new Sparkles(scene);
     let k, motion, spin = 0.3, vel = 0;

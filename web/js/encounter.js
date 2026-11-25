@@ -46,7 +46,8 @@ export class Encounter {
     this.home = new THREE.Vector3(Math.sin(h) * d, -EYE, -Math.cos(h) * d);
     // No motion sensors (stand-in or a computer): tilt the view down to Kiki.
     if (!o.have || o.locked) o.pitch = -Math.atan2(EYE - 0.25, d) - 0.06; // Kiki a little above the middle, clear of the stone in your hand
-    this.kiki = makeKiki(this.v.id, 0.42 * (this.rec.h / this.v.cm) ** 0.5, !!this.rec.sparkle); this.kiki.position.copy(this.home); this.group.add(this.kiki);
+    // (this one's own size varies a little, never enough to look like a bigger kind)
+    this.kiki = makeKiki(this.v.id, 0.42 * C.individualSize(this.rec.h, this.v.cm), !!this.rec.sparkle); this.kiki.position.copy(this.home); this.group.add(this.kiki);
     this.kiki.rotation.y = Math.atan2(-this.home.x, -this.home.z);
     this.motion = new KikiMotion(this.kiki, reducedMotion);
     this.scale = this.kiki.scale.x;
@@ -515,8 +516,10 @@ export class Encounter {
         // so Kiki stands in its middle (the whole screen is still drawn, so jumps can go up over the title).
         const W = view.w, H = view.h, r = space.getBoundingClientRect(), sig = [W, H, Math.round(r.top), Math.round(r.height)].join();
         if (sig === fit || r.height < 10) return; fit = sig;
-        const viewH = 0.85 * H / r.height, d = Math.max(1.2, viewH / (2 * Math.tan(15 * Math.PI / 180)));
-        cam.fov = 30; cam.position.set(0, 0.3, d); cam.lookAt(0, 0.25, 0);
+        // (framed by this Kiki's own height, crown and all: a big Legendary is never cut off)
+        if (!this.revealBox) { const sh = k.userData.shadow; k.remove(sh); const v0 = k.visible; k.visible = true; this.revealBox = new THREE.Box3().setFromObject(k); k.visible = v0; k.add(sh); }
+        const kh = Math.max(0.5, this.revealBox.max.y), cy = kh * 0.5, viewH = 0.85 * H / r.height * (kh / 0.5), d = Math.max(1.2, viewH / (2 * Math.tan(15 * Math.PI / 180)));
+        cam.fov = 30; cam.position.set(0, cy + 0.05, d); cam.lookAt(0, cy, 0);
         cam.setViewOffset(W, H, 0, -((r.top + r.height * 0.52) - H / 2), W, H); cam.updateProjectionMatrix();
       } };
     });

@@ -2,7 +2,7 @@
 // the Unity project's Core/Art: chubbier pear body, bigger grin, bolder mirrored spirals, a V-folded leaf fan, and the
 // six variants' crowns, markings and glow. Kikis are little creatures, not stuffed toys (owner): smooth skin, no seams. Plus the Rune Stone, the portal, Rune Circles and sparkles.
 import * as THREE from '../vendor/three.module.min.js';
-import { rng, hash, variant } from './core.js';
+import { rng, hash, variant, kikiSize } from './core.js';
 import { premium, light } from './lux.js';
 import { mergeGeometries, mergeVertices } from '../vendor/addons/utils/BufferGeometryUtils.js';
 import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, SHOES, SHOE_COLORS } from './explorer3d.js';
@@ -19,7 +19,7 @@ function shift(hex, dh = 0.42, dl = 0.04, sm = 1.05) { const c = C(hex), hsl = {
 const shiftCss = (css, dh) => HEX(shift(parseInt(css.slice(1), 16), dh, 0));
 export function lookFor(id, sparkle = false) {
   const v = variant(id);
-  const look = { crown: 'canon', leaf: 0x38a626, tip: 0x92e25c, body: 0xffc928, rainbow: false, gold: false, belly: null, stars: false, glow: false, scale: 1, ...((v && v.look) || {}) };
+  const look = { crown: 'canon', leaf: 0x38a626, tip: 0x92e25c, body: 0xffc928, rainbow: false, gold: false, belly: null, stars: false, glow: false, ...((v && v.look) || {}), scale: kikiSize(v.id) }; // (size by rarity and evolution: core.kikiSize)
   if (!sparkle) return look;
   const out = { ...look, sparkle: true, body: shift(look.body, look.body === 0xffc928 ? 0.8 : 0.42, 0.1, 0.7) };
   for (const k of ['leaf', 'tip', 'c1', 'c2']) if (typeof out[k] === 'number' && out[k] > 16) out[k] = shift(out[k]);

@@ -33,6 +33,21 @@ export const RARITY = {
 import { SPECIES } from './species.js';
 export const VARIANTS = SPECIES;
 export const variant = id => VARIANTS.find(v => v.id === id) || VARIANTS[0];
+// How big each Kiki is drawn (owner: "make sure when they evolve they get larger … a common Kiki should never be
+// larger"). By rarity, each step about 25% bigger, so a Common is never bigger than a rarer Kiki; and every evolution
+// is bigger than what it evolved from (a step up in rarity, or at least 15% more if it stays the same rarity). One
+// Kiki to the next of the same kind varies by at most ±5% (SIZE_VARY), never enough to cross into the next size.
+export const SIZE_BY_RARITY = { Common: 0.8, Rare: 1.0, Epic: 1.22, Legendary: 1.4 };
+export const SIZE_VARY = 0.05;
+const preEvo = Object.fromEntries(VARIANTS.filter(v => v.evolvesTo).map(v => [v.evolvesTo, v.id]));
+const sizeCache = new Map();
+export function kikiSize(id) {
+  if (sizeCache.has(id)) return sizeCache.get(id);
+  const v = variant(id), own = SIZE_BY_RARITY[v.rarity] || 1, from = preEvo[id] ? kikiSize(preEvo[id]) * 1.15 : 0;
+  const s = Math.max(own, from); sizeCache.set(id, s); return s;
+}
+/** This one Kiki's size against its kind's (from its height), kept within ±SIZE_VARY. */
+export const individualSize = (h, cm) => Math.max(1 - SIZE_VARY, Math.min(1 + SIZE_VARY, Math.sqrt((h || cm) / cm)));
 
 // ---------- spawning ----------
 export const WINDOW = 15 * 60, MIN_DUR = 15 * 60, MAX_DUR = 30 * 60;

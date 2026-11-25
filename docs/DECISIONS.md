@@ -669,3 +669,17 @@ don't appear dumb or half-assed". Every Kiki was rendered and reviewed; crowns t
   snowline and a flag); Hemlock Holly's frosted tips are a soft frost green instead of metallic white.
 - Stars everywhere are soft cushion shapes. The heaviest Kiki is now ~33k triangles (was ~24k), still light enough
   for the map and catches.
+
+## 42. Kikis grow when they evolve; a Common is never bigger (owner)
+
+Owner: "make sure when they evolve they get larger … a common Kiki should never be larger". Each species had its own
+size (look.scale, 0.78–1.2), so three Commons (Meadow, Pine, Lily) were as big as most Rares, and Sanctuary Sadie (a
+Rare evolution) was smaller than them. Now size comes from one rule (core.kikiSize): by rarity, Common 0.8, Rare 1.0,
+Epic 1.22, Legendary 1.4 (each step about 25%), and every evolution at least 15% bigger than what it evolved from
+(always true here, since every evolution is a step up in rarity). One Kiki to the next of the same kind varies by at
+most ±5% (it was up to about ±15%), so even the biggest Common is smaller than the smallest Rare. Tests check both
+rules for every Kiki. Everywhere a Kiki is drawn in 3D uses it: the map, catches, battles, raids, hatching, your
+buddy. A Kiki's page is framed for the biggest Kiki of its family, so you see a Kiki is smaller than what it becomes,
+and when it evolves it grows in front of you. The caught screen frames each Kiki by its own height, crown and all, so
+a big Legendary is never cut off, and raid bosses are drawn a little smaller to make room for Legendaries' new size.
+The list's little pictures still fill their cards.

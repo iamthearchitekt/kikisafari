@@ -427,5 +427,13 @@ test('looks round-trip through their short text key, old keys still decode', () 
   const old = A.encodeLook(L).split('.').slice(0, 20).join('.'); // a friend on an older version sends fewer keys
   assert.equal(A.lookOf({ look: A.decodeLook(old) }).sex, 0);
 });
+test('every evolution is bigger than what it evolved from', () => {
+  for (const v of C.VARIANTS) if (v.evolvesTo) assert.ok(C.kikiSize(v.evolvesTo) > C.kikiSize(v.id) * 1.1, `${v.evolvesTo} not bigger than ${v.id}`);
+});
+test('a Common is never bigger than a rarer Kiki, even the biggest Common next to the smallest of a rarer kind', () => {
+  const lo = 1 - C.SIZE_VARY, hi = 1 + C.SIZE_VARY;
+  for (const a of C.VARIANTS) for (const b of C.VARIANTS) if (C.RARITY[a.rarity].order < C.RARITY[b.rarity].order) assert.ok(C.kikiSize(a.id) * hi < C.kikiSize(b.id) * lo, `${a.id} can look as big as ${b.id}`);
+  assert.equal(C.individualSize(1000, 40), hi); assert.equal(C.individualSize(1, 40), lo); assert.equal(C.individualSize(40, 40), 1);
+});
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

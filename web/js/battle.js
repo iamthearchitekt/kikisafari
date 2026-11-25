@@ -91,7 +91,7 @@ export function runBattle(app, { mine, theirs, title, raid = false, time = 120, 
     const scene = st.api.scene;
     const put = (side, f) => {
       const old = side ? B : A; if (old) scene.remove(old);
-      const h = side ? (raid ? 1.35 : 0.8) : 0.7, k = makeKiki(f.sp, h, f.sparkle), pos = side ? PB : PA; k.position.copy(pos);
+      const h = side ? (raid ? 1.12 : 0.8) : 0.7, k = makeKiki(f.sp, h, f.sparkle), pos = side ? PB : PA; k.position.copy(pos);
       k.rotation.y = Math.atan2((side ? PA : PB).x - pos.x, (side ? PA : PB).z - pos.z); k.userData.s = k.scale.x; scene.add(k);
       const m = new KikiMotion(k, reducedMotion);
       if (side) { B = k; motB = m; } else { A = k; motA = m; }
