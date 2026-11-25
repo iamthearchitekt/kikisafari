@@ -621,3 +621,17 @@ triangles, script time, memory, downloads) and a screenshot tour at phone size f
   extruded sides cost 214k and was cut).
 - The map credits were a three-line white box over the top-right corner, often on top of a Kiki: now one slim line.
 - Full-screen pages get a softer background (a glow at the top, a faint dot pattern, a hint of purple at the bottom).
+
+## 40. Lighter Kikis on the map (owner)
+
+Owner picked "Kikis on the map: simpler versions in the distance". The distant Kikis are the rustling leaves (any Kiki
+over 70 m away), often thirty or more at once, and they were the map's biggest cost: eight separate draws each (seven
+leaves and a shadow), with new shapes and materials made for every one (and never freed as you walked on).
+- A rustle's leaves only ever move together, so they're one shape, shared with its material and shadow by every
+  rustle: two draws each instead of eight (a busy Denver street: 280 → 70 draws).
+- Rustles over 150 m from you use a simpler tuft (a quarter of the triangles); up close they're as before.
+- A Rune Circle's seven standing stones are one shape (17 → 11 draws per circle).
+- Shapes every map thing of a kind uses (the rarity ring, the tap target) are made once; a thing's own shapes are
+  freed from the graphics chip when it's left behind (shared ones stay).
+Settled busy map, measured: 155 draws / 534k triangles a frame before today's passes, 107 / 528k now (including the
+new building shadows); graphics buffers in use 2,580 → 1,260. Kikis within 70 m stay full 3D: they're the stars.

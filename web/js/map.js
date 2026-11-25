@@ -4,13 +4,16 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import { roadHalf, insideShape } from './osm.js';
-import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle, lookOf } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makeCircle, makeExplorer, makeRustle, lookOf, dropShapes } from './art.js';
 import { STOP_COOLDOWN } from './rules.js';
 import { reducedMotion, view } from './services.js';
 
 const DAY = { park: 0x8fd45e, woods: 0x4fa046, grass: 0xa6dc74, water: 0x45d6e6, casing: 0xb9bedd, road: 0xffffff, main: 0xffe58a, path: 0xf3dfa8, rail: 0x6b6f8c, roof: 0xf4ecff, wall: 0xcfc4ea, land: 0xe9f3d6 };
 const NIGHT = { park: 0x2e5a63, woods: 0x22434f, grass: 0x34636b, water: 0x2e4c8c, casing: 0x1c2350, road: 0x5a5f9a, main: 0x8b6fd8, path: 0x4a4f7a, rail: 0x14183a, roof: 0x6b5fa8, wall: 0x463d7a, land: 0x22304f };
 const MAJOR = new Set(['motorway', 'trunk', 'primary', 'secondary']);
+// shapes every map thing of a kind uses (made once; marked shared so freeing a thing leaves them alone)
+const share = g => { g.userData.shared = true; return g; };
+const SHARED = { kikiRing: share(new THREE.RingGeometry(5, 6.6, 48)), hit: share(new THREE.SphereGeometry(8, 8, 6)), hitBig: share(new THREE.SphereGeometry(9, 8, 6)), hidden: new THREE.MeshBasicMaterial({ visible: false }) };
 
 class Layer {
   constructor() { this.pos = []; this.col = []; }
@@ -218,7 +221,7 @@ export class StreetMap {
       const r = makeRustle(); r.scale.setScalar(4); g.add(r); g.userData.rustle = r; g.userData.hidden = true;
     } else if (t.kind === 'kiki') {
       const k = makeKiki(t.variant.id, 10); k.rotation.y = Math.PI * 0.85; g.add(k); g.userData.motion = new KikiMotion(k, reducedMotion); g.userData.kiki = k;
-      const r = new THREE.Mesh(new THREE.RingGeometry(5, 6.6, 48), new THREE.MeshBasicMaterial({ color: C.RARITY[t.variant.rarity].main, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r);
+      const r = new THREE.Mesh(SHARED.kikiRing, new THREE.MeshBasicMaterial({ color: C.RARITY[t.variant.rarity].main, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.y = 0.3; r.renderOrder = -3; g.add(r);
       g.userData.base = k.scale.x; k.scale.setScalar(0.0001); g.userData.pop = 0; // pops up out of the leaves
     } else if (t.kind === 'stop') {
       const s = makeRuneStone(0.04); s.scale.setScalar(110); s.position.y = 9; g.add(s); g.userData.stone = s;
@@ -227,7 +230,7 @@ export class StreetMap {
     } else {
       const c = makeCircle(t.variant.id); c.scale.setScalar(3.6); g.add(c); g.userData.circle = c;
     }
-    const hit = new THREE.Mesh(new THREE.SphereGeometry(t.kind === 'circle' ? 9 : 8, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = t.kind === 'circle' ? 5 : 6; hit.userData.hitFor = g; g.add(hit); g.userData.hit = hit;
+    const hit = new THREE.Mesh(t.kind === 'circle' ? SHARED.hitBig : SHARED.hit, SHARED.hidden); hit.position.y = t.kind === 'circle' ? 5 : 6; hit.userData.hitFor = g; g.add(hit); g.userData.hit = hit;
     return g;
   }
 
@@ -253,11 +256,14 @@ export class StreetMap {
     for (const t of things) {
       if (t.distance > 400) continue; keep.add(t.id);
       let v = this.views.get(t.id);
-      if (v && t.kind === 'kiki' && !!v.userData.hidden !== t.distance > C.VISIBLE + (v.userData.hidden ? 0 : 8)) { this.things.remove(v); this.views.delete(t.id); v = null; } // came into view (or left it)
+      if (v && t.kind === 'kiki' && !!v.userData.hidden !== t.distance > C.VISIBLE + (v.userData.hidden ? 0 : 8)) { this.things.remove(v); dropShapes(v); this.views.delete(t.id); v = null; } // came into view (or left it)
       if (!v) { v = this.makeThing(t); this.views.set(t.id, v); this.things.add(v); v.position.copy(this.local(t.where)); }
       v.userData.thing = t; v.position.lerp(this.local(t.where), 1 - Math.exp(-dt * 4));
       if (v.userData.motion) v.userData.motion.update(dt);
-      if (v.userData.rustle) v.userData.rustle.userData.update(dt);
+      if (v.userData.rustle) { // distant Kikis: a simpler tuft far off (over 150 m from you)
+        const far = t.distance > 150; if (v.userData.far !== far) { v.userData.far = far; v.userData.rustle.userData.setFar(far); }
+        v.userData.rustle.userData.update(dt);
+      }
       if (v.userData.kiki && v.userData.pop < 1) { v.userData.pop = Math.min(1, v.userData.pop + dt * 2.5); const k = v.userData.pop, s = 1 + Math.sin(k * Math.PI) * 0.25; v.userData.kiki.scale.setScalar(Math.max(0.0001, k * s) * v.userData.base); }
       if (v.userData.stone) {
         const ready = !this.app.progress.stops[t.id] || Math.floor(Date.now() / 1000) - this.app.progress.stops[t.id] >= STOP_COOLDOWN;
@@ -268,7 +274,7 @@ export class StreetMap {
       else if (v.userData.track) { v.remove(v.userData.track); v.userData.track = null; }
       if (v.userData.circle) { v.userData.circle.userData.portal.userData.update(dt, time, this.camera); v.userData.circle.userData.setKeeper(t.raid ? t.raid.sp : t.variant.id); v.userData.circle.userData.setColor(t.raid ? 0xff2d8a : t.color || 0x7a00ff); if (v.userData.circle.userData.motion) v.userData.circle.userData.motion.update(dt); }
     }
-    for (const [id, v] of this.views) if (!keep.has(id)) { this.things.remove(v); this.views.delete(id); }
+    for (const [id, v] of this.views) if (!keep.has(id)) { this.things.remove(v); dropShapes(v); this.views.delete(id); } // (left behind as you walk: freed)
   }
 
   tap(x, y) {

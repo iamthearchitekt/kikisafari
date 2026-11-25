@@ -8,7 +8,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as C from './core.js';
 import * as R from './rules.js';
-import { makeKiki, KikiMotion, makeRuneStone, makePortal, vortexify, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND } from './art.js';
+import { makeKiki, KikiMotion, makeRuneStone, makePortal, vortexify, makeTreat, cosmicCanvas, portrait, easeOutBack, BODY_H, GROUND, dropShapes } from './art.js';
 import { EYE } from './world.js';
 import { $, hx, sfx, voice, pop, shake, toast, tuning, reducedMotion, settings, view } from './services.js';
 import { liveStage } from './ui.js';
@@ -559,7 +559,7 @@ export class Encounter {
   finish(why) {
     this.state = 'done'; this.unbind(); this.scene.remove(this.group);
     // free this catch's buffers on the graphics chip (shared shapes are simply sent again next time they're drawn)
-    this.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); $('enc-hud').hidden = true; $('hud').hidden = false; $('enc-tap').disabled = false; this.hint(null);
+    dropShapes(this.group); $('enc-hud').hidden = true; $('hud').hidden = false; $('enc-tap').disabled = false; this.hint(null);
     this.onDone(why);
   }
 }

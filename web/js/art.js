@@ -4,6 +4,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { rng, hash, variant } from './core.js';
 import { premium, light } from './lux.js';
+import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 import { makeExplorer3D, explorerReady, preloadExplorer, loadExplorerKit, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, SHOES, SHOE_COLORS } from './explorer3d.js';
 export { preloadExplorer, loadExplorerKit, explorerReady, SEXES, SHIRTS, LEGWEAR, HAIRDOS, HAIR_FOR, SHADES, FRAMES, LENSES, SHOES, SHOE_COLORS };
 
@@ -118,7 +119,8 @@ function normalMap(belly) {
 
 // ---------- geometry ----------
 const geoCache = new Map();
-const cached = (k, f) => { if (!geoCache.has(k)) geoCache.set(k, f()); return geoCache.get(k); };
+// (shapes kept here are shared by many objects: marked so clean-ups leave them alone)
+const cached = (k, f) => { if (!geoCache.has(k)) { const g = f(); if (g && g.userData) g.userData.shared = true; geoCache.set(k, g); } return geoCache.get(k); };
 
 function eggGeometry() {
   return cached('egg', () => {
@@ -168,8 +170,8 @@ function hsv(h, s, v) {
   return new THREE.Color(f(5), f(3), f(1));
 }
 /** One leaf, stem at z=0 to tip at z=1: folded up along the midrib, arching with a drooping tip. */
-export function leafGeometry(width, round, base, tip, strongTip) {
-  const g = new THREE.SphereGeometry(1, 14, 22); g.rotateX(Math.PI / 2);
+export function leafGeometry(width, round, base, tip, strongTip, detail = 1) {
+  const g = new THREE.SphereGeometry(1, Math.max(6, Math.round(14 * detail)), Math.max(8, Math.round(22 * detail))); g.rotateX(Math.PI / 2);
   const p = g.attributes.position, cols = [], b = C(base), t = C(tip);
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), u = (z + 1) / 2, r = Math.max(1e-4, Math.hypot(x, y));
@@ -770,12 +772,21 @@ export function makeBeam(height, radius, color = 0x7a00ff, strength = 0.6) {
 }
 
 /** A Rune Circle: seven carved standing stones, a dais, a ground ring, the portal and a light column; the Keeper stands on the dais. */
+let _circleStones = null;
+function circleStonesGeometry() {
+  if (_circleStones) return _circleStones;
+  const R = 2.6, geos = [], o = new THREE.Object3D();
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2 + 0.2, h = 1.3 * (0.9 + 0.2 * ((i * 37) % 7) / 7);
+    o.scale.setScalar(h / 2); o.position.set(Math.cos(a) * R, h * 0.43, Math.sin(a) * R); o.rotation.set(0, -a + Math.PI / 2, ((i * 53) % 9 - 4) * 0.012); o.updateMatrix();
+    geos.push(standingStoneGeometry().clone().applyMatrix4(o.matrix));
+  }
+  _circleStones = mergeGeometries(geos); geos.forEach(g => g.dispose()); _circleStones.userData.shared = true;
+  return _circleStones;
+}
 export function makeCircle(keeperId) {
   const g = new THREE.Group(), mat = runeMaterial(1, 0.42), R = 2.6;
-  for (let i = 0; i < 7; i++) {
-    const a = i / 7 * Math.PI * 2 + 0.2, h = 1.3 * (0.9 + 0.2 * ((i * 37) % 7) / 7), st = new THREE.Mesh(standingStoneGeometry(), mat);
-    st.scale.setScalar(h / 2); st.position.set(Math.cos(a) * R, h * 0.43, Math.sin(a) * R); st.rotation.set(0, -a + Math.PI / 2, ((i * 53) % 9 - 4) * 0.012); g.add(st);
-  }
+  g.add(new THREE.Mesh(circleStonesGeometry(), mat)); // the seven standing stones, one shape (one draw, not seven)
   const dais = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.15, 0.16, 40), new THREE.MeshStandardMaterial({ color: 0x3d4275, roughness: 0.8 }));
   dais.position.y = 0.08; g.add(dais);
   const ring = new THREE.Mesh(new THREE.RingGeometry(3.15, 3.32, 96), new THREE.MeshBasicMaterial({ color: 0x7a00ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
@@ -1254,17 +1265,35 @@ export function makeExplorer(look = {}, skin) {
 }
 
 // ---------- rustling leaves on the map: something is hiding here ----------
+// The leaves rustling where a Kiki hides (the distant Kikis on the map, often dozens at once). They move only as a
+// whole tuft, so the seven leaves are one shape, shared by every rustle along with its material and shadow: two draws
+// each instead of eight, and nothing new to make (or leak) as they come and go while you walk.
+let rustleKit = null;
+function rustleParts() {
+  if (rustleKit) return rustleKit;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const tuftAt = detail => {
+    const geos = [];
+    for (let i = 0; i < 7; i++) {
+      const g = leafGeometry(0.5, 0.8, 0x2f9e24, 0x9be36a, true, detail);
+      m4.compose(new THREE.Vector3(), q.setFromEuler(e.set(-(0.95 + (i % 3) * 0.18), i / 7 * Math.PI * 2, 0, 'YXZ')), new THREE.Vector3().setScalar(0.8 + (i % 2) * 0.25));
+      geos.push(g.applyMatrix4(m4));
+    }
+    const t = mergeGeometries(geos); geos.forEach(g => g.dispose()); t.userData.shared = true; return t;
+  };
+  return rustleKit = {
+    tuft: tuftAt(1), tuftFar: tuftAt(0.45), // (far away a rustle is a few pixels: a quarter of the triangles looks the same)
+    mat: plush({ color: 0xffffff, vertexColors: true, roughness: 0.3 }, 0.3),
+    shadowGeo: Object.assign(new THREE.PlaneGeometry(2.4, 2.4), { userData: { shared: true } }), shadowMat: new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x0d0a26, transparent: true, opacity: 0.3, depthWrite: false }),
+  };
+}
 export function makeRustle() {
-  const g = new THREE.Group(), tuft = new THREE.Group(); g.add(tuft);
-  const m = plush({ color: 0xffffff, vertexColors: true, roughness: 0.3 }, 0.3);
-  for (let i = 0; i < 7; i++) {
-    const leaf = new THREE.Mesh(leafGeometry(0.5, 0.8, 0x2f9e24, 0x9be36a, true), m);
-    leaf.rotation.set(-(0.95 + (i % 3) * 0.18), i / 7 * Math.PI * 2, 0, 'YXZ'); leaf.scale.setScalar(0.8 + (i % 2) * 0.25); tuft.add(leaf);
-  }
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x0d0a26, transparent: true, opacity: 0.3, depthWrite: false }));
-  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; g.add(shadow);
+  const K = rustleParts(), g = new THREE.Group(), tuft = new THREE.Mesh(K.tuft, K.mat); g.add(tuft);
+  const shadow = new THREE.Mesh(K.shadowGeo, K.shadowMat); shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; g.add(shadow);
   let t = Math.random() * 10, burst = 0;
   g.userData = {
+    /** far: a simpler tuft (and its rustle needn't be smooth) */
+    setFar(far) { tuft.geometry = far ? K.tuftFar : K.tuft; },
     update(dt) {
       t += dt; burst -= dt; if (burst < -1.6 - Math.random()) burst = 0.55;
       const k = burst > 0 ? Math.sin(burst * 40) * (burst / 0.55) : 0;
@@ -1359,3 +1388,6 @@ export function portrait(what, size = 256) {
   portraits.set(key, url); return url;
 }
 export { THREE };
+
+/** Free an object's own shapes from the graphics chip when it leaves for good (shared shapes stay). */
+export function dropShapes(root) { root.traverse(o => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); }); }
