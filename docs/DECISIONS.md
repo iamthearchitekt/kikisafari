@@ -635,3 +635,37 @@ leaves and a shadow), with new shapes and materials made for every one (and neve
   freed from the graphics chip when it's left behind (shared ones stay).
 Settled busy map, measured: 155 draws / 534k triangles a frame before today's passes, 107 / 528k now (including the
 new building shadows); graphics buffers in use 2,580 → 1,260. Kikis within 70 m stay full 3D: they're the stars.
+
+## 41. Kiki looks refined (owner)
+
+Owner: "Fairy Cairn Fern looks like shit, so do the mushrooms, make them better … no stickers on their stomachs … the
+owl Kiki looks dumb too, switch it to something else … Fuzz Kiki, find something else … you can be witchy and
+celestial … Puddle Kiki can be Wooder Kiki … do a massive refinement to the Kiki variants, dial in their looks so they
+don't appear dumb or half-assed". Every Kiki was rendered and reviewed; crowns that looked crude were rebuilt:
+- No tummy markings on any Kiki (they read as stickers). The data stays (look.belly) but isn't drawn.
+- Crowns can now have glowing parts (drawn unlit, so they shine): fairy lights, glowing mushroom spots, star bells,
+  the wizard's stars, aurora ribbons, the stone circle's rune.
+- Fairy Cairn Fern: a cairn of four smooth river stones (moss on the lower ones), a fern unfurling behind, open fronds
+  either side, and a tiny fairy (a glowing light with wings) above. Its Fluff is Fairy Cairn Fluff.
+- Shroom Kiki and Fungi Phil: proper toadstools: a domed cap with a curled rim, fine gills under it, raised spots, a
+  stem that swells at the foot with a skirt, and little ones beside it. Fungi Phil's cap glows at the rim, its spots
+  glow, and it has two little ones.
+- The owl family is now witchy and celestial: Hoot Kiki is Hex Kiki (a floppy witch's hat, crinkled, with a band, a
+  gold crescent charm and a star at the drooping tip); Lucid Wizard has a tall midnight wizard's hat with a gold band,
+  gold stars and a crescent on it, and a ring of little stars circling it.
+- The Fuzz family is celestial: Fuzz Kiki is Comet Kiki (a plump cushion star with three tails streaming back, gold to
+  pink to lilac); Clown Town Coco wears a celestial jester's hat (midnight and violet halves, two floppy points with
+  gold star bells, a gold band with Comet Kiki's star at the front).
+- Puddle Kiki is Wooder Kiki (owner's spelling). The water family's waves are rebuilt as real curling waves seen
+  side-on (deep blue to turquoise, white foam on the crest, spray): one for Wooder Kiki, two back to back for Swimmin'
+  Hole Sid, three for Tide Kiki and Tidecaller (whose spray glows).
+- Also rebuilt: Acorn Kiki (a scaly acorn cap like a beret, curly stem, oak leaves); Hilltop Hank (a little oak with
+  a soft, lumpy canopy, branches and hanging acorns); Lily and Lotus Kiki (a veined lily pad worn like a beret and a
+  cupped, layered flower; the lotus round a seed pod); Marshmallow Kiki (a big toasted marshmallow with a drip,
+  skewered on a twig); Pebble Kiki (smooth pebbles); Stone Circle Steve (a little stone circle with a lintel on a
+  grassy mound, a rune glowing in the middle); Dusk Kiki and Portal Wookie (the moon now sits on the head instead of
+  floating; Portal Wookie's has a swirling portal behind it and orbiting stars); Sunburst Kiki (a sun medallion with
+  wavy flame rays); Aurora Kiki (glowing ribbons of northern lights); Summit Kiki (craggy peaks with ridges, a jagged
+  snowline and a flag); Hemlock Holly's frosted tips are a soft frost green instead of metallic white.
+- Stars everywhere are soft cushion shapes. The heaviest Kiki is now ~33k triangles (was ~24k), still light enough
+  for the map and catches.
