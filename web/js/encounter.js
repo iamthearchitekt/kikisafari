@@ -557,7 +557,9 @@ export class Encounter {
   }
 
   finish(why) {
-    this.state = 'done'; this.unbind(); this.scene.remove(this.group); $('enc-hud').hidden = true; $('hud').hidden = false; $('enc-tap').disabled = false; this.hint(null);
+    this.state = 'done'; this.unbind(); this.scene.remove(this.group);
+    // free this catch's buffers on the graphics chip (shared shapes are simply sent again next time they're drawn)
+    this.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); $('enc-hud').hidden = true; $('hud').hidden = false; $('enc-tap').disabled = false; this.hint(null);
     this.onDone(why);
   }
 }

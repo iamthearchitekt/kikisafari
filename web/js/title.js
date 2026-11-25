@@ -11,6 +11,7 @@ import { liveStage } from './ui.js';
 import { realTree, realFern, realBush, leafMass, taperedTube, barkMaterial, blade, lawn } from './foliage.js';
 import { light } from './lux.js';
 import { reducedMotion } from './services.js';
+import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 
 const C = h => new THREE.Color(h);
 const LEAF = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); // grass and leaves: matte, cheap
@@ -164,6 +165,7 @@ export function startTitle(host) {
           if (i % 4 === 2) { const m = mushrooms(0.22, [0x4fd8ff, 0xff4fd8, 0xb46bff][i % 3]); m.position.set(x - 0.1, y - 0.04, 4.3); m.rotation.y = i; frame.add(m); } }
         const { hh: h2, hw: w2 } = at(5.2);
         for (const s of [-1, 1]) for (let j = 0; j < 3; j++) { const l = new THREE.Mesh(leafGeometry(0.42, 0.75, 0x10462a, 0x5fc95a, true), LEAF); l.scale.setScalar(h2 * (0.32 + j * 0.06)); l.position.set(s * w2 * (1.02 + j * 0.02), cam.position.y - h2 * (1.02 - j * 0.1), 5.2 - j * 0.15); l.rotation.set(-(0.9 + j * 0.25), s * (-0.55 - j * 0.35), 0, 'YXZ'); frame.add(l); } }
+      bake(frame);
     };
     // Kiki pops out of the portal and lands in the clearing, then waves and dances.
     const k = makeKiki('meadow', 1.35), m = new KikiMotion(k, reducedMotion), base = k.scale.x, home = new THREE.Vector3(0, -1.06, -0.2);
@@ -198,4 +200,26 @@ export function startTitle(host) {
       sparkles.update(dt);
     } };
   });
+}
+
+/** The frame of trees, ferns, bushes, grass and flowers never moves once placed, so its hundreds of little meshes are
+ *  baked into one mesh per material (about 540 separate draws a frame on the title screen before). Instanced leaves,
+ *  see-through pieces and anything animated are left as they are. */
+function bake(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), buckets = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || o.material.transparent || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender) return;
+    const g = o.geometry, sig = Object.keys(g.attributes).sort().join() + (g.index ? '|i' : '|n') + '|' + o.material.uuid;
+    const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), c = g.clone().applyMatrix4(m);
+    if (m.determinant() < 0 && c.index) { const ix = c.index.array; for (let i = 0; i < ix.length; i += 3) { const t = ix[i]; ix[i] = ix[i + 2]; ix[i + 2] = t; } } // mirrored: keep faces facing out
+    if (!buckets.has(sig)) buckets.set(sig, { mat: o.material, geos: [], objs: [] });
+    const b = buckets.get(sig); b.geos.push(c); b.objs.push(o);
+  });
+  for (const { mat, geos, objs } of buckets.values()) {
+    if (geos.length < 2) continue;
+    const g = mergeGeometries(geos, false); geos.forEach(x => x.dispose()); if (!g) continue;
+    const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; root.add(mesh);
+    for (const o of objs) o.parent.remove(o);
+  }
 }

@@ -597,3 +597,27 @@ Simulated test (a textured room; the phone held at a floor spot ~2 m away, swayi
 with the surface lock 1 px on average (worst 2 px on a rug, 3 px carpet, 5 px wood), shake under 0.5 px per frame. A
 blank floor gets no lock and behaves as before. Walking half a metre while Kiki is out of view and coming back:
 found again on a rug; on harder floors Kiki is glued to the spot its feet are on when it comes back.
+
+## 39. Speed and polish pass (owner)
+
+Owner: "any optimisations possible? … any suggestions or things you can find in deep audits to improve overall
+experiences, especially visually … any overall improvements welcomed". A measured audit of every screen (draw calls,
+triangles, script time, memory, downloads) and a screenshot tour at phone size found:
+- The map kept drawing at full cost behind every full-screen page (Kikis, a Kiki, the bag, shop, eggs, tasks, the
+  look picker, the caught screen) and behind battles' own 3D stage. Now the game checks whether an opaque page covers
+  the whole screen and draws nothing underneath. Kikis list: ~110 draws / 470k triangles a frame → 0; battle 171 /
+  513k → 70 / 73k; look picker 135 / 533k → 29 / 82k; caught screen 22 / 101k → 6 / 13k.
+- Every start downloaded and unpacked every outfit and hairstyle (several MB) two seconds in, for the look picker most
+  visits never open. Now only your own explorer loads at start (Ranger Rue a few seconds later for returning
+  explorers); the rest loads when Change look opens (it already showed a loading badge). First download 3.25 MB →
+  2.4 MB (3D models 1.55 MB → 0.7 MB), and no background unpacking while you play.
+- Each catch left its shapes on the graphics chip; they're freed when the catch ends.
+- The title screen drew ~540 separate pieces a frame (each fern, flower, mushroom and grass tuft). The frame never
+  moves, so it's baked into one mesh per material after it's placed: 540 → 203 draws, looking the same.
+- Map: buildings now cast soft shadows, which makes the map read as 3D (it looked flat, especially by day). Like a
+  board game's drop shadows they always fall towards the lower right of the screen, so they're seen whichever way the
+  map turns. They're kept light: one convex shape per building slid on the graphics chip, never longer than the
+  building is wide, darkened once where they overlap (stencil): ~30k triangles on a dense map (a first version with
+  extruded sides cost 214k and was cut).
+- The map credits were a three-line white box over the top-right corner, often on top of a Kiki: now one slim line.
+- Full-screen pages get a softer background (a glow at the top, a faint dot pattern, a hint of purple at the bottom).

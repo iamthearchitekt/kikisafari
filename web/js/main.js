@@ -7,7 +7,7 @@ import * as R from './rules.js';
 import { WorldView, Location, OsmLoader, drawRadar } from './world.js';
 import { StreetMap } from './map.js';
 import { Encounter } from './encounter.js';
-import { portrait, lookOf, encodeLook, preloadExplorer, loadExplorerKit, forgetExplorerPortraits } from './art.js';
+import { portrait, lookOf, encodeLook, preloadExplorer, forgetExplorerPortraits } from './art.js';
 import { openMenu, openExplorer, nearbyPanel, stopPanel, levelUps, confirm, openSettings } from './ui.js';
 import { runTutorial, spawnStarters } from './tutorial.js';
 import { loadWeather, mods, openEvents, did, walked, openEggs, openTasks, openMedals } from './phase2.js';
@@ -36,7 +36,7 @@ app.syncProfile = () => app.online && app.online.signedIn ? syncProfile(app) : n
 app.osm = new OsmLoader();
 
 // ---------- rendering ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), alpha: true, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas: $('gl'), alpha: true, antialias: true, stencil: true }); // (stencil: building shadows on the map)
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0); premium(renderer);
 app.world = new WorldView(app);
 app.map = new StreetMap(app);
@@ -45,8 +45,11 @@ app.osm.listeners.push((cell, area) => app.map.addArea(cell, area));
 // outfit for your body and every hairstyle in the background for the look picker (friends' looks load when shown).
 // Ranger Rue (the guide, outfit 4) comes along, since she greets new explorers straight away.
 const freshPortraits = () => { forgetExplorerPortraits(); document.querySelectorAll('img.who').forEach(im => { im.src = portrait('explorer-full:4:3', 384); }); };
-Promise.all([preloadExplorer(lookOf(app.progress.explorer)), preloadExplorer(lookOf({ outfit: 4 }))]).then(() => { freshPortraits(); app.map.setExplorer(); }).catch(() => {})
-  .finally(() => setTimeout(() => loadExplorerKit(lookOf(app.progress.explorer).sex).then(freshPortraits).catch(() => {}), 2000));
+// Every other outfit and hairstyle (several MB) is only loaded when the look picker opens (it shows a loading badge),
+// not in the background at every start: that cost data and stutter on the map for a screen most visits never open.
+const rue = () => preloadExplorer(lookOf({ outfit: 4 })).then(freshPortraits).catch(() => {});
+preloadExplorer(lookOf(app.progress.explorer)).then(() => { freshPortraits(); app.map.setExplorer(); }).catch(() => {})
+  .finally(() => { if (app.progress.tutorial === 'done') setTimeout(rue, 6000); else rue(); });
 light(renderer, app.map.scene, 'day', 0.5); light(renderer, app.world.scene, 'day', 0.6); // soft reflections on Kikis, stones and circles
 // The camera picture, sky and 3D layers cover the whole screen (CSS: 100lvh). Their real size is measured from the
 // canvas: on iOS 26 Safari, innerHeight stops short of the screen under the floating toolbar (owner's friend, iPhone 17:
@@ -271,6 +274,21 @@ const keys = {};
 addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; keys[e.key.toLowerCase()] = true; if (e.key === 'Shift') keys.shift = true; });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === 'Shift') keys.shift = false; });
 
+// ---------- full-screen pages ----------
+// A page with its own opaque background covering the whole screen (Kikis, a Kiki, the bag, the shop, a battle, the
+// caught screen…) hides the game completely, so the map or camera view isn't drawn underneath it. (It used to be: the
+// map at full cost every frame behind every page, and in battles behind the battle's own 3D stage.)
+let covered = false, coverTick = 0;
+function checkCovered() {
+  covered = false;
+  for (const el of $('overlay').children) {
+    const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.99) continue;
+    const r = el.getBoundingClientRect(); if (r.left > 1 || r.top > 1 || r.right < view.w - 1 || r.bottom < view.h - 1) continue;
+    if (cs.backgroundImage !== 'none' || /^rgb\(/.test(cs.backgroundColor)) { covered = true; return; } // rgba(…) is see-through
+  }
+}
+new MutationObserver(checkCovered).observe($('overlay'), { childList: true });
+
 // ---------- loop ----------
 let last = performance.now(), time = 0, hudTick = 0, walkFix = null;
 function frame(now) {
@@ -281,11 +299,13 @@ function frame(now) {
   if (!$('game').hidden && app.loc.fix) {
     app.loc.simWalk(keys, app.mapMode ? (app.map.yaw || 0) : app.world.orient.heading, dt);
     app.world.update(dt);
+    if ((coverTick -= dt) <= 0) { coverTick = 0.25; checkCovered(); } // (pages fade and slide in: look again now and then)
     // AR with the camera live: pin the view to the camera picture so nothing drifts (vtrack.js)
     const o = app.world.orient, v = $('cam');
-    if (stream && cameraWanted() && o.have && !o.locked && v.readyState >= 2) app.world.vlock.update(v, view.w, view.h); else if (app.world.vlock.on) app.world.vlock.stop();
+    if (stream && cameraWanted() && o.have && !o.locked && v.readyState >= 2 && !covered) app.world.vlock.update(v, view.w, view.h); else if (app.world.vlock.on && !covered) app.world.vlock.stop();
     if (app.encounter && app.encounter.update) app.encounter.update(dt, time);
-    if (app.mapMode && !app.encounter) { app.map.update(dt, time, app.loc.fix, app.world.orient.facing, app.world.things); renderer.render(app.map.scene, app.map.camera); }
+    if (covered) { /* nothing to see under the page */ }
+    else if (app.mapMode && !app.encounter) { app.map.update(dt, time, app.loc.fix, app.world.orient.facing, app.world.things); renderer.render(app.map.scene, app.map.camera); }
     else renderer.render(app.world.scene, app.world.camera);
     if ((hudTick -= dt) <= 0) { hudTick = 0.1; hud(); }
   } else if (!$('game').hidden) {

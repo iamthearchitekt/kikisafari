@@ -100,7 +100,8 @@ button { font: inherit; color: inherit; }
 .chip .ds { color: var(--muted); }
 .chip .ar { width: 18px; height: 18px; flex: none; }
 .chip.near { background: #fff27a; }
-.attribution { display: block; max-width: 120px; text-align: right; line-height: 1.2; text-decoration: none; padding: 2px 6px; font-size: 9px; font-weight: 600; color: var(--navy); background: rgba(255, 255, 255, .7); border-radius: 6px; }
+/* the map credits: one slim line (it used to be a three-line box that sat over Kikis at the top right) */
+.attribution { display: block; white-space: nowrap; text-align: right; line-height: 1.3; text-decoration: none; padding: 1px 6px; font-size: 8px; font-weight: 600; color: var(--navy); background: rgba(255, 255, 255, .45); border-radius: 5px; opacity: .85; }
 #enc-hud .namecard { display: flex; flex-direction: column; align-items: center; padding: 2px 16px 6px; }
 #enc-hud .namecard .pp { font-family: 'Lilita One'; font-size: 15px; letter-spacing: .5px; color: var(--muted); }
 #enc-hud .namecard b { font-family: 'Lilita One'; font-weight: 400; font-size: 22px; }
@@ -193,7 +194,7 @@ body:has(#enc-hud:not([hidden])) #toasts { bottom: auto; top: calc(var(--sat) + 
 .rite .tip { position: absolute; left: 0; right: 0; bottom: calc(var(--sab) + 26px); font-size: 15px; opacity: .8; }
 
 /* Menu screens (Phase 1) */
-.screen-sheet { position: absolute; inset: 0; background: linear-gradient(#bfe6ff, #e8f6ff); display: flex; flex-direction: column; padding: calc(var(--sat) + 10px) 12px calc(var(--sab) + 10px); overflow: hidden; }
+.screen-sheet { position: absolute; inset: 0; background: radial-gradient(130% 55% at 50% -8%, rgba(255,255,255,.75), rgba(255,255,255,0) 62%), radial-gradient(90% 45% at 50% 108%, rgba(160,120,255,.16), rgba(160,120,255,0) 70%), radial-gradient(circle, rgba(24,35,122,.05) 1.2px, transparent 1.6px) 0 0 / 22px 22px, linear-gradient(#bfe6ff, #e8f6ff); display: flex; flex-direction: column; padding: calc(var(--sat) + 10px) 12px calc(var(--sab) + 10px); overflow: hidden; }
 .screen-sheet.dark { background: linear-gradient(#2a165e, #170a3d); color: #fff; }
 .sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .sheet-head h2 { flex: 1; margin: 0; font-family: 'Lilita One'; font-weight: 400; font-size: 30px; color: #fff; -webkit-text-stroke: 2.5px var(--navy); paint-order: stroke fill; text-shadow: 0 4px 0 var(--navy); }

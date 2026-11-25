@@ -56,7 +56,7 @@ function inset(ring, d) {
   }
   return out;
 }
-function building(layer, pts, h, pal, holes = []) {
+function building(layer, pts, h, pal, holes = [], shadows = null) {
   let ring = openRing(pts); if (ring.length < 3) return;
   ring = inset(ring, 0.15);
   h += (Math.abs(Math.round(ring[0].x * 13.7 + ring[0].z * 5.3)) % 17) * 0.035; // each roof at its own height, never level with a neighbour's
@@ -72,6 +72,44 @@ function building(layer, pts, h, pal, holes = []) {
     layer.tri([a.x, split, a.z], [b.x, split, b.z], [b.x, h, b.z], rim, rim, rim); layer.tri([a.x, split, a.z], [b.x, h, b.z], [a.x, h, a.z], rim, rim, rim);
   }
   flat(layer, ring, h, new THREE.Color(pal.roof).multiplyScalar(vary), holes);
+  if (shadows) shadows.add(ring, h);
+}
+// Each building casts a soft shadow on the ground. Like a board game's drop shadows they always fall towards the lower
+// right of the screen (so they're seen whichever way the map is turned, never hidden behind the building): the
+// building's outline (its convex hull), slid along on the graphics chip (uDir, set as the map turns), so the shapes are
+// built once. Kept light: one plain shape per building (a few triangles), its slide never longer than the building is
+// wide so it always joins the building; one mesh per area, darkened once where shadows overlap (stencil).
+const SHADOW_Y = 0.059;
+function hull(pts) {
+  const p = pts.slice().sort((a, b) => a.x - b.x || a.z - b.z), cross = (o, a, b) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x), lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+class ShadowLayer {
+  constructor() { this.pos = []; this.lift = []; this.idx = []; }
+  add(ring, h) {
+    const H = hull(ring), n = H.length; if (n < 3) return;
+    let A = 0, P = 0; for (let i = 0; i < n; i++) { const a = H[i], b = H[(i + 1) % n]; A += a.x * b.z - b.x * a.z; P += Math.hypot(b.x - a.x, b.z - a.z); }
+    const lift = Math.min(h, 4 * Math.abs(A / 2) / P), k = this.pos.length / 3; // (slide = lift × 0.5: at most about the building's width)
+    for (const q of H) { this.pos.push(q.x, SHADOW_Y, q.z); this.lift.push(lift); }
+    for (let i = 1; i < n - 1; i++) this.idx.push(k, k + i, k + i + 1);
+  }
+  geometry() {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('aLift', new THREE.Float32BufferAttribute(this.lift, 1));
+    g.setIndex(this.pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1)); return g;
+  }
+}
+function shadowMaterial() {
+  const m = new THREE.MeshBasicMaterial({ color: 0x1a1048, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide,
+    stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+  const dir = { value: new THREE.Vector2(0.25, 0.38) }; m.userData.dir = dir.value;
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uDir = dir;
+    sh.vertexShader = 'attribute float aLift;\nuniform vec2 uDir;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xz += aLift * uDir;');
+  };
+  m.customProgramCacheKey = () => 'mapShadow';
+  return m;
 }
 
 // ---------- trees in parks and woods (premium part 2): stylised, board-game trees, all instanced ----------
@@ -116,6 +154,7 @@ export class StreetMap {
     this.origin = null; this.built = new Set(); this.waiting = []; this.views = new Map(); this.dist = 230; this.yaw = null; this.night = false; this.player = this.makePlayer(); this.scene.add(this.player); this.walkSpeed = 0; this.facing = 0;
     this.mats = [0, 1, 2, 3, 4].map(i => { const m = new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false, side: THREE.DoubleSide }); return m; });
     this.buildMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    this.shadowMat = shadowMaterial();
   }
   pal() { return this.night ? NIGHT : DAY; }
   local(p) { const l = C.toLocal(this.origin, p); return new THREE.Vector3(l.e, 0, -l.n); }
@@ -125,6 +164,7 @@ export class StreetMap {
     this.origin = { ...me }; this.night = C.isNight(me, new Date()) || this.app.debugNight();
     this.scene.background = new THREE.Color(this.pal().land);
     this.scene.fog = new THREE.Fog(this.pal().land, 400, 900); // the map fades softly into the distance
+    this.shadowMat.opacity = this.night ? 0.3 : 0.16; this.shadowMat.color.set(this.night ? 0x05030f : 0x1a1048);
     this.makeSky();
     // Areas that loaded before the map was first opened.
     for (const [cell, area] of this.waiting.splice(0)) this.addArea(cell, area);
@@ -134,7 +174,7 @@ export class StreetMap {
     const key = cell.x + ':' + cell.y; if (this.built.has(key)) return;
     if (!this.origin) { this.waiting.push([cell, area]); return; }
     this.built.add(key);
-    const pal = this.pal(), L = [new Layer(), new Layer(), new Layer(), new Layer(), new Layer()], B = new Layer();
+    const pal = this.pal(), L = [new Layer(), new Layer(), new Layer(), new Layer(), new Layer()], B = new Layer(), S = new ShadowLayer();
     const o = C.toLocal(this.origin, area.origin), P = f => f.local.map(p => ({ x: p.e + o.e, z: -(p.n + o.n) })), Hs = f => (f.holesLocal || []).map(h => h.map(p => ({ x: p.e + o.e, z: -(p.n + o.n) })));
     for (const f of area.features) {
       switch (f.kind) {
@@ -146,12 +186,13 @@ export class StreetMap {
         case 'road': { const w = roadHalf(f.cat) * 2; ribbon(L[2], P(f), w + 2.2, 0.04, pal.casing); ribbon(L[3], P(f), w, 0.05, MAJOR.has(f.cat) ? pal.main : pal.road); break; }
         case 'path': ribbon(L[4], P(f), f.cat === 'pedestrian' ? 6 : 2.4, 0.055, pal.path); break;
         case 'rail': ribbon(L[4], P(f), 2.2, 0.058, pal.rail); break;
-        case 'building': if (f.poly) building(B, P(f), Math.min(24, f.height * 0.8), pal, Hs(f)); break;
+        case 'building': if (f.poly) building(B, P(f), Math.min(24, f.height * 0.8), pal, Hs(f), S); break;
       }
     }
     const g = new THREE.Group();
     L.forEach((l, i) => { if (!l.pos.length) return; const m = new THREE.Mesh(l.geometry(), this.mats[i]); m.renderOrder = -10 + i; g.add(m); });
     if (B.pos.length) g.add(new THREE.Mesh(B.geometry(), this.buildMat));
+    if (S.pos.length) { const sm = new THREE.Mesh(S.geometry(), this.shadowMat); sm.frustumCulled = false; g.add(sm); } // (slid on the chip: its box isn't where it's drawn)
     // trees in the parks and woods, kept clear of this area's Rune Circles and supply stops
     const entry = this.app.osm && this.app.osm.data.cells.get(cell.x + ':' + cell.y), avoid = entry ? [...entry.stops, ...entry.circles].map(t => area.local(t.where)) : [];
     const trees = parkTrees(area, o, pal, avoid, this.night); if (trees) g.add(trees);
@@ -206,6 +247,8 @@ export class StreetMap {
     const h = this.yaw * Math.PI / 180, tilt = 54 * Math.PI / 180, f = new THREE.Vector3(Math.sin(h), 0, -Math.cos(h));
     this.camera.position.copy(this.player.position).addScaledVector(f, -this.dist * Math.cos(tilt)).add(new THREE.Vector3(0, this.dist * Math.sin(tilt), 0));
     this.camera.lookAt(this.player.position);
+    // building shadows fall towards the lower right of the screen, about half a building's height long
+    const right = new THREE.Vector3(Math.cos(h), 0, Math.sin(h)); this.shadowMat.userData.dir.set((right.x * 0.55 - f.x * 0.85) * 0.5, (right.z * 0.55 - f.z * 0.85) * 0.5);
     const keep = new Set();
     for (const t of things) {
       if (t.distance > 400) continue; keep.add(t.id);
